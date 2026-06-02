@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>面试知识复习库</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ===== Layer Architecture Diagram ===== */
+    .sys-arch {
+      position: relative;
+      margin: 2rem 0;
+    }
+    .sys-layer {
+      display: flex;
+      align-items: stretch;
+      margin-bottom: 2px;
+    }
+    .sys-layer-label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      padding: 0.8rem 0.6rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      letter-spacing: 0.15em;
+      border-radius: 10px 0 0 10px;
+      min-width: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .sys-layer-content {
+      flex: 1;
+      display: grid;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 0 10px 10px 0;
+      background: rgba(255,255,255,0.02);
+    }
+    .sys-layer-content.cols-1 { grid-template-columns: 1fr; }
+    .sys-layer-content.cols-2 { grid-template-columns: 1fr 1fr; }
+    .sys-layer-content.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .sys-layer-content.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .sys-layer-content.cols-5 { grid-template-columns: repeat(5, 1fr); }
+    .sys-layer-content.cols-6 { grid-template-columns: repeat(6, 1fr); }
+
+    .sys-item {
+      padding: 0.55rem 0.7rem;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1.5px solid;
+      transition: all 0.2s;
+      cursor: default;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sys-item.done {
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .sys-item.done:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .sys-item .item-name { font-weight: 700; }
+    .sys-item .item-sub {
+      font-size: 0.68rem;
+      font-weight: 400;
+      opacity: 0.7;
+      line-height: 1.3;
+    }
+
+    /* Color variants */
+    .si-blue   { border-color: #38bdf8; background: rgba(56,189,248,0.08); }
+    .si-purple { border-color: #818cf8; background: rgba(129,140,248,0.08); }
+    .si-green  { border-color: #34d399; background: rgba(52,211,153,0.08); }
+    .si-orange { border-color: #fb923c; background: rgba(251,146,60,0.08); }
+    .si-pink   { border-color: #f472b6; background: rgba(244,114,182,0.08); }
+    .si-cyan   { border-color: #22d3ee; background: rgba(34,211,238,0.08); }
+    .si-yellow { border-color: #facc15; background: rgba(250,204,21,0.08); }
+    .si-red    { border-color: #f87171; background: rgba(248,113,113,0.08); }
+
+    /* Category headers */
+    .cat-section {
+      margin-bottom: 2.5rem;
+    }
+    .cat-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 2px solid var(--surface2);
+    }
+    .cat-header .cat-icon {
+      font-size: 1.5rem;
+    }
+    .cat-header .cat-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+    .cat-header .cat-desc {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+      gap: 10px;
+    }
+
+    .cat-item {
+      padding: 0.75rem 0.6rem;
+      border-radius: 10px;
+      text-align: center;
+      border: 1.5px solid;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      cursor: default;
+    }
+    .cat-item a {
+      text-decoration: none;
+      color: inherit;
+    }
+    .cat-item.clickable {
+      cursor: pointer;
+    }
+    a.cat-item {
+      display: flex;
+      text-decoration: none;
+      color: var(--text);
+    }
+    a.cat-item:hover {
+      text-decoration: none;
+    }
+    .cat-item.clickable:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    .cat-item .ci-name { font-weight: 700; }
+    .cat-item .ci-sub {
+      font-size: 0.7rem;
+      opacity: 0.65;
+      line-height: 1.3;
+    }
+    .cat-item .ci-tag {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.5rem;
+      border-radius: 99px;
+      margin-top: 2px;
+      align-self: center;
+    }
+
+    /* Full-width separator */
+    .layer-sep {
+      text-align: center;
+      padding: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.3em;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: flex;
+      gap: 1.2rem;
+      margin: 1.5rem 0;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .stat-pill .sp-num {
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
+    /* Relation arrows between sections */
+    .rel-note {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      padding: 0.3rem 0;
+      font-style: italic;
+    }
+
+    @media (max-width: 768px) {
+      .cat-grid { grid-template-columns: repeat(2, 1fr); }
+      .sys-layer { flex-direction: column; }
+      .sys-layer-label {
+        writing-mode: horizontal-tb;
+        padding: 0.4rem;
+        border-radius: 10px 10px 0 0;
+        min-width: auto;
+      }
+      .sys-layer-content { border-radius: 0 0 10px 10px; grid-template-columns: 1fr 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">📚 面试知识复习库</a>
+      <span style="color:var(--text-dim); font-size:0.85rem;">求职备战 · 系统复习</span>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>面试知识复习库</h1>
+    <p class="subtitle">按系统架构分层，逐一击破核心技术栈</p>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-pill"><span class="sp-num" style="color:var(--accent);">45</span> 个技术主题</div>
+      <div class="stat-pill"><span class="sp-num" style="color:var(--accent3);">5</span> 已完成</div>
+      <div class="stat-pill"><span class="sp-num" style="color:var(--accent4);">40</span> 待编写</div>
+      <div class="stat-pill"><span class="sp-num" style="color:var(--accent2);">8</span> 个分类</div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- System Architecture Overview -->
+    <!-- ============================================================ -->
+    <h2><span class="icon">🏗️</span>系统架构全景图</h2>
+
+    <div class="diagram">
+      <div class="diagram-title">技术栈在系统架构中的位置关系</div>
+      <div class="sys-arch">
+
+        <!-- Layer: 客户端 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(56,189,248,0.12); color:#38bdf8; border:1.5px solid #38bdf8;">客户端</div>
+          <div class="sys-layer-content cols-3">
+            <div class="sys-item si-blue"><span class="item-name">React</span><span class="item-sub">UI 框架</span></div>
+            <div class="sys-item si-blue"><span class="item-name">Vue</span><span class="item-sub">渐进式框架</span></div>
+            <div class="sys-item si-blue"><span class="item-name">Webpack / Vite</span><span class="item-sub">构建工具</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; HTTP / HTTPS / WebSocket &nbsp; ▼</div>
+
+        <!-- Layer: 接入层 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(34,211,238,0.12); color:#22d3ee; border:1.5px solid #22d3ee;">接入层</div>
+          <div class="sys-layer-content cols-4">
+            <div class="sys-item si-cyan"><span class="item-name">Nginx</span><span class="item-sub">反向代理 / 负载均衡</span></div>
+            <div class="sys-item si-cyan"><span class="item-name">Netty</span><span class="item-sub">高性能网络框架</span></div>
+            <div class="sys-item si-cyan"><span class="item-name">Gateway</span><span class="item-sub">API 网关</span></div>
+            <div class="sys-item si-cyan"><span class="item-name">CDN</span><span class="item-sub">内容分发</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 服务调用 (REST / gRPC / Dubbo) &nbsp; ▼</div>
+
+        <!-- Layer: 服务层 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(129,140,248,0.12); color:#818cf8; border:1.5px solid #818cf8;">服务层</div>
+          <div class="sys-layer-content cols-5">
+            <div class="sys-item si-purple"><span class="item-name">Spring</span><span class="item-sub">IoC / AOP</span></div>
+            <div class="sys-item si-purple"><span class="item-name">Spring Boot</span><span class="item-sub">自动配置</span></div>
+            <div class="sys-item si-purple"><span class="item-name">Spring Cloud</span><span class="item-sub">微服务全家桶</span></div>
+            <div class="sys-item si-purple"><span class="item-name">Dubbo</span><span class="item-sub">RPC 框架</span></div>
+            <div class="sys-item si-purple"><span class="item-name">gRPC</span><span class="item-sub">跨语言 RPC</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 治理 · 协调 · 可观测 &nbsp; ▼</div>
+
+        <!-- Layer: 治理层 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(244,114,182,0.12); color:#f472b6; border:1.5px solid #f472b6;">治理层</div>
+          <div class="sys-layer-content cols-6">
+            <div class="sys-item si-pink"><span class="item-name">Nacos</span><span class="item-sub">注册 / 配置中心</span></div>
+            <div class="sys-item si-pink"><span class="item-name">Zookeeper</span><span class="item-sub">分布式协调</span></div>
+            <div class="sys-item si-pink"><span class="item-name">Sentinel</span><span class="item-sub">限流 / 熔断</span></div>
+            <div class="sys-item si-pink"><span class="item-name">Seata</span><span class="item-sub">分布式事务</span></div>
+            <div class="sys-item si-pink"><span class="item-name">SkyWalking</span><span class="item-sub">链路追踪</span></div>
+            <div class="sys-item si-pink"><span class="item-name">ELK</span><span class="item-sub">日志收集</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 读写请求 &nbsp; ▼</div>
+
+        <!-- Layer: 存储层 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(251,146,60,0.12); color:#fb923c; border:1.5px solid #fb923c;">存储层</div>
+          <div class="sys-layer-content cols-6">
+            <div class="sys-item si-orange"><span class="item-name">MySQL</span><span class="item-sub">关系型 · 事务</span></div>
+            <div class="sys-item si-orange"><span class="item-name">Redis</span><span class="item-sub">缓存 · 高速KV</span></div>
+            <div class="sys-item si-orange"><span class="item-name">MongoDB</span><span class="item-sub">文档数据库</span></div>
+            <div class="sys-item si-orange"><span class="item-name">Elasticsearch</span><span class="item-sub">搜索引擎</span></div>
+            <div class="sys-item si-orange"><span class="item-name">TiDB</span><span class="item-sub">分布式 SQL</span></div>
+            <div class="sys-item si-orange"><span class="item-name">HBase</span><span class="item-sub">列式存储</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 异步消息 · 流处理 &nbsp; ▼</div>
+
+        <!-- Layer: 消息/流 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(52,211,153,0.12); color:#34d399; border:1.5px solid #34d399;">消息 & 流</div>
+          <div class="sys-layer-content cols-5">
+            <div class="sys-item si-green"><span class="item-name">Kafka</span><span class="item-sub">高吞吐消息队列</span></div>
+            <div class="sys-item si-green"><span class="item-name">RocketMQ</span><span class="item-sub">金融级 MQ</span></div>
+            <div class="sys-item si-green"><span class="item-name">RabbitMQ</span><span class="item-sub">AMQP 消息代理</span></div>
+            <div class="sys-item si-green"><span class="item-name">Flink</span><span class="item-sub">实时流计算</span></div>
+            <div class="sys-item si-green"><span class="item-name">Spark</span><span class="item-sub">批处理 / ML</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 基础支撑 &nbsp; ▼</div>
+
+        <!-- Layer: 底层 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(250,204,21,0.12); color:#facc15; border:1.5px solid #facc15;">基础设施</div>
+          <div class="sys-layer-content cols-5">
+            <div class="sys-item si-yellow"><span class="item-name">Docker</span><span class="item-sub">容器化</span></div>
+            <div class="sys-item si-yellow"><span class="item-name">Kubernetes</span><span class="item-sub">容器编排</span></div>
+            <div class="sys-item si-yellow"><span class="item-name">Jenkins / GitLab CI</span><span class="item-sub">CI/CD</span></div>
+            <div class="sys-item si-yellow"><span class="item-name">Prometheus</span><span class="item-sub">监控</span></div>
+            <div class="sys-item si-yellow"><span class="item-name">Grafana</span><span class="item-sub">可视化</span></div>
+          </div>
+        </div>
+
+        <div class="layer-sep">▼ &nbsp; 一切的根基 &nbsp; ▼</div>
+
+        <!-- Layer: 内功 -->
+        <div class="sys-layer">
+          <div class="sys-layer-label" style="background:rgba(248,113,113,0.12); color:#f87171; border:1.5px solid #f87171;">内功</div>
+          <div class="sys-layer-content cols-6">
+            <div class="sys-item si-red"><span class="item-name">数据结构与算法</span><span class="item-sub">编程基石</span></div>
+            <div class="sys-item si-red"><span class="item-name">计算机网络</span><span class="item-sub">TCP / HTTP</span></div>
+            <div class="sys-item si-red"><span class="item-name">操作系统</span><span class="item-sub">进程 / 内存 / IO</span></div>
+            <div class="sys-item si-red"><span class="item-name">JVM</span><span class="item-sub">内存 / GC / 调优</span></div>
+            <div class="sys-item si-red"><span class="item-name">Java 并发</span><span class="item-sub">线程 / 锁 / JUC</span></div>
+            <div class="sys-item si-red"><span class="item-name">分布式理论</span><span class="item-sub">CAP / Raft / Paxos</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Detailed Category Listings -->
+    <!-- ============================================================ -->
+    <h2><span class="icon">📖</span>分类知识点列表</h2>
+
+    <!-- ---- 1. 编程语言 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">💻</span>
+        <div>
+          <div class="cat-title" style="color:#38bdf8;">编程语言</div>
+          <div class="cat-desc">语言基础、核心特性、新版本特性</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <a href="java-basics.html" class="cat-item si-orange clickable" style="text-decoration:none; color:var(--text);">
+          <span class="ci-name">☕ Java 基础</span>
+          <span class="ci-sub">集合 · IO · 泛型 · 反射 · Lambda</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </a>
+        <div class="cat-item si-orange">
+          <span class="ci-name">☕ Java 高级</span>
+          <span class="ci-sub">并发编程 · JUC · 注解 · SPI</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-blue">
+          <span class="ci-name">🐍 Python</span>
+          <span class="ci-sub">GIL · 装饰器 · 元类 · 协程</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">🐹 Go</span>
+          <span class="ci-sub">Goroutine · Channel · GC · Interface</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">📜 JavaScript / TS</span>
+          <span class="ci-sub">事件循环 · 闭包 · 原型链 · Promise</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 2. JVM 生态 / Java 框架 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">🌱</span>
+        <div>
+          <div class="cat-title" style="color:#818cf8;">JVM 生态 & Java 框架</div>
+          <div class="cat-desc">Java 生态核心——运行时、Web 框架、ORM</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-purple">
+          <span class="ci-name">⚙️ JVM</span>
+          <span class="ci-sub">内存模型 · GC 算法 · 类加载 · 调优</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-purple">
+          <span class="ci-name">🌱 Spring</span>
+          <span class="ci-sub">IoC · AOP · Bean 生命周期 · 事务</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-purple">
+          <span class="ci-name">🚀 Spring Boot</span>
+          <span class="ci-sub">自动配置 · Starter · Actuator</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-purple">
+          <span class="ci-name">☁️ Spring Cloud</span>
+          <span class="ci-sub">Feign · Ribbon · Hystrix · Gateway</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-purple">
+          <span class="ci-name">🗃️ MyBatis</span>
+          <span class="ci-sub">动态 SQL · 缓存 · 插件 · 延迟加载</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-purple">
+          <span class="ci-name">🔗 Netty</span>
+          <span class="ci-sub">EventLoop · Pipeline · 零拷贝 · 编解码</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 3. 数据库 ---- -->
+    <div class="cat-section">
+      <div class="cat-header" style="cursor:pointer;" onclick="window.location.href='compare-databases.html'">
+        <span class="cat-icon">🗄️</span>
+        <div>
+          <div class="cat-title" style="color:#fb923c;">🗄️ 数据库 <span style="font-size:0.75rem; color:var(--text-dim); font-weight:400;">→ 查看对比</span></div>
+          <div class="cat-desc">关系型、NoSQL、搜索引擎——数据的持久化与检索</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-orange">
+          <span class="ci-name">🐬 MySQL</span>
+          <span class="ci-sub">索引 · 事务 · 锁 · 主从 · 优化</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <a href="redis.html" class="cat-item si-orange clickable" style="text-decoration:none; color:var(--text);">
+          <span class="ci-name">🔴 Redis</span>
+          <span class="ci-sub">数据结构 · 缓存 · 分布式锁 · 集群</span>
+          <span class="ci-tag tag-done">✅</span>
+        </a>
+        <div class="cat-item si-orange">
+          <span class="ci-name">🍃 MongoDB</span>
+          <span class="ci-sub">文档模型 · 聚合 · 索引 · 副本集</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-orange">
+          <span class="ci-name">🔍 Elasticsearch</span>
+          <span class="ci-sub">倒排索引 · 分词 · 聚合 · 集群</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-orange">
+          <span class="ci-name">🐘 PostgreSQL</span>
+          <span class="ci-sub">MVCC · JSONB · 扩展 · 高级查询</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-orange">
+          <span class="ci-name">🔗 TiDB</span>
+          <span class="ci-sub">分布式 SQL · Raft · HTAP</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-orange">
+          <span class="ci-name">📊 HBase</span>
+          <span class="ci-sub">列族存储 · Region · LSM Tree</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 4. 消息队列 & 流计算 ---- -->
+    <div class="cat-section">
+      <div class="cat-header" style="cursor:pointer;" onclick="window.location.href='compare-mq.html'">
+        <span class="cat-icon">📨</span>
+        <div>
+          <div class="cat-title" style="color:#34d399;">📨 消息队列 & 流计算 <span style="font-size:0.75rem; color:var(--text-dim); font-weight:400;">→ 查看对比</span></div>
+          <div class="cat-desc">异步解耦、削峰填谷、实时数据处理</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <a href="kafka.html" class="cat-item si-green clickable" style="text-decoration:none; color:var(--text);">
+          <span class="ci-name">📨 Kafka</span>
+          <span class="ci-sub">分区 · 副本 · Consumer Group · Exactly-Once</span>
+          <span class="ci-tag tag-done">✅</span>
+        </a>
+        <div class="cat-item si-green">
+          <span class="ci-name">🚀 RocketMQ</span>
+          <span class="ci-sub">顺序消息 · 延迟消息 · 事务消息</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <a href="rabbitmq.html" class="cat-item si-green clickable" style="text-decoration:none; color:var(--text);">
+          <span class="ci-name">🐰 RabbitMQ</span>
+          <span class="ci-sub">Exchange · Queue · ACK · 死信队列</span>
+          <span class="ci-tag tag-done">✅</span>
+        </a>
+        <div class="cat-item si-green">
+          <span class="ci-name">📡 Pulsar</span>
+          <span class="ci-sub">存算分离 · 多租户 · Segment</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <a href="flink.html" class="cat-item si-green clickable" style="text-decoration:none; color:var(--text);">
+          <span class="ci-name">🌊 Flink</span>
+          <span class="ci-sub">Window · Watermark · State · CEP</span>
+          <span class="ci-tag tag-done">✅</span>
+        </a>
+        <div class="cat-item si-green">
+          <span class="ci-name">⚡ Spark</span>
+          <span class="ci-sub">RDD · DataFrame · Structured Streaming</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+      <div class="rel-note">Kafka / RocketMQ / RabbitMQ 负责消息传递 → Flink / Spark 负责流/批计算</div>
+    </div>
+
+    <!-- ---- 5. 微服务 & 服务治理 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">🔗</span>
+        <div>
+          <div class="cat-title" style="color:#f472b6;">微服务 & 服务治理</div>
+          <div class="cat-desc">服务拆分、注册发现、限流熔断、分布式事务</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-pink">
+          <span class="ci-name">📡 Dubbo</span>
+          <span class="ci-sub">RPC · 负载均衡 · 集群容错</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🔗 gRPC</span>
+          <span class="ci-sub">Protobuf · HTTP/2 · 流式调用</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">📋 Nacos</span>
+          <span class="ci-sub">服务注册 · 配置管理 · 健康检查</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🦁 Zookeeper</span>
+          <span class="ci-sub">ZAB 协议 · 临时节点 · 分布式锁</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🛡️ Sentinel</span>
+          <span class="ci-sub">限流 · 熔断降级 · 热点防护</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🔄 Seata</span>
+          <span class="ci-sub">AT / TCC / Saga · 分布式事务</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🔗 Consul</span>
+          <span class="ci-sub">服务发现 · KV · 健康检查</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-pink">
+          <span class="ci-name">🕐 XXL-Job</span>
+          <span class="ci-sub">分布式任务调度 · 分片 · 失败重试</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 6. 运维 & 云原生 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">☁️</span>
+        <div>
+          <div class="cat-title" style="color:#facc15;">运维 & 云原生</div>
+          <div class="cat-desc">容器化、编排、CI/CD、监控可观测</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-yellow">
+          <span class="ci-name">🐳 Docker</span>
+          <span class="ci-sub">镜像 · 容器 · Dockerfile · 网络</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">☸️ Kubernetes</span>
+          <span class="ci-sub">Pod · Service · Ingress · HPA</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">🔧 Jenkins / GitLab CI</span>
+          <span class="ci-sub">Pipeline · 构建 · 部署自动化</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">📈 Prometheus</span>
+          <span class="ci-sub">指标采集 · PromQL · 告警</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">📊 Grafana</span>
+          <span class="ci-sub">仪表盘 · 数据源 · 可视化</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">🔭 SkyWalking</span>
+          <span class="ci-sub">链路追踪 · 拓扑图 · 告警</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">📝 ELK Stack</span>
+          <span class="ci-sub">Elasticsearch · Logstash · Kibana</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-yellow">
+          <span class="ci-name">🔀 Istio</span>
+          <span class="ci-sub">Service Mesh · Sidecar · 流量管理</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 7. 系统设计 & 分布式 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">🏗️</span>
+        <div>
+          <div class="cat-title" style="color:#22d3ee;">系统设计 & 分布式理论</div>
+          <div class="cat-desc">高并发架构、一致性算法、经典设计题</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-cyan">
+          <span class="ci-name">🏗️ 系统设计</span>
+          <span class="ci-sub">高并发 · 高可用 · 经典设计题</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">📐 分布式理论</span>
+          <span class="ci-sub">CAP · BASE · 一致性哈希 · 幂等</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">🗳️ 共识算法</span>
+          <span class="ci-sub">Paxos · Raft · ZAB · Gossip</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">🔒 分布式锁</span>
+          <span class="ci-sub">Redis · Zookeeper · RedLock</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">💰 分布式事务</span>
+          <span class="ci-sub">2PC · TCC · Saga · 最终一致性</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-cyan">
+          <span class="ci-name">🔐 安全 & 认证</span>
+          <span class="ci-sub">OAuth2 · JWT · HTTPS · 加密</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 8. 内功 ---- -->
+    <div class="cat-section">
+      <div class="cat-header">
+        <span class="cat-icon">🧠</span>
+        <div>
+          <div class="cat-title" style="color:#f87171;">内功心法</div>
+          <div class="cat-desc">一切技术的地基——算法、网络、操作系统</div>
+        </div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat-item si-red">
+          <span class="ci-name">🧮 算法与数据结构</span>
+          <span class="ci-sub">排序 · 树 · 图 · DP · 贪心 · 回溯</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-red">
+          <span class="ci-name">🌐 计算机网络</span>
+          <span class="ci-sub">TCP · HTTP · DNS · WebSocket · 安全</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-red">
+          <span class="ci-name">🖥️ 操作系统</span>
+          <span class="ci-sub">进程 · 线程 · 内存 · IO · 死锁</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-red">
+          <span class="ci-name">📖 设计模式</span>
+          <span class="ci-sub">单例 · 工厂 · 策略 · 观察者 · 代理</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-red">
+          <span class="ci-name">🔨 编译原理</span>
+          <span class="ci-sub">词法分析 · AST · JIT · 类加载</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+        <div class="cat-item si-red">
+          <span class="ci-name">🐧 Linux</span>
+          <span class="ci-sub">常用命令 · Shell · 进程管理 · 网络</span>
+          <span class="ci-tag tag-pending">⏳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
+      <div style="margin-bottom:0.5rem;">
+      <span style="color:var(--accent3);">✅</span> 已完成 5 个 &nbsp;
+      <span style="color:var(--accent4);">⏳</span> 待编写 40 个
+      </div>
+      面试知识复习库 · 45 个技术主题 · 持续更新中<br>
+      Last updated 2026-06-02
+    </div>
+  </div>
+
+</body>
+</html>
