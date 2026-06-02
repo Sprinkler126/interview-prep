@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redis - 面试知识复习库</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">📚 面试知识复习库</a>
+      <a class="back" href="index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🔴 Redis</h1>
+    <p class="subtitle">Remote Dictionary Server · 高性能内存数据库 · 缓存 · 消息队列 · 分布式锁</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">核心数据结构</a></li>
+          <li class="sub"><a href="#s1-3">持久化机制</a></li>
+          <li class="sub"><a href="#s1-4">内存淘汰策略</a></li>
+          <li class="sub"><a href="#s1-5">单线程与IO多路复用</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">缓存策略与缓存问题</a></li>
+          <li class="sub"><a href="#s2-2">分布式锁</a></li>
+          <li class="sub"><a href="#s2-3">消息队列与延迟队列</a></li>
+          <li class="sub"><a href="#s2-4">高可用架构</a></li>
+          <li class="sub"><a href="#s2-5">限流与排行榜</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 Redis 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">Redis 单实例架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>客户端层</strong>
+                <div class="arch-label">redis-cli · Jedis · Lettuce · Redisson</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ TCP / Unix Socket</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent2);background:rgba(129,140,248,0.06);">
+                <strong>网络事件驱动层</strong> — IO 多路复用（epoll / kqueue）
+                <div class="arch-label">单线程事件循环 · 非阻塞IO · aeEventLoop</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                📝 命令执行<div class="arch-label">单线程串行<br>保证原子性</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                📦 数据存储<div class="arch-label">全局 dict<br>key → RedisObject</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06);">
+                💾 持久化<div class="arch-label">RDB 快照<br>AOF 日志</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--border);background:var(--surface2);">
+                <strong>内存分配器</strong> — jemalloc / libc
+                <div class="arch-label">内存池 · 碎片整理 · LRU/LFU 淘汰</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>核心设计思想</h4>
+          <ul>
+            <li><strong>纯内存操作</strong>：数据在内存中，读写 10 万+ QPS</li>
+            <li><strong>单线程模型</strong>：避免上下文切换和锁竞争，命令串行保证原子性</li>
+            <li><strong>IO 多路复用</strong>：单线程同时处理大量连接，<code>epoll</code>(Linux) / <code>kqueue</code>(macOS)</li>
+            <li><strong>丰富数据结构</strong>：String / Hash / List / Set / ZSet / Stream / Bitmap / HyperLogLog</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-2">1.2 核心数据结构及底层实现</h3>
+        <div class="diagram">
+          <div class="diagram-title">Redis 数据类型 → 底层编码映射</div>
+          <table>
+            <thead><tr><th>数据类型</th><th>底层编码</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">String</span></td><td>int / embstr / raw (SDS)</td><td>整数用 int，≤44 字节用 embstr，否则 raw SDS</td></tr>
+              <tr><td><span class="badge badge-green">List</span></td><td>listpack → quicklist</td><td>Redis 7+ 统一使用 quicklist（listpack + 双向链表）</td></tr>
+              <tr><td><span class="badge badge-orange">Hash</span></td><td>listpack → hashtable</td><td>小数据 listpack 压缩存储，超过阈值转 hashtable</td></tr>
+              <tr><td><span class="badge badge-purple">Set</span></td><td>intset / listpack → hashtable</td><td>纯整数用 intset，小集合用 listpack，大集合用 hashtable</td></tr>
+              <tr><td><span class="badge badge-red">ZSet</span></td><td>listpack → skiplist + hashtable</td><td>跳表支持范围查询 O(logN)，hashtable 支持精确查找 O(1)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Simple Dynamic String (SDS)</h4>
+          <div class="diagram">
+            <div class="diagram-title">SDS 内存布局</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">len<br><span style="font-size:0.75rem;font-weight:400">已用长度</span></div>
+              <div class="flow-box flow-purple">alloc<br><span style="font-size:0.75rem;font-weight:400">分配空间</span></div>
+              <div class="flow-box flow-green">flags<br><span style="font-size:0.75rem;font-weight:400">类型标记</span></div>
+              <div class="flow-box flow-orange">buf[]<br><span style="font-size:0.75rem;font-weight:400">字节数组 + \0</span></div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>O(1) 获取长度</strong>：C 原生字符串需 O(n) 遍历到 '\0'</li>
+            <li><strong>杜绝缓冲区溢出</strong>：自动检查和扩容</li>
+            <li><strong>减少内存重分配</strong>：空间预分配 + 惰性释放</li>
+            <li><strong>二进制安全</strong>：可存储任意二进制数据</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>跳表 (Skip List) — ZSet 核心</h4>
+          <div class="diagram">
+            <div class="diagram-title">跳表结构示意</div>
+            <div style="font-family:'SF Mono',monospace;font-size:0.85rem;line-height:2.2;text-align:center;">
+              <div style="color:var(--text-dim)">Level 3: HEAD ──────────────────────────→ <span style="color:var(--accent)">30</span> ──→ NULL</div>
+              <div style="color:var(--text-dim)">Level 2: HEAD ──────────→ <span style="color:var(--accent3)">15</span> ──────────→ <span style="color:var(--accent)">30</span> ──→ NULL</div>
+              <div style="color:var(--text-dim)">Level 1: HEAD ──→ <span style="color:var(--accent2)">7</span> ──→ <span style="color:var(--accent3)">15</span> ──→ <span style="color:var(--accent4)">22</span> ──→ <span style="color:var(--accent)">30</span> ──→ NULL</div>
+              <div style="color:var(--text-dim)">Level 0: HEAD → 3 → <span style="color:var(--accent2)">7</span> → 11 → <span style="color:var(--accent3)">15</span> → 18 → <span style="color:var(--accent4)">22</span> → 25 → <span style="color:var(--accent)">30</span> → NULL</div>
+            </div>
+          </div>
+          <ul>
+            <li>查找 O(logN)，与平衡树相当；实现简单，范围查询天然支持</li>
+            <li>每个节点层高随机（<code>zslRandomLevel</code>，P=0.25），概率性平衡</li>
+            <li>Redis 选跳表而非红黑树：<strong>实现简单、范围查询高效、易做 ZRANGEBYSCORE</strong></li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 持久化机制</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">📸 RDB (Redis Database)</h4>
+            <p><strong>原理</strong>：fork 子进程，Copy-on-Write 生成内存快照，序列化为 .rdb 文件</p>
+            <div class="flow" style="flex-direction:column;gap:0.3rem">
+              <div class="flow-box flow-blue" style="width:100%">fork() 子进程</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-purple" style="width:100%">Copy-on-Write 内存快照</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-green" style="width:100%">序列化 .rdb 文件</div>
+            </div>
+            <ul style="margin-top:1rem">
+              <li>✅ 文件紧凑，适合备份和灾难恢复</li>
+              <li>✅ 恢复速度快（直接加载二进制）</li>
+              <li>❌ 可能丢失最后一次快照后的数据</li>
+              <li>❌ fork 时大内存实例可能阻塞</li>
+            </ul>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">📝 AOF (Append Only File)</h4>
+            <p><strong>原理</strong>：追加方式记录每条写命令，按 fsync 策略刷盘</p>
+            <div class="flow" style="flex-direction:column;gap:0.3rem">
+              <div class="flow-box flow-green" style="width:100%">写命令 → AOF 缓冲区</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-orange" style="width:100%">fsync 策略刷盘</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-blue" style="width:100%">AOF Rewrite 压缩</div>
+            </div>
+            <ul style="margin-top:1rem">
+              <li>✅ 数据更安全（最多丢 1 秒）</li>
+              <li>✅ 文件可读，可手动修复</li>
+              <li>❌ 文件体积大（需 rewrite 压缩）</li>
+              <li>❌ 恢复速度相对慢（重放命令）</li>
+            </ul>
+          </div>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">AOF 三种 fsync 策略</div>
+          <table>
+            <thead><tr><th>策略</th><th>行为</th><th>数据安全</th><th>性能</th></tr></thead>
+            <tbody>
+              <tr><td><code>always</code></td><td>每条命令 fsync</td><td><span class="badge badge-green">最高</span></td><td><span class="badge badge-red">最差</span></td></tr>
+              <tr><td><code>everysec</code> ⭐</td><td>每秒 fsync</td><td><span class="badge badge-orange">较高</span></td><td><span class="badge badge-green">较好</span></td></tr>
+              <tr><td><code>no</code></td><td>OS 决定</td><td><span class="badge badge-red">不可控</span></td><td><span class="badge badge-green">最好</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip">Redis 4.0+ 支持<strong>混合持久化</strong>：AOF Rewrite 时先写 RDB 格式，再追加增量 AOF，兼顾恢复速度和数据安全。5.0 默认开启。</div>
+
+        <h3 id="s1-4">1.4 内存淘汰策略</h3>
+        <div class="diagram">
+          <div class="diagram-title">8 种淘汰策略</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>noeviction</strong>（默认）— 不淘汰，内存满时写入报错
+              </div>
+            </div>
+            <div class="arch-connector">内存不足时 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>allkeys 组</strong>
+                <div class="arch-label">allkeys-lru<br>allkeys-lfu<br>allkeys-random</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>volatile 组</strong>
+                <div class="arch-label">volatile-lru<br>volatile-lfu<br>volatile-random<br>volatile-ttl</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">LRU (最近最少使用)</h4>
+            <p>淘汰<strong>最久没被访问</strong>的 key，关注时间维度</p>
+            <p class="warn" style="margin-top:0.5rem">问题：一次性批量读取的冷数据可能挤掉热点数据</p>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">LFU (最不经常使用)</h4>
+            <p>淘汰<strong>访问频率最低</strong>的 key（Redis 4.0+），关注频次维度</p>
+            <p class="tip" style="margin-top:0.5rem">Morris 计数器 + 衰减时间，近似统计访问频率</p>
+          </div>
+        </div>
+
+        <h3 id="s1-5">1.5 单线程模型与 IO 多路复用</h3>
+        <div class="diagram">
+          <div class="diagram-title">Redis 事件循环处理流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端连接</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">epoll_wait<br><span style="font-size:0.7rem;font-weight:400">IO多路复用</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">事件分发<br><span style="font-size:0.7rem;font-weight:400">文件事件</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">命令执行<br><span style="font-size:0.7rem;font-weight:400">单线程串行</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">响应返回</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>为什么单线程还能这么快？</h4>
+          <ul>
+            <li><strong>纯内存操作</strong>：瓶颈在网络 IO 而非 CPU</li>
+            <li><strong>IO 多路复用</strong>：单线程同时监听多个 socket</li>
+            <li><strong>无锁设计</strong>：避免线程切换和锁竞争</li>
+            <li><strong>高效数据结构</strong>：SDS、跳表、压缩列表等优化</li>
+          </ul>
+        </div>
+        <div class="tip">Redis 6.0+ 引入<strong>多线程 IO</strong>（<code>io-threads</code>）：网络读写多线程，<strong>命令执行仍是单线程</strong>。不是多线程执行命令！</div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 缓存策略与经典缓存问题</h3>
+        <div class="card">
+          <h4>问题场景：为什么需要缓存？</h4>
+          <p>MySQL QPS 通常千级别，Redis 可抗 10 万+ QPS，将热点数据放内存快速响应。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Cache Aside Pattern 请求流程</div>
+          <div class="arch-container">
+            <div class="arch-row"><div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)"><strong>客户端请求</strong></div></div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row"><div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)"><strong>① 查 Redis</strong><div class="arch-label">命中 → 直接返回</div></div></div>
+            <div class="arch-connector">未命中 ⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)"><strong>② 查数据库</strong></div>
+            </div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)"><strong>③ 写回缓存</strong><div class="arch-label">设置 TTL</div></div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)"><strong>④ 返回数据</strong></div>
+            </div>
+          </div>
+        </div>
+        <h4>三大经典缓存问题</h4>
+        <div class="diagram">
+          <table>
+            <thead><tr><th>问题</th><th>现象</th><th>原因</th><th>解决方案</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">缓存穿透</span></td><td>查询<strong>不存在</strong>的数据，永远不命中</td><td>恶意攻击或业务 bug</td><td>① 缓存空值 ② 布隆过滤器</td></tr>
+              <tr><td><span class="badge badge-orange">缓存击穿</span></td><td><strong>热点 key 过期</strong>，大量请求打到 DB</td><td>高频 key 刚好失效</td><td>① 互斥锁 ② 逻辑过期 ③ 永不过期</td></tr>
+              <tr><td><span class="badge badge-red">缓存雪崩</span></td><td><strong>大量 key 同时过期</strong>或 Redis 宕机</td><td>TTL 相同 / 整体故障</td><td>① TTL 加随机 ② 集群 ③ 多级缓存</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>布隆过滤器 (Bloom Filter) 防穿透</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Key 进入</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">K 个哈希函数</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">位数组标记对应位为 1</div>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li>所有哈希位都是 1 → <strong>可能存在</strong>（有误判率）</li>
+            <li>任一哈希位是 0 → <strong>一定不存在</strong>（无漏判）</li>
+            <li>不支持删除（Counting Bloom Filter 可以）</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-2">2.2 分布式锁</h3>
+        <div class="card"><h4>问题场景</h4><p>单机锁只在 JVM 内有效，分布式系统中多实例访问共享资源需要跨进程锁。</p></div>
+        <div class="diagram">
+          <div class="diagram-title">Redis 分布式锁流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">服务A<br><span style="font-size:0.7rem">SETNX lock uuid</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Redis<br><span style="font-size:0.7rem">lock_key → uuid</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">服务B<br><span style="font-size:0.7rem">SETNX → 失败</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>关键要素</h4>
+          <table>
+            <thead><tr><th>要素</th><th>命令</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td><strong>互斥</strong></td><td><code>SET key val NX</code></td><td>NX 保证只有第一个 SET 成功</td></tr>
+              <tr><td><strong>防死锁</strong></td><td><code>EX 30</code></td><td>崩溃后锁自动释放</td></tr>
+              <tr><td><strong>防误删</strong></td><td>value 用 UUID</td><td>删除前检查是否是自己的锁</td></tr>
+              <tr><td><strong>原子释放</strong></td><td>Lua 脚本</td><td>判断 + 删除必须原子</td></tr>
+              <tr><td><strong>可重入</strong></td><td>Hash 记录重入次数</td><td>同一线程多次加锁</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Lua 解锁脚本</div>
+          <pre><code>if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end</code></pre>
+        </div>
+        <div class="tip"><strong>Redisson</strong> 的 Watch Dog 机制：后台线程每 10 秒检查锁，自动续期（默认 30 秒），解决业务未执行完锁就过期的问题。</div>
+        <div class="warn">单节点锁在主从切换时可能丢失。<strong>RedLock</strong>（向 N 个独立节点加锁，多数成功才算）可提高可靠性，但 Martin Kleppmann 有著名反驳，需了解争议。</div>
+
+        <h3 id="s2-3">2.3 消息队列与延迟队列</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">List 简单队列</h4>
+            <div class="flow" style="flex-direction:column;gap:0.2rem">
+              <div class="flow-box flow-blue" style="width:100%">生产者 LPUSH</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-purple" style="width:100%">List 存储</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-green" style="width:100%">消费者 BRPOP</div>
+            </div>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">Stream 高级队列 (5.0+)</h4>
+            <div class="flow" style="flex-direction:column;gap:0.2rem">
+              <div class="flow-box flow-green" style="width:100%">XADD 生产</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-orange" style="width:100%">Consumer Group</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-blue" style="width:100%">XACK 确认</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>延迟队列（Sorted Set）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">ZADD delay_queue {timestamp} {msg}</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">ZSet 按时间排序</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">ZRANGEBYSCORE 到期取出</div>
+          </div>
+          <p style="margin-top:0.5rem">典型：<strong>订单超时取消</strong>、定时推送、重试机制。</p>
+        </div>
+
+        <h3 id="s2-4">2.4 高可用架构：主从 / 哨兵 / 集群</h3>
+        <div class="diagram">
+          <div class="diagram-title">三种部署模式演进</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)"><strong>Master</strong><div class="arch-label">读写</div></div>
+              <div style="display:flex;flex-direction:column;justify-content:center"><span style="color:var(--text-dim)">→ →</span></div>
+              <div style="display:flex;flex-direction:column;gap:0.5rem">
+                <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);padding:0.6rem 1rem"><strong>Slave 1</strong></div>
+                <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);padding:0.6rem 1rem"><strong>Slave 2</strong></div>
+              </div>
+              <div style="text-align:left;font-size:0.88rem;color:var(--text-dim);max-width:260px"><strong style="color:var(--accent)">主从复制</strong><br>✅ 读写分离<br>❌ Master 宕机需手动切换</div>
+            </div>
+            <div class="arch-connector">⬇️ 解决自动故障转移</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)"><strong>Sentinel × 3</strong> — 监控 + 自动选举新 Master</div>
+            </div>
+            <div class="arch-connector">⬇️ 解决水平扩展</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)"><strong>Redis Cluster</strong> — 16384 slot 分片 · 6 节点(3主3从) · Gossip 协议</div>
+            </div>
+          </div>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Cluster 数据分片</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Client<br><span style="font-size:0.7rem">key: "user:1001"</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">CRC16(key) % 16384<br><span style="font-size:0.7rem">计算 slot</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">路由到对应节点<br><span style="font-size:0.7rem">MOVED 重定向</span></div>
+          </div>
+        </div>
+
+        <h3 id="s2-5">2.5 限流与排行榜</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">⏱️ 滑动窗口限流</h4>
+            <p><strong>场景</strong>：API 接口限流</p>
+            <div class="flow"><div class="flow-box flow-blue">ZADD key ts uuid</div><div class="flow-arrow">→</div><div class="flow-box flow-purple">ZREMRANGEBYSCORE</div><div class="flow-arrow">→</div><div class="flow-box flow-green">ZCARD 计数</div></div>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">🏆 排行榜</h4>
+            <p><strong>场景</strong>：游戏排名、销量排行</p>
+            <div class="flow"><div class="flow-box flow-green">ZINCRBY rank 1 user</div><div class="flow-arrow">→</div><div class="flow-box flow-orange">ZREVRANGE 0 9</div><div class="flow-arrow">→</div><div class="flow-box flow-blue">Top 10</div></div>
+          </div>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Redis 为什么这么快？</div>
+          <div class="a"><strong>参考</strong>：① 纯内存操作；② 单线程避免上下文切换和锁；③ IO 多路复用（epoll）；④ 高效数据结构（SDS、跳表、压缩列表）。<br><strong>追问：6.0 多线程矛盾吗？</strong>不矛盾。6.0 多线程仅用于网络 IO 读写，命令执行仍是单线程。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">缓存穿透、击穿、雪崩是什么？怎么解决？</div>
+          <div class="a"><strong>穿透</strong>：查不存在的数据 → 缓存空值 + 布隆过滤器。<br><strong>击穿</strong>：热点 key 过期 → 互斥锁 / 逻辑过期。<br><strong>雪崩</strong>：大量 key 同时过期 → TTL 加随机 / 集群 / 多级缓存。<br><strong>追问：布隆过滤器缺点？</strong>有误判率，不支持删除。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Redis 持久化怎么选？</div>
+          <div class="a">RDB 快照（文件小恢复快，可能丢数据）+ AOF 日志（最多丢 1 秒，文件大恢复慢）。生产推荐<strong>同时开启</strong>，4.0+ 混合持久化兼顾两者。<br><strong>追问：fork 会阻塞吗？</strong>大内存实例（16GB+）fork 时复制页表可能阻塞几十到几百 ms。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何用 Redis 实现分布式锁？</div>
+          <div class="a"><code>SET key uuid NX EX 30</code> 加锁，Lua 脚本原子判断+删除释放锁。UUID 防误删，EX 防死锁。Redisson Watch Dog 自动续期。<br><strong>追问：为什么不用 DEL？</strong>先 GET 再 DEL 不原子，可能误删别人的锁。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Redis 数据类型底层结构？</div>
+          <div class="a">String→SDS，List→quicklist，Hash→listpack/hashtable，Set→intset/hashtable，ZSet→skiplist+hashtable。小数据用压缩存储，超过阈值自动转换。<br><strong>追问：为什么 ZSet 用跳表不用红黑树？</strong>① 实现简单；② 范围查询高效；③ 并发友好。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Redis 集群怎么分片？</div>
+          <div class="a">16384 个 slot，<code>CRC16(key) % 16384</code> 计算归属。不在此节点则 MOVED 重定向。<code>{hash_tag}</code> 让多个 key 同 slot。<br><strong>追问：为什么 16384？</strong>节点数通常 <1000，16384 的 bitmap（2KB）心跳包传输开销合理。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Redis vs Memcached？</div>
+          <div class="a">Redis：丰富数据结构、持久化、原生集群、发布订阅。Memcached：仅 KV、无持久化、多线程、内存效率更高（slab）。<strong>99% 场景选 Redis</strong>。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">大 Key 怎么发现和处理？</div>
+          <div class="a"><strong>发现</strong>：<code>--bigkeys</code> 扫描、<code>MEMORY USAGE</code>、<code>DEBUG OBJECT</code>。<br><strong>危害</strong>：阻塞请求、网络慢、内存不均。<br><strong>处理</strong>：拆分、<code>UNLINK</code> 异步删除、HSCAN+HDEL 渐进删除。</div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Redis · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

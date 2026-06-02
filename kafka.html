@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kafka - 面试知识复习库</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="index.html">📚 面试知识复习库</a><a class="back" href="index.html">← 返回目录</a></div></nav>
+  <div class="container">
+    <h1>📨 Apache Kafka</h1>
+    <p class="subtitle">分布式流处理平台 · 高吞吐 · 持久化 · 水平扩展 · Exactly-Once</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#p1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#p1-1">整体架构</a></li>
+          <li class="sub"><a href="#p1-2">核心概念</a></li>
+          <li class="sub"><a href="#p1-3">存储机制</a></li>
+          <li class="sub"><a href="#p1-4">副本机制 ISR</a></li>
+          <li class="sub"><a href="#p1-5">Producer 机制</a></li>
+          <li class="sub"><a href="#p1-6">Consumer 机制</a></li>
+          <li class="sub"><a href="#p1-7">事务与 Exactly-Once</a></li>
+          <li><a href="#p2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#p2-1">日志收集</a></li>
+          <li class="sub"><a href="#p2-2">消息队列</a></li>
+          <li class="sub"><a href="#p2-3">流处理与 CDC</a></li>
+          <li class="sub"><a href="#p2-4">性能调优</a></li>
+          <li class="sub"><a href="#p2-5">消息积压处理</a></li>
+          <li><a href="#p3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ================= PART 1 ================= -->
+        <h2 id="p1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="p1-1">1.1 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">Kafka 集群架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Producer 生产者</strong>
+                <div class="arch-label">序列化 → 分区器 → 批量发送 → 压缩</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 发送到 Leader Broker</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Broker 0</strong><br>Topic-A: P0(Leader) P1(Follower)<br>Topic-B: P1(Leader) P0(Follower)
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Broker 1</strong><br>Topic-A: P1(Leader) P0(Follower)<br>Topic-B: P0(Leader) P1(Follower)
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Broker 2</strong><br>Topic-A: P2(Leader)<br>Topic-B: P2(Follower)
+              </div>
+            </div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>Consumer Group 消费者组</strong>
+                <div class="arch-label">Consumer 0 → P0 · Consumer 1 → P1 · Consumer 2 → P2（一个 Partition 只能被组内一个 Consumer 消费）</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>ZooKeeper vs KRaft</h4>
+          <p>Kafka 传统模式依赖 ZooKeeper 管理元数据（Broker 注册、Topic 配置、Leader 选举）。<strong>KRaft 模式</strong>（3.3+ 生产就绪）用 Raft 共识协议取代 ZK，Controller 节点管理元数据，启动更快、扩展性更好。</p>
+        </div>
+
+        <h3 id="p1-2">1.2 核心概念</h3>
+        <div class="diagram">
+          <div class="diagram-title">Topic → Partition → Segment 层次结构</div>
+          <div class="layer-stack">
+            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>Topic</strong> — 逻辑消息流（如 order-events）</div>
+            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>Partition</strong> — 物理分片（P0 / P1 / P2），有序、不可变</div>
+            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>Segment</strong> — 分区内文件切片（默认 1GB 或 7 天滚动）</div>
+            <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>Index + Log</strong> — .index 稀疏索引 + .log 消息文件</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>关键术语</h4>
+          <ul>
+            <li><strong>Offset</strong>：消息在 Partition 内的唯一递增 ID，消费者按 offset 消费</li>
+            <li><strong>Replica</strong>：每个 Partition 有多个副本（Leader + Follower），分布在不同 Broker</li>
+            <li><strong>Consumer Group</strong>：一组消费者共同消费一个 Topic，每个 Partition 只分配给组内一个消费者</li>
+            <li><strong>Rebalance</strong>：消费者加入/离开组时，重新分配 Partition 的过程</li>
+            <li><strong>__consumer_offsets</strong>：内置 Topic，存储消费者组的消费位移</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-3">1.3 存储机制 — 为什么这么快</h3>
+        <div class="diagram">
+          <div class="diagram-title">Kafka 高性能四板斧</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>① 顺序写磁盘</strong>
+                <div class="arch-label">追加写入 append-only<br>比随机写快 1000 倍<br>600MB/s vs 100KB/s</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>② Zero-Copy</strong>
+                <div class="arch-label">sendfile() 系统调用<br>磁盘→内核缓冲→网卡<br>跳过用户态，减少 2 次拷贝</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>③ Page Cache</strong>
+                <div class="arch-label">利用 OS 页缓存<br>热数据在内存中<br>进程重启不丢缓存</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>④ 批量 + 压缩</strong>
+                <div class="arch-label">batch.size 攒批发送<br>linger.ms 等待更多消息<br>Snappy/Gzip/LZ4 压缩</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Zero-Copy 详解</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">传统：磁盘→内核→用户态→内核→网卡（4次拷贝）</div>
+          </div>
+          <div class="flow" style="margin:0.5rem 0">
+            <div class="flow-box flow-green">Kafka：磁盘→内核→网卡（2次拷贝，sendfile）</div>
+          </div>
+          <p>数据不经过应用程序，直接从文件描述符传到 socket，减少 CPU 拷贝和上下文切换。</p>
+        </div>
+
+        <h3 id="p1-4">1.4 副本机制：ISR 与高水位</h3>
+        <div class="diagram">
+          <div class="diagram-title">ISR (In-Sync Replicas) 机制</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Leader</strong><br>LEO=7 HW=5
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Follower 1</strong><br>LEO=6 HW=5
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Follower 2</strong><br>LEO=5 HW=5
+              </div>
+              <div class="arch-box" style="border-color:var(--danger);background:rgba(239,68,68,0.06)">
+                <strong>Follower 3</strong><br>LEO=2（落后太多，踢出 ISR）
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>关键概念</h4>
+          <ul>
+            <li><strong>LEO (Log End Offset)</strong>：每个副本最后一条消息的 offset+1</li>
+            <li><strong>HW (High Watermark)</strong>：ISR 中所有副本 LEO 的最小值，消费者只能消费到 HW 之前的消息</li>
+            <li><strong>ISR</strong>：与 Leader 保持同步的副本集合。Follower 落后超过 <code>replica.lag.time.max.ms</code>（默认 30s）会被踢出</li>
+            <li><strong>acks=all</strong> 时：Producer 发送的消息需要 ISR 中所有副本确认才返回成功</li>
+          </ul>
+        </div>
+        <div class="warn"><strong>Leader 选举</strong>：Leader 宕机后从 ISR 中选择新 Leader。如果 ISR 为空（unclean.leader.election.enable=true），可能选一个数据不完整的 Follower 当 Leader，会丢数据。生产环境建议设为 false。</div>
+
+        <h3 id="p1-5">1.5 Producer 机制</h3>
+        <div class="diagram">
+          <div class="diagram-title">Producer 发送流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">序列化</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">分区器<br><span style="font-size:0.7rem">key hash / round-robin</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">RecordAccumulator<br><span style="font-size:0.7rem">按 partition 攒批</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Sender 线程<br><span style="font-size:0.7rem">批量发送</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Broker ACK</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>ACK 机制与可靠性保证</h4>
+          <table>
+            <thead><tr><th>acks</th><th>行为</th><th>可靠性</th><th>性能</th></tr></thead>
+            <tbody>
+              <tr><td><code>0</code></td><td>发送即忘，不等确认</td><td><span class="badge badge-red">可能丢消息</span></td><td><span class="badge badge-green">最高</span></td></tr>
+              <tr><td><code>1</code></td><td>Leader 写入即确认</td><td><span class="badge badge-orange">Leader 宕机可能丢</span></td><td><span class="badge badge-green">较高</span></td></tr>
+              <tr><td><code>all</code> ⭐</td><td>ISR 全部确认</td><td><span class="badge badge-green">最高</span></td><td><span class="badge badge-orange">较低</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>分区策略</h4>
+          <ul>
+            <li><strong>指定 key</strong>：<code>hash(key) % partitionNum</code>，同 key 的消息进同一 Partition（保证顺序）</li>
+            <li><strong>无 key</strong>：Sticky 分区（2.4+），一个批次内的消息发到同一 Partition，减少小消息开销</li>
+            <li><strong>自定义 Partitioner</strong>：实现 Partitioner 接口，按业务逻辑路由</li>
+          </ul>
+        </div>
+        <div class="tip"><strong>幂等 Producer</strong>（<code>enable.idempotence=true</code>）：Broker 端通过 PID + SequenceNumber 去重，保证单 Partition 内消息不重复。Producer 重启会分配新 PID，所以幂等只在单次会话内有效。</div>
+
+        <h3 id="p1-6">1.6 Consumer 机制</h3>
+        <div class="card">
+          <h4>Push vs Pull</h4>
+          <p>Kafka 采用 <strong>Pull 模式</strong>：消费者主动拉取消息。优势：消费者掌控消费速率，不会被压垮；劣势：Broker 无消息时消费者空轮询（通过 long poll 缓解）。</p>
+        </div>
+        <div class="card">
+          <h4>Offset 管理</h4>
+          <ul>
+            <li><strong>自动提交</strong>（<code>enable.auto.commit=true</code>）：定时提交，简单但可能丢消息或重复消费</li>
+            <li><strong>手动提交</strong>：消费完业务逻辑后调用 <code>commitSync()</code> / <code>commitAsync()</code>，生产推荐</li>
+            <li>Offset 存储在 <code>__consumer_offsets</code> 内置 Topic 中（50 个 Partition）</li>
+          </ul>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Rebalance 策略对比</div>
+          <table>
+            <thead><tr><th>策略</th><th>特点</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Range</strong></td><td>按 Topic 的 Partition 范围分配</td><td>简单场景，可能不均</td></tr>
+              <tr><td><strong>RoundRobin</strong></td><td>所有 Topic 的 Partition 轮询分配</td><td>多 Topic 均匀分配</td></tr>
+              <tr><td><strong>Sticky</strong></td><td>尽量保持上次分配结果</td><td>减少 Rebalance 迁移</td></tr>
+              <tr><td><strong>CooperativeSticky</strong></td><td>增量式 Rebalance，不暂停全部消费</td><td>生产推荐，减少停顿</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="warn"><strong>Rebalance 问题</strong>：Rebalance 期间整个 Consumer Group 停止消费（Stop-the-World）。优化：① 用 CooperativeSticky 增量式；② 合理设置 session.timeout.ms 和 heartbeat.interval.ms；③ 避免频繁重启消费者。</div>
+
+        <h3 id="p1-7">1.7 事务与 Exactly-Once</h3>
+        <div class="diagram">
+          <div class="diagram-title">Kafka 事务流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">initTransactions()</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">beginTransaction()</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">send() × N</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">commitTransaction()</div>
+          </div>
+          <p style="margin-top:0.8rem;text-align:center;color:var(--text-dim)">Transaction Coordinator 在 __transaction_state 中记录事务状态</p>
+        </div>
+        <div class="card">
+          <h4>端到端 Exactly-Once 保证</h4>
+          <p><strong>Producer 端</strong>：幂等 Producer + 事务（跨 Partition 原子写入）<br>
+          <strong>Consumer 端</strong>：手动提交 Offset + 业务处理幂等（唯一 ID + 去重表）<br>
+          <strong>Kafka Streams</strong>：<code>processing.guarantee=exactly_once_v2</code>，自动处理</p>
+        </div>
+
+        <!-- ================= PART 2 ================= -->
+        <h2 id="p2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="p2-1">2.1 日志收集场景</h3>
+        <div class="diagram">
+          <div class="diagram-title">ELK + Kafka 日志管道</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">应用日志</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Filebeat<br><span style="font-size:0.7rem">采集</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Kafka<br><span style="font-size:0.7rem">缓冲/解耦</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Logstash<br><span style="font-size:0.7rem">转换</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Elasticsearch</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">Kibana</div>
+          </div>
+        </div>
+        <div class="tip">Kafka 在日志管道中的作用：<strong>缓冲层</strong>——吸收日志洪峰，解耦采集端和消费端，支持多消费者组同时消费（一份数据多个用途）。</div>
+
+        <h3 id="p2-2">2.2 消息队列场景</h3>
+        <div class="card">
+          <h4>解耦 · 异步 · 削峰</h4>
+          <p><strong>削峰</strong>：秒杀 10 万 QPS，数据库 5000 QPS。Kafka 先承接，消费者按能力匀速消费。<br>
+          <strong>异步</strong>：下单后发消息，库存/积分/短信异步处理，响应 500ms → 50ms。<br>
+          <strong>解耦</strong>：新增消费者无需改生产者。</p>
+        </div>
+
+        <h3 id="p2-3">2.3 流处理与 CDC</h3>
+        <div class="diagram">
+          <div class="diagram-title">Kafka Connect + Debezium CDC</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">MySQL Binlog</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Debezium<br><span style="font-size:0.7rem">Source Connector</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Kafka Topics</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Flink / ES / HBase<br><span style="font-size:0.7rem">Sink Connector</span></div>
+          </div>
+        </div>
+
+        <h3 id="p2-4">2.4 性能调优</h3>
+        <div class="card">
+          <h4>Producer 调优</h4>
+          <table>
+            <thead><tr><th>参数</th><th>默认值</th><th>调优建议</th></tr></thead>
+            <tbody>
+              <tr><td><code>batch.size</code></td><td>16KB</td><td>增大到 64KB~1MB，提高吞吐</td></tr>
+              <tr><td><code>linger.ms</code></td><td>0</td><td>设为 5~100ms，等更多消息攒批</td></tr>
+              <tr><td><code>compression.type</code></td><td>none</td><td>设为 lz4 或 snappy，减少网络</td></tr>
+              <tr><td><code>buffer.memory</code></td><td>32MB</td><td>增大到 64MB，防止缓冲区满阻塞</td></tr>
+              <tr><td><code>acks</code></td><td>all</td><td>可靠性要求不高可设为 1</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Broker 调优</h4>
+          <table>
+            <thead><tr><th>参数</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr><td><code>num.io.threads</code></td><td>设为 CPU 核数，处理磁盘 IO</td></tr>
+              <tr><td><code>num.network.threads</code></td><td>设为 CPU 核数，处理网络请求</td></tr>
+              <tr><td><code>log.segment.bytes</code></td><td>1GB（默认），按需调整</td></tr>
+              <tr><td><code>log.retention.hours</code></td><td>168h（7天），按存储调整</td></tr>
+              <tr><td><code>replica.fetch.max.bytes</code></td><td>≥ message.max.bytes</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="p2-5">2.5 消息积压处理</h3>
+        <div class="diagram">
+          <div class="diagram-title">积压处理流程</div>
+          <div class="flow">
+            <div class="flow-box flow-red">发现积压<br><span style="font-size:0.7rem">consumer lag > 阈值</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">紧急扩容<br><span style="font-size:0.7rem">增加消费者实例</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">分区扩容<br><span style="font-size:0.7rem">增加 partition 数</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">优化消费<br><span style="font-size:0.7rem">批量处理/并行</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <ul>
+            <li><strong>紧急</strong>：增加消费者数量（需 ≤ Partition 数），临时跳过非关键消息</li>
+            <li><strong>根本</strong>：优化消费逻辑（减少 DB 查询、批量写入、异步处理）</li>
+            <li><strong>预防</strong>：监控 consumer lag，设置告警阈值</li>
+          </ul>
+        </div>
+
+        <!-- ================= PART 3 ================= -->
+        <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa"><div class="q">Kafka 为什么吞吐量这么高？</div><div class="a">① 顺序写磁盘（追加写入比随机写快 1000 倍）；② Zero-Copy（sendfile 系统调用，数据不经过用户态）；③ Page Cache（利用 OS 页缓存，进程重启不丢）；④ 批量发送 + 压缩（batch.size + linger.ms 攒批，Snappy/LZ4 压缩减少网络）。</div></div>
+
+        <div class="qa"><div class="q">Kafka 如何保证消息不丢失？</div><div class="a">三个环节——① <strong>Producer</strong>：<code>acks=all</code> + 幂等 Producer + 重试；② <strong>Broker</strong>：<code>min.insync.replicas=2</code> + 多副本 ISR + <code>unclean.leader.election.enable=false</code>；③ <strong>Consumer</strong>：手动提交 Offset，处理完再确认。</div></div>
+
+        <div class="qa"><div class="q">Kafka 如何保证消息顺序？</div><div class="a">Partition 内有序，跨 Partition 无序。要保证顺序：① 同一业务 key 的消息发到同一 Partition（指定 key）；② 单 Partition 单消费者。注意：Producer 重试可能导致乱序，<code>max.in.flight.requests.per.connection=1</code> 或开启幂等（5.0+ 允许 <5 且不乱序）。</div></div>
+
+        <div class="qa"><div class="q">Consumer Rebalance 是什么？有什么问题？怎么优化？</div><div class="a">消费者加入/离开组时重新分配 Partition。<strong>问题</strong>：Rebalance 期间整个组停止消费（Stop-the-World），可能持续几十秒。<strong>优化</strong>：① 用 CooperativeSticky 增量式 Rebalance；② 合理设置 session.timeout.ms；③ 避免频繁重启；④ 静态成员（group.instance.id）减少不必要的 Rebalance。</div></div>
+
+        <div class="qa"><div class="q">ISR 机制是什么？</div><div class="a">ISR（In-Sync Replicas）是与 Leader 保持同步的副本集合。acks=all 时需要 ISR 全部确认。Follower 落后超过 replica.lag.time.max.ms 会被踢出。优势：不需要所有副本确认，只要"跟得上"的确认，兼顾可靠性和性能。Leader 宕机从 ISR 选举新 Leader。</div></div>
+
+        <div class="qa"><div class="q">Kafka 和 RabbitMQ 的区别？</div><div class="a">Kafka 是"日志型"——追加写磁盘、消费后不删除、高吞吐（百万级/s）、Pull 模式、适合大数据/日志。RabbitMQ 是"传统型"——消费后删除、灵活路由（4 种 Exchange）、低延迟（μs 级）、Push 模式、适合业务消息。简单说：大数据选 Kafka，业务消息选 RabbitMQ。</div></div>
+
+        <div class="qa"><div class="q">Kafka 如何实现 Exactly-Once？</div><div class="a">Producer 端：幂等（PID + SequenceNumber 去重）+ 事务（跨 Partition 原子写入）。Consumer 端：手动提交 + 业务幂等（唯一 ID 去重）。Kafka Streams：processing.guarantee=exactly_once_v2 自动处理。端到端 Exactly-Once 需要 Source 和 Sink 都支持事务。</div></div>
+
+        <div class="qa"><div class="q">Kafka 消息积压怎么处理？</div><div class="a">紧急：增加消费者实例（需 ≤ Partition 数）、临时跳过非关键消息。根本：优化消费逻辑（批量处理、异步写入、减少 DB 调用）、增加 Partition 数。预防：监控 consumer lag，设置告警。</div></div>
+
+        <div class="qa"><div class="q">Zero-Copy 原理？</div><div class="a">传统方式：磁盘→内核缓冲→用户态→内核 socket 缓冲→网卡（4 次拷贝）。Zero-Copy：磁盘→内核缓冲→网卡（2 次拷贝），使用 sendfile() 系统调用，数据不经过用户态，减少 CPU 拷贝和上下文切换。</div></div>
+
+        <div class="qa"><div class="q">__consumer_offsets 是什么？</div><div class="a">Kafka 内置 Topic（50 个 Partition），存储消费者组的消费位移。消费者提交 Offset 时写入该 Topic（key=groupId+topic+partition，value=offset）。Coordinator 根据 groupId 的 hash 选择 Partition。旧版本依赖 ZK 存储 Offset，新版本全部用 __consumer_offsets。</div></div>
+
+        <div class="qa"><div class="q">KRaft 模式是什么？</div><div class="a">Kafka 3.3+ 用 Raft 共识协议取代 ZooKeeper。Controller 节点组成 Raft 集群管理元数据。优势：① 启动更快（不需要加载 ZK 数据）；② 扩展性更好（支持更多 Partition）；③ 运维更简单（少一个组件）。生产环境 3.3+ 推荐使用 KRaft。</div></div>
+
+        <div class="qa"><div class="q">Partition 数量怎么选？</div><div class="a">考虑因素：① 消费者并行度（Partition 数 ≥ 消费者数）；② 吞吐需求（更多 Partition = 更高并行度，但也有上限）；③ 端到端延迟（Partition 越多，Rebalance 越慢）；④ Leader 选举时间（Partition 越多，选举越慢）。经验值：单 Topic 不超过 200 个 Partition，按需扩展。</div></div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Kafka · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u,{passive:true});u()})();
+  </script>
+</body>
+</html>

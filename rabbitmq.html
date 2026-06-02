@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RabbitMQ - 面试知识复习库</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="index.html">📚 面试知识复习库</a><a class="back" href="index.html">← 返回目录</a></div></nav>
+  <div class="container">
+    <h1>🐰 RabbitMQ</h1>
+    <p class="subtitle">AMQP 消息代理 · 灵活路由 · 可靠投递 · 企业级</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#p1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#p1-1">整体架构</a></li>
+          <li class="sub"><a href="#p1-2">Exchange 类型</a></li>
+          <li class="sub"><a href="#p1-3">消息确认机制</a></li>
+          <li class="sub"><a href="#p1-4">持久化</a></li>
+          <li class="sub"><a href="#p1-5">死信队列 DLX</a></li>
+          <li class="sub"><a href="#p1-6">延迟队列</a></li>
+          <li class="sub"><a href="#p1-7">流控与内存告警</a></li>
+          <li><a href="#p2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#p2-1">异步解耦</a></li>
+          <li class="sub"><a href="#p2-2">削峰填谷</a></li>
+          <li class="sub"><a href="#p2-3">延迟任务</a></li>
+          <li class="sub"><a href="#p2-4">全链路可靠性</a></li>
+          <li class="sub"><a href="#p2-5">高可用方案</a></li>
+          <li class="sub"><a href="#p2-6">消息积压处理</a></li>
+          <li><a href="#p3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ================= PART 1 ================= -->
+        <h2 id="p1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="p1-1">1.1 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">AMQP 协议模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Producer 生产者</strong>
+                <div class="arch-label">Connection → Channel → 发布消息到 Exchange</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 携带 Routing Key</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Exchange</strong><br>路由引擎
+                <div class="arch-label">根据 type + binding key<br>路由到匹配的 Queue</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ Binding（绑定规则）</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Queue A</strong><br>消息缓冲
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Queue B</strong><br>消息缓冲
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Queue C</strong><br>消息缓冲
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ Push / Pull</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Consumer 消费者</strong>
+                <div class="arch-label">Channel → 订阅 Queue → 处理消息 → ACK 确认</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>核心组件</h4>
+          <ul>
+            <li><strong>Connection</strong>：TCP 长连接，一个连接可复用多个 Channel</li>
+            <li><strong>Channel</strong>：轻量级会话，多线程共用一个 Connection</li>
+            <li><strong>Exchange</strong>：路由引擎，根据 type 和 binding key 决定消息去哪个 Queue</li>
+            <li><strong>Queue</strong>：消息存储缓冲，消费者从 Queue 订阅</li>
+            <li><strong>Binding</strong>：Exchange 和 Queue 之间的绑定关系，携带 routing key</li>
+            <li><strong>Virtual Host</strong>：虚拟隔离空间，类似 namespace</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-2">1.2 Exchange 类型</h3>
+        <div class="diagram">
+          <div class="diagram-title">四种 Exchange 类型</div>
+          <table>
+            <thead><tr><th>类型</th><th>路由规则</th><th>典型场景</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Direct</span></td><td>精确匹配 routing key</td><td>点对点、任务分发</td></tr>
+              <tr><td><span class="badge badge-green">Fanout</span></td><td>广播到所有绑定队列（忽略 routing key）</td><td>广播通知、日志分发</td></tr>
+              <tr><td><span class="badge badge-orange">Topic</span></td><td>通配符匹配：<code>*</code> 匹配一个词，<code>#</code> 匹配零或多个词</td><td>按规则订阅、分类路由</td></tr>
+              <tr><td><span class="badge badge-purple">Headers</span></td><td>根据消息 header 属性匹配</td><td>复杂属性匹配（少用）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Topic Exchange 示例</h4>
+          <div class="flow">
+            <div class="flow-box flow-orange">order.create.cn<br><span style="font-size:0.7rem">routing key</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Topic Exchange<br><span style="font-size:0.7rem">匹配规则</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Q1: order.*<br><span style="font-size:0.7rem">匹配 ✅</span></div>
+            <div class="flow-box flow-blue">Q2: order.#.cn<br><span style="font-size:0.7rem">匹配 ✅</span></div>
+            <div class="flow-box flow-red">Q3: payment.*<br><span style="font-size:0.7rem">不匹配 ❌</span></div>
+          </div>
+        </div>
+
+        <h3 id="p1-3">1.3 消息确认机制</h3>
+        <div class="diagram">
+          <div class="diagram-title">全链路确认机制</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Producer → Broker</strong>
+                <div class="arch-label">Publisher Confirm<br>异步回调确认</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Broker 存储</strong>
+                <div class="arch-label">Exchange + Queue<br>持久化</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Broker → Consumer</strong>
+                <div class="arch-label">Consumer ACK<br>手动/自动确认</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Consumer ACK 模式</h4>
+          <table>
+            <thead><tr><th>模式</th><th>行为</th><th>可靠性</th></tr></thead>
+            <tbody>
+              <tr><td><code>auto</code></td><td>收到即确认，不管是否处理成功</td><td><span class="badge badge-red">可能丢消息</span></td></tr>
+              <tr><td><code>manual</code></td><td>业务代码中手动调用 basicAck/basicNack</td><td><span class="badge badge-green">最可靠</span></td></tr>
+              <tr><td><code>auto（ prefetch ）</code></td><td>处理完一条再推下一条</td><td><span class="badge badge-orange">较好</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip"><strong>生产推荐</strong>：手动 ACK + <code>basicNack(requeue=false)</code> 失败消息进入死信队列，不要 requeue=true（会反复重试导致消息堆积）。</div>
+
+        <h3 id="p1-4">1.4 持久化</h3>
+        <div class="card">
+          <h4>三层持久化</h4>
+          <ul>
+            <li><strong>Exchange 持久化</strong>：<code>durable=true</code>，Broker 重启后 Exchange 还在</li>
+            <li><strong>Queue 持久化</strong>：<code>durable=true</code>，Broker 重启后 Queue 还在（但消息会丢）</li>
+            <li><strong>Message 持久化</strong>：<code>deliveryMode=2</code>，消息写入磁盘</li>
+          </ul>
+          <p class="warn">三者缺一不可！Exchange 和 Queue 不持久化，重启后结构丢失；消息不持久化，重启后内容丢失。</p>
+        </div>
+
+        <h3 id="p1-5">1.5 死信队列 (DLX)</h3>
+        <div class="diagram">
+          <div class="diagram-title">死信队列触发条件</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--danger);background:rgba(239,68,68,0.06)">
+                <strong>消息被 reject / nack</strong><br>（requeue=false）
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>消息 TTL 过期</strong>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>队列达到最大长度</strong>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 三种情况都会导致消息成为死信</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>Dead Letter Exchange (DLX)</strong> → 绑定的死信队列
+                <div class="arch-label">可以设置重试、告警、人工处理</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="p1-6">1.6 延迟队列</h3>
+        <div class="card">
+          <h4>方案一：TTL + DLX（原生实现）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Producer<br><span style="font-size:0.7rem">设置消息 TTL=30min</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">业务队列<br><span style="font-size:0.7rem">无消费者</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">TTL 过期<br><span style="font-size:0.7rem">成为死信</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">DLX 死信队列<br><span style="font-size:0.7rem">消费者处理</span></div>
+          </div>
+          <p>典型：<strong>订单 30 分钟未支付自动取消</strong>。下单时发消息到业务队列（TTL=30min），超时后进入死信队列，消费者检查订单状态并取消。</p>
+        </div>
+        <div class="card">
+          <h4>方案二：延迟插件（rabbitmq_delayed_message_exchange）</h4>
+          <p>安装插件后，Exchange 类型变为 <code>x-delayed-message</code>，消息携带 <code>x-delay</code> header 指定延迟时间，Broker 到时间后才投递。</p>
+          <p class="tip">优势：支持任意延迟时间（不局限于队列级别 TTL），实现更灵活。劣势：需要安装插件，社区维护。</p>
+        </div>
+
+        <h3 id="p1-7">1.7 流控与内存告警</h3>
+        <div class="card">
+          <h4>Credit-Based Flow Control</h4>
+          <p>RabbitMQ 使用信用流控：Producer 发送消息消耗 Credit，Broker 处理完后返还 Credit。Credit 用完时 Producer 阻塞，防止 Broker 被压垮。</p>
+          <h4>内存 / 磁盘告警</h4>
+          <ul>
+            <li><strong>内存告警</strong>：内存使用超过阈值（默认 40%），Broker 阻塞所有连接的写入</li>
+            <li><strong>磁盘告警</strong>：磁盘剩余空间低于阈值（默认 50MB），Broker 阻塞写入</li>
+            <li>告警解除后自动恢复</li>
+          </ul>
+        </div>
+
+        <!-- ================= PART 2 ================= -->
+        <h2 id="p2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="p2-1">2.1 异步解耦</h3>
+        <div class="diagram">
+          <div class="diagram-title">订单系统异步解耦</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">下单服务</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">RabbitMQ<br><span style="font-size:0.7rem">order.exchange</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">库存服务</div>
+            <div class="flow-box flow-purple">积分服务</div>
+            <div class="flow-box flow-pink">短信服务</div>
+          </div>
+          <p style="margin-top:0.8rem">下单只需写库 + 发消息，500ms → 50ms。新增"通知服务"只需绑定 Exchange，不改下单代码。</p>
+        </div>
+
+        <h3 id="p2-2">2.2 削峰填谷</h3>
+        <div class="card">
+          <h4>秒杀场景</h4>
+          <p>瞬时 10 万 QPS，数据库 5000 QPS。RabbitMQ 先承接流量到队列，消费者按 5000 QPS 匀速消费。队列起缓冲作用，保护下游。</p>
+          <p class="warn">注意：RabbitMQ 消息存内存，大量堆积会影响性能。如果预估堆积量大（>百万），考虑用 Kafka 替代。</p>
+        </div>
+
+        <h3 id="p2-3">2.3 延迟任务</h3>
+        <div class="card">
+          <h4>典型场景</h4>
+          <ul>
+            <li><strong>订单超时取消</strong>：下单 → 发 TTL=30min 消息 → 超时检查并取消</li>
+            <li><strong>会议提醒</strong>：创建会议 → 发 TTL=提前15min 消息 → 到时推送通知</li>
+            <li><strong>重试机制</strong>：失败消息 → 发递增 TTL 消息（1s→5s→30s）→ 延迟重试</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-4">2.4 全链路可靠性保障</h3>
+        <div class="diagram">
+          <div class="diagram-title">可靠性三板斧</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>① Producer Confirm</strong>
+                <div class="arch-label">异步回调<br>channel.confirmSelect()<br>addConfirmListener</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>② 持久化</strong>
+                <div class="arch-label">Exchange durable<br>Queue durable<br>Message deliveryMode=2</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>③ Consumer ACK</strong>
+                <div class="arch-label">手动确认 basicAck<br>失败 basicNack(requeue=false)<br>进死信队列</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>消息幂等性</h4>
+          <p>网络抖动可能导致消息重复投递。解决方案：Producer 发送时携带全局唯一 ID（如 UUID），Consumer 处理前查询去重表，已处理则跳过。</p>
+        </div>
+
+        <h3 id="p2-5">2.5 高可用方案</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">普通集群</h4>
+            <p>元数据同步，Queue 数据只在声明节点上</p>
+            <p>其他节点访问时从声明节点拉取</p>
+            <p class="warn">Queue 所在节点宕机 → 数据丢失</p>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">镜像队列 (Mirror)</h4>
+            <p>Queue 数据在所有节点都有镜像</p>
+            <p>写入同步到所有镜像，读从 Master</p>
+            <p class="tip">节点宕机自动切换，数据不丢</p>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Quorum Queue（3.8+ 推荐）</h4>
+          <p>基于 Raft 协议的分布式队列，替代镜像队列。优势：① 更好的数据一致性；② 更高的吞吐量；③ 支持消息确认的多数派提交。劣势：不支持消费者优先级、不支持 TTL 消息的即时过期检测。</p>
+        </div>
+
+        <h3 id="p2-6">2.6 消息积压处理</h3>
+        <div class="card">
+          <ul>
+            <li><strong>紧急</strong>：增加消费者数量、提高 prefetch 数量</li>
+            <li><strong>根本</strong>：优化消费逻辑、批量处理、异步写入</li>
+            <li><strong>预防</strong>：监控队列长度，设置告警</li>
+            <li><strong>极端</strong>：临时将消息转发到更大的队列，消费者从新队列消费</li>
+          </ul>
+        </div>
+
+        <!-- ================= PART 3 ================= -->
+        <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa"><div class="q">RabbitMQ 的 Exchange 有哪些类型？分别什么场景？</div><div class="a"><strong>Direct</strong>：精确匹配 routing key，点对点任务分发。<strong>Fanout</strong>：广播到所有绑定队列，日志分发。<strong>Topic</strong>：通配符匹配（*一个词，#零或多词），按规则订阅。<strong>Headers</strong>：按 header 属性匹配（少用）。</div></div>
+
+        <div class="qa"><div class="q">如何保证消息不丢失？</div><div class="a">三个环节——① <strong>Producer</strong>：开启 Publisher Confirm，异步回调确认 Broker 已收到；② <strong>Broker</strong>：Exchange + Queue + Message 三者都持久化（durable + deliveryMode=2）；③ <strong>Consumer</strong>：手动 ACK，处理完再确认；失败用 basicNack(requeue=false) 进死信队列。</div></div>
+
+        <div class="qa"><div class="q">如何保证消息顺序性？</div><div class="a">单 Queue 单 Consumer 有序。如果需要并行消费但保证部分有序：将同一业务 key 的消息发到同一 Queue（用 key hash 路由）。注意：Consumer ACK 失败后 requeue 可能导致乱序，建议失败进死信队列。</div></div>
+
+        <div class="qa"><div class="q">什么是死信队列？怎么用？</div><div class="a">消息在三种情况下成为死信：① 被 reject/nack（requeue=false）；② TTL 过期；③ 队列满。死信会路由到指定的 DLX（Dead Letter Exchange）绑定的队列。用途：延迟任务（TTL+DLX）、失败消息重试、异常消息告警。</div></div>
+
+        <div class="qa"><div class="q">RabbitMQ 如何实现延迟队列？</div><div class="a">两种方案——① <strong>TTL + DLX</strong>：消息设 TTL 发到无消费者的队列，过期后进死信队列被消费。② <strong>延迟插件</strong>：安装 delayed_message_exchange，消息带 x-delay header，Broker 到时间才投递。方案一简单但只能队列级别设 TTL；方案二灵活支持任意延迟时间。</div></div>
+
+        <div class="qa"><div class="q">镜像队列和 Quorum Queue 有什么区别？</div><div class="a"><strong>镜像队列</strong>：主从模式，写入 Master 后同步到 Slave，Master 宕机从 Slave 选新 Master。问题：同步是异步的，可能丢消息。<strong>Quorum Queue</strong>（3.8+）：基于 Raft，多数派确认才算成功，数据一致性更好，吞吐量更高。推荐用 Quorum Queue 替代镜像队列。</div></div>
+
+        <div class="qa"><div class="q">消息幂等性怎么保证？</div><div class="a">Producer 发送时携带全局唯一 ID（如 UUID）。Consumer 处理前查去重表（Redis Set 或 DB 表），已处理则跳过。注意：去重表要设过期时间（如 24h），防止无限增长。</div></div>
+
+        <div class="qa"><div class="q">RabbitMQ 和 Kafka 的区别？什么场景用哪个？</div><div class="a"><strong>RabbitMQ</strong>：传统消息代理，灵活路由（4 种 Exchange），低延迟（μs 级），消息消费后删除，适合业务消息。<strong>Kafka</strong>：分布式流平台，高吞吐（百万级/s），消息保留可回溯，Pull 模式，适合大数据/日志。简单说：业务消息选 RabbitMQ，大数据选 Kafka。</div></div>
+
+        <div class="qa"><div class="q">消息积压怎么处理？</div><div class="a">紧急：① 增加消费者数量；② 提高 prefetch 值；③ 临时跳过非关键消息。根本：① 优化消费逻辑（减少 DB 调用、批量处理）；② 异步化非关键操作。预防：监控队列长度和消费速率，设置告警阈值。</div></div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          RabbitMQ · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u,{passive:true});u()})();
+  </script>
+</body>
+</html>
