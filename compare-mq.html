@@ -55,26 +55,20 @@
   <div class="container">
     <h1>📨 消息队列 & 流计算对比</h1>
     <p class="subtitle">Kafka · RocketMQ · RabbitMQ · Pulsar · Flink · Spark — 异步解耦到实时计算</p>
-    <div class="page-layout">
-      <div class="sidebar">
-        <div class="sidebar-title">📑 目录导航</div>
-        <ul>
-          <li><a href="#overview">全景定位</a></li>
-          <li><a href="#summary">一句话速查表</a></li>
-          <li><a href="#vs1">Kafka vs RabbitMQ</a></li>
-          <li><a href="#vs2">Kafka vs RocketMQ</a></li>
-          <li><a href="#vs3">Kafka vs Pulsar</a></li>
-          <li><a href="#vs4">Flink vs Spark</a></li>
-          <li><a href="#vs5">MQ vs 流处理</a></li>
-          <li><a href="#scenario">场景选型指南</a></li>
-          <li><a href="#interview">面试高频对比题</a></li>
-        </ul>
-      </div>
-      <div class="main-content">
 
-
-61|      
-
+    <div class="toc">
+      <div class="toc-title">📑 目录</div>
+      <ul>
+        <li><a href="#overview">全景定位：消息队列在架构中的角色</a></li>
+        <li><a href="#summary">一句话速查表</a></li>
+        <li><a href="#vs1">Kafka vs RabbitMQ — 高吞吐 vs 灵活路由</a></li>
+        <li><a href="#vs2">Kafka vs RocketMQ — 开源标杆 vs 金融级</a></li>
+        <li><a href="#vs3">Kafka vs Pulsar — 经典 vs 新一代</a></li>
+        <li><a href="#vs4">Flink vs Spark Streaming — 实时流 vs 微批</a></li>
+        <li><a href="#vs5">MQ vs 流处理 — 消息队列和流计算的关系</a></li>
+        <li><a href="#scenario">场景选型指南</a></li>
+        <li><a href="#interview">面试高频对比题</a></li>
+      </ul>
     </div>
 
     <!-- ============================================================ -->
@@ -486,3 +480,282 @@
         </div>
         <div class="vs-row">
           <div class="dim-val left"><span class="highlight">社区最成熟，生态最丰富</span></div>
+          <div class="dim-label">成熟度</div>
+          <div class="dim-val right">快速增长中，但生态不如 Kafka</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试话术</strong>：Pulsar 的存算分离架构是最大亮点——扩容不需要数据迁移，多租户天然支持。但 Kafka 生态更成熟（Flink/Spark/Connect 集成好），社区更大。目前 Kafka 仍是主流选择，Pulsar 在云原生和多租户场景有优势。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 4: Flink vs Spark Streaming -->
+    <!-- ============================================================ -->
+    <h2 id="vs4"><span class="icon">⚔️</span>Flink vs Spark Streaming — 实时流 vs 微批</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#34d399;">🌊 Flink</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#facc15;">⚡ Spark Streaming</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">真正的流处理（逐条处理）</span></div>
+          <div class="dim-label">计算模型</div>
+          <div class="dim-val right">微批处理（Micro-Batch）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">ms 级延迟</span></div>
+          <div class="dim-label">延迟</div>
+          <div class="dim-val right">秒级延迟（批大小决定）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">Event Time 天然支持</span></div>
+          <div class="dim-label">时间语义</div>
+          <div class="dim-val right">Processing Time 为主</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">Watermark 机制处理乱序</span></div>
+          <div class="dim-label">乱序处理</div>
+          <div class="dim-val right">无原生 Watermark</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">丰富的 State 管理</span></div>
+          <div class="dim-label">状态管理</div>
+          <div class="dim-val right">DStream 无原生 State</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">Chandy-Lamport 精确一次</span></div>
+          <div class="dim-label">Exactly-Once</div>
+          <div class="dim-val right">微批 + 幂等实现</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">DataStream + Table/SQL</div>
+          <div class="dim-label">API</div>
+          <div class="dim-val right"><span class="highlight">Spark SQL 更成熟</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">流处理为主，批处理为辅</div>
+          <div class="dim-label">批流统一</div>
+          <div class="dim-val right"><span class="highlight">Structured Streaming 统一批流</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">流计算首选</div>
+          <div class="dim-label">市场趋势</div>
+          <div class="dim-val right"><span class="highlight">批处理 + 机器学习首选</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>Flink vs Spark 技术栈选型</h4>
+      <div class="diagram">
+        <div class="diagram-title">流处理 vs 批处理的定位</div>
+        <div class="arch-container">
+          <div class="arch-row">
+            <div class="arch-box" style="border-color:var(--accent3); background:rgba(52,211,153,0.06);">
+              <strong>🌊 Flink</strong>
+              <div class="arch-label">实时风控 · 实时大屏<br>CDC · CEP · 低延迟 ETL</div>
+            </div>
+            <div class="arch-box" style="border-color:var(--accent); background:rgba(56,189,248,0.06);">
+              <strong>⚡ Spark</strong>
+              <div class="arch-label">离线数仓 · 机器学习<br>大规模批处理 · 图计算</div>
+            </div>
+          </div>
+          <div class="arch-connector">↓ 统一趋势 ↓</div>
+          <div class="arch-row">
+            <div class="arch-box-wide" style="border-color:var(--accent2); background:rgba(129,140,248,0.06);">
+              <strong>湖仓一体</strong> — Flink CDC + Iceberg/Hudi + Spark 批处理
+              <div class="arch-label">实时入湖 + 离线分析 的统一架构</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 5: MQ vs 流处理 -->
+    <!-- ============================================================ -->
+    <h2 id="vs5"><span class="icon">🔗</span>MQ vs 流处理 — 它们是什么关系？</h2>
+
+    <div class="card">
+      <h4>消息队列 ≠ 流处理，但经常配合使用</h4>
+      <div class="diagram">
+        <div class="diagram-title">MQ 和流处理引擎的协作关系</div>
+        <div class="flow">
+          <div class="flow-box flow-blue">数据源<br><span style="font-size:0.7rem;">业务系统/日志</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-green"><strong>MQ（传输层）</strong><br><span style="font-size:0.7rem;">Kafka / RocketMQ</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-orange"><strong>流处理（计算层）</strong><br><span style="font-size:0.7rem;">Flink / Spark</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-purple">输出<br><span style="font-size:0.7rem;">DB/ES/大屏</span></div>
+        </div>
+      </div>
+      <div class="compare-row" style="margin-top:1rem;">
+        <div class="compare-box" style="border-color:var(--accent3);">
+          <h4 style="color:var(--accent3);">📨 消息队列</h4>
+          <p><strong>做什么</strong>：数据的搬运工，负责可靠传输</p>
+          <p><strong>不做什么</strong>：不做复杂计算、窗口聚合、状态管理</p>
+          <p><strong>关键词</strong>：解耦、削峰、异步、广播</p>
+        </div>
+        <div class="compare-box" style="border-color:var(--accent4);">
+          <h4 style="color:var(--accent4);">🌊 流处理引擎</h4>
+          <p><strong>做什么</strong>：数据的加工厂，负责实时计算</p>
+          <p><strong>不做什么</strong>：不做消息持久化和可靠投递</p>
+          <p><strong>关键词</strong>：窗口、聚合、CEP、状态、ETL</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试要点</strong>：Kafka 既是消息队列也是流平台（Kafka Streams），但在大数据场景通常只用它做传输层，计算交给 Flink。不要把"消息队列"和"流处理"混为一谈——前者解决"数据怎么传"，后者解决"数据怎么算"。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Scenario Guide -->
+    <!-- ============================================================ -->
+    <h2 id="scenario"><span class="icon">🎯</span>场景选型指南</h2>
+
+    <div class="when-grid">
+      <div class="when-card" style="border-color:#34d399;">
+        <div class="wc-title" style="color:#34d399;">📨 选 Kafka</div>
+        <div class="wc-scene">
+          • 高吞吐日志收集（万级 → 百万级/s）<br>
+          • 大数据管道（Hadoop/Spark/Flink 数据源）<br>
+          • 需要消息回溯（按 offset 重新消费）<br>
+          • CDC 数据同步（Debezium + Kafka Connect）<br>
+          • 典型：日志平台、数据仓库、实时数仓
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#818cf8;">
+        <div class="wc-title" style="color:#818cf8;">🚀 选 RocketMQ</div>
+        <div class="wc-scene">
+          • 金融级消息（事务消息、可靠投递）<br>
+          • 延迟消息（订单超时、定时推送）<br>
+          • 消息过滤（Tag/SQL 表达式）<br>
+          • 国内大厂技术栈（阿里系）<br>
+          • 典型：电商交易、金融支付、物流
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">🐰 选 RabbitMQ</div>
+        <div class="wc-scene">
+          • 复杂路由规则（Topic/Direct/Fanout）<br>
+          • 低延迟业务消息（μs 级）<br>
+          • 企业级 AMQP 合规需求<br>
+          • 小团队，运维简单优先<br>
+          • 典型：企业应用、微服务通信、任务队列
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#f472b6;">
+        <div class="wc-title" style="color:#f472b6;">📡 选 Pulsar</div>
+        <div class="wc-scene">
+          • 云原生环境，需要存算分离<br>
+          • 多租户隔离需求<br>
+          • 跨地域数据同步（Geo-Replication）<br>
+          • 典型：云平台、SaaS 服务、多数据中心
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#34d399;">
+        <div class="wc-title" style="color:#34d399;">🌊 选 Flink</div>
+        <div class="wc-scene">
+          • 实时计算（延迟 < 1秒）<br>
+          • 复杂事件处理（CEP 规则引擎）<br>
+          • 状态管理（大状态 + Exactly-Once）<br>
+          • CDC 实时入湖<br>
+          • 典型：实时风控、实时大屏、实时 ETL
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#facc15;">
+        <div class="wc-title" style="color:#facc15;">⚡ 选 Spark</div>
+        <div class="wc-scene">
+          • 大规模离线批处理<br>
+          • 机器学习训练（MLlib）<br>
+          • 图计算（GraphX）<br>
+          • 已有 Spark 生态，统一技术栈<br>
+          • 典型：离线数仓、数据挖掘、模型训练
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Interview Questions -->
+    <!-- ============================================================ -->
+    <h2 id="interview"><span class="icon">🎤</span>面试高频对比题</h2>
+
+    <div class="qa">
+      <div class="q">Kafka、RabbitMQ、RocketMQ 怎么选？</div>
+      <div class="a">
+        <strong>参考答案</strong>：看场景——大数据/日志/高吞吐选 <strong>Kafka</strong>（百万级/s，磁盘堆积无压力）；业务消息/低延迟/复杂路由选 <strong>RabbitMQ</strong>（4 种 Exchange，μs 级延迟）；金融级/延迟消息/事务消息选 <strong>RocketMQ</strong>（阿里双十一验证，18 级延迟消息）。三者不互斥，大型系统可能同时用 Kafka 做数据管道 + RabbitMQ 做业务消息。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Kafka 为什么吞吐量比 RabbitMQ 高？</div>
+      <div class="a">
+        <strong>参考答案</strong>：四个原因——① <strong>顺序写磁盘</strong>：Kafka 追加写入，比随机写快 1000 倍；② <strong>批量发送</strong>：Producer 攒一批消息一起发，减少网络开销；③ <strong>Zero-Copy</strong>：sendfile 系统调用，数据直接从磁盘到网卡，不经过用户态；④ <strong>Pull 模式</strong>：消费者按需拉取，Broker 不需要维护推送状态。RabbitMQ 是单条投递 + 内存操作，延迟低但吞吐量上不去。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Flink 和 Spark Streaming 最本质的区别是什么？</div>
+      <div class="a">
+        <strong>参考答案</strong>：计算模型不同。Flink 是<strong>真正的流处理</strong>，数据逐条到达逐条处理，延迟 ms 级。Spark Streaming 是<strong>微批处理</strong>，把流数据切成小批次（如 1 秒一批），本质上还是批处理，延迟秒级。这个本质区别导致：Flink 天然支持 Event Time 和 Watermark 处理乱序数据，有完善的 State 管理和 Checkpoint 机制。Spark Structured Streaming 虽然也在改进，但在低延迟和状态管理上仍不如 Flink。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">消息队列如何保证消息不丢失？</div>
+      <div class="a">
+        <strong>参考答案</strong>：三个环节都要保证——<br>
+        ① <strong>生产者</strong>：Kafka 用 <code>acks=all</code> + 幂等 Producer；RabbitMQ 用 Publisher Confirm；RocketMQ 用同步发送 + 重试。<br>
+        ② <strong>Broker</strong>：Kafka 多副本 ISR + <code>min.insync.replicas=2</code>；RabbitMQ 消息持久化（durable + deliveryMode=2）；RocketMQ 同步刷盘 + 主从同步。<br>
+        ③ <strong>消费者</strong>：手动提交 Offset/ACK，处理完再确认。不要用自动提交，否则消息处理失败就丢了。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">什么是消息积压？怎么处理？</div>
+      <div class="a">
+        <strong>参考答案</strong>：消费者处理速度跟不上生产速度，导致消息在队列中堆积。<br>
+        <strong>紧急处理</strong>：① 增加消费者数量（加机器）；② 增加分区数（Kafka）或队列数（RabbitMQ）；③ 消费者跳过非关键消息。<br>
+        <strong>根本解决</strong>：① 优化消费逻辑（减少 DB 查询、批量处理）；② 消费者并行消费（多线程）；③ 架构优化（读写分离、异步处理）。<br>
+        <strong>预防</strong>：监控消费延迟（Kafka lag），设置告警阈值。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Kafka 的 ISR 机制是什么？</div>
+      <div class="a">
+        <strong>参考答案</strong>：ISR（In-Sync Replicas）是与 Leader 保持同步的副本集合。Producer 发送消息时，需要 ISR 中所有副本确认才算写入成功（<code>acks=all</code> 时）。如果 Follower 同步太慢（落后超过 <code>replica.lag.time.max.ms</code>），会被踢出 ISR。ISR 机制的优势：不需要所有副本都确认，只需要"跟得上"的副本确认，兼顾了可靠性和性能。如果 Leader 宕机，从 ISR 中选举新 Leader，不会丢数据。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Flink 的 Checkpoint 和 Spark 的 Checkpoint 有什么区别？</div>
+      <div class="a">
+        <strong>参考答案</strong>：Flink 的 Checkpoint 基于 <strong>Chandy-Lamport 分布式快照算法</strong>，通过 Barrier 对齐实现全局一致性快照，支持 Exactly-Once 语义，且对正常处理的影响很小（异步增量快照）。Spark 的 Checkpoint 是<strong>血缘截断</strong>，将 RDD 持久化到 HDFS，主要用于容错和切断过长的血缘链。两者目的不同：Flink Checkpoint 是为了故障恢复时保证状态一致性，Spark Checkpoint 更多是为了优化计算和容错。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Pulsar 的存算分离架构有什么优势？</div>
+      <div class="a">
+        <strong>参考答案</strong>：Pulsar 把 Broker（计算层）和 BookKeeper（存储层）分离。优势：① <strong>扩容无需迁移数据</strong>：加 Broker 直接用，数据在 BookKeeper 上不动；② <strong>独立扩展</strong>：计算瓶颈加 Broker，存储瓶颈加 Bookie；③ <strong>故障恢复快</strong>：Broker 无状态，挂了直接启动新的，不需要恢复数据。对比 Kafka：Kafka 的 Broker 既计算又存储，扩 Broker 需要 Rebalance 迁移 Partition，耗时且影响性能。
+      </div>
+    </div>
+
+    <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
+      <a href="index.html" style="color:var(--accent); text-decoration:none;">← 返回知识库目录</a>
+      <br><br>
+      消息队列 & 流计算对比 · 面试知识复习库 · Last updated 2026-06-02
+    </div>
+
+  </div>
+
+</body>
+</html>
