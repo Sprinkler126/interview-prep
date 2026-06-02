@@ -24,6 +24,8 @@ body {
   min-height: 100vh;
 }
 .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+/* 有侧边栏时加宽容器，保证内容区足够 */
+.container:has(.page-layout) { max-width: 1400px; }
 
 /* ===== Navigation ===== */
 .nav {
@@ -36,7 +38,7 @@ body {
   backdrop-filter: blur(12px);
 }
 .nav-inner {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 1.5rem;
   display: flex;
