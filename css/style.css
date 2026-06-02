@@ -210,8 +210,6 @@ th {
   background: var(--surface2);
   font-weight: 700;
   color: var(--accent);
-  position: sticky;
-  top: 60px;
 }
 tr:hover { background: rgba(56,189,248,0.04); }
 
