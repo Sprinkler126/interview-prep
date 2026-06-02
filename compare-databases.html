@@ -163,27 +163,21 @@
   <div class="container">
     <h1>🗄️ 数据库技术对比</h1>
     <p class="subtitle">MySQL · Redis · MongoDB · Elasticsearch · PostgreSQL · TiDB · HBase — 七种存储，各有战场</p>
-    <div class="page-layout">
-      <div class="sidebar">
-        <div class="sidebar-title">📑 目录导航</div>
-        <ul>
-          <li><a href="#overview">全景定位</a></li>
-          <li><a href="#summary">一句话速查表</a></li>
-          <li><a href="#vs1">MySQL vs PostgreSQL</a></li>
-          <li><a href="#vs2">MySQL vs TiDB</a></li>
-          <li><a href="#vs3">MongoDB vs ES</a></li>
-          <li><a href="#vs4">Redis vs Memcached</a></li>
-          <li><a href="#vs5">HBase vs MongoDB</a></li>
-          <li><a href="#scenario">场景选型指南</a></li>
-          <li><a href="#interview">面试高频对比题</a></li>
-        </ul>
-      </div>
-      <div class="main-content">
 
     <!-- TOC -->
-
-170|      
-
+    <div class="toc">
+      <div class="toc-title">📑 目录</div>
+      <ul>
+        <li><a href="#overview">全景定位：七种数据库在架构中的位置</a></li>
+        <li><a href="#summary">一句话速查表</a></li>
+        <li><a href="#vs1">MySQL vs PostgreSQL — 关系型双雄</a></li>
+        <li><a href="#vs2">MySQL vs TiDB — 单机 vs 分布式 SQL</a></li>
+        <li><a href="#vs3">MongoDB vs Elasticsearch — 文档存储 vs 搜索引擎</a></li>
+        <li><a href="#vs4">Redis vs Memcached — 内存缓存选型</a></li>
+        <li><a href="#vs5">HBase vs MongoDB — 列式 vs 文档，大数据场景</a></li>
+        <li><a href="#scenario">场景选型指南：什么业务该选什么？</a></li>
+        <li><a href="#interview">面试高频对比题</a></li>
+      </ul>
     </div>
 
     <!-- ============================================================ -->
@@ -486,3 +480,337 @@
           <div class="dim-val left">OLTP</div>
           <div class="dim-label">负载类型</div>
           <div class="dim-val right"><span class="highlight">HTAP（TiFlash 列存）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">零成本，无需迁移</span></div>
+          <div class="dim-label">MySQL 迁移</div>
+          <div class="dim-val right">兼容 MySQL 协议，可平滑迁移</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>TiDB 架构图</h4>
+      <div class="arch-container">
+        <div class="arch-row">
+          <div class="arch-box-wide" style="border-color:var(--accent); background:rgba(56,189,248,0.06);">
+            <strong>TiDB Server</strong>（无状态 SQL 层 · 兼容 MySQL 协议）
+          </div>
+        </div>
+        <div class="arch-connector">⬇️</div>
+        <div class="arch-row">
+          <div class="arch-box" style="border-color:var(--accent2); background:rgba(129,140,248,0.06);">
+            <strong>PD</strong><br>
+            <span class="arch-label">元数据 · 调度 · TSO</span>
+          </div>
+          <div class="arch-box" style="border-color:var(--accent3); background:rgba(52,211,153,0.06);">
+            <strong>TiKV</strong><br>
+            <span class="arch-label">行存 · Raft · 分布式事务</span>
+          </div>
+          <div class="arch-box" style="border-color:var(--accent4); background:rgba(251,146,60,0.06);">
+            <strong>TiFlash</strong><br>
+            <span class="arch-label">列存 · 实时 HTAP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试话术</strong>：当 MySQL 单实例扛不住、分库分表太痛苦时，TiDB 是"不用改代码的分布式 MySQL"。自动分片、分布式事务、HTAP 混合负载。但引入分布式也有代价：跨节点事务延迟、运维复杂度提升。适合数据量 > 1TB 或写入量极大的场景。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 3: MongoDB vs Elasticsearch -->
+    <!-- ============================================================ -->
+    <h2 id="vs3"><span class="icon">⚔️</span>MongoDB vs Elasticsearch — 文档存储 vs 搜索引擎</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#fb923c;">🍃 MongoDB</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fb923c;">🔍 Elasticsearch</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">通用文档数据库</span></div>
+          <div class="dim-label">定位</div>
+          <div class="dim-val right"><span class="highlight">搜索引擎 / 日志分析</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">BSON 文档（二进制 JSON）</div>
+          <div class="dim-label">存储格式</div>
+          <div class="dim-val right">JSON 文档 + 倒排索引</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">CRUD 均衡</span></div>
+          <div class="dim-label">读写特点</div>
+          <div class="dim-val right"><span class="highlight">读优化（写慢）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">MQL + Aggregation Pipeline</div>
+          <div class="dim-label">查询方式</div>
+          <div class="dim-val right">DSL + 全文检索 + 聚合</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">B-Tree 索引</div>
+          <div class="dim-label">索引类型</div>
+          <div class="dim-val right"><span class="highlight">倒排索引 + FST</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">强（4.0+ 多文档事务）</span></div>
+          <div class="dim-label">事务支持</div>
+          <div class="dim-val right">不支持</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">副本集 + Sharding</div>
+          <div class="dim-label">高可用</div>
+          <div class="dim-val right">主分片 + 副本分片</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">做主数据库</span></div>
+          <div class="dim-label">通常角色</div>
+          <div class="dim-val right"><span class="highlight">做搜索引擎 / 二级存储</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warn">
+      <strong>核心区别</strong>：MongoDB 是<strong>通用文档数据库</strong>，可以当主库用，支持事务和复杂 CRUD。Elasticsearch 是<strong>搜索引擎</strong>，擅长全文检索和聚合分析，但写入延迟高、不支持事务，通常不作主库。两者数据模型都是 JSON 文档，但底层实现完全不同。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 4: Redis vs Memcached -->
+    <!-- ============================================================ -->
+    <h2 id="vs4"><span class="icon">⚔️</span>Redis vs Memcached — 内存缓存选型</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#fb923c;">🔴 Redis</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#22d3ee;">Memcached</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">内存数据库 + 缓存</span></div>
+          <div class="dim-label">定位</div>
+          <div class="dim-val right">纯缓存</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">String/List/Hash/Set/ZSet/Stream</span></div>
+          <div class="dim-label">数据结构</div>
+          <div class="dim-val right">仅 String (KV)</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">RDB + AOF</span></div>
+          <div class="dim-label">持久化</div>
+          <div class="dim-val right">不支持</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">单线程（6.0 多线程 IO）</div>
+          <div class="dim-label">线程模型</div>
+          <div class="dim-val right"><span class="highlight">多线程</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">原生 Cluster</span></div>
+          <div class="dim-label">集群</div>
+          <div class="dim-val right">客户端一致性哈希</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">发布订阅 · Lua · 事务</span></div>
+          <div class="dim-label">高级功能</div>
+          <div class="dim-val right">无</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">较高（压缩列表等）</div>
+          <div class="dim-label">内存效率</div>
+          <div class="dim-val right"><span class="highlight">更高（slab 分配器）</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试结论</strong>：99% 的场景选 Redis。Memcached 唯一的优势是多线程在纯 KV 场景下 CPU 利用率更高、内存 slab 分配器碎片更少。但 Redis 的数据结构、持久化、集群、Lua 脚本等功能远超 Memcached。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 5: HBase vs MongoDB -->
+    <!-- ============================================================ -->
+    <h2 id="vs5"><span class="icon">⚔️</span>HBase vs MongoDB — 大数据场景选型</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#f87171;">📊 HBase</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fb923c;">🍃 MongoDB</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left">列族存储（Hadoop 生态）</div>
+          <div class="dim-label">定位</div>
+          <div class="dim-val right">通用文档数据库</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">RowKey + Column Family</div>
+          <div class="dim-label">数据模型</div>
+          <div class="dim-val right">BSON 文档</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">PB 级</span></div>
+          <div class="dim-label">数据规模</div>
+          <div class="dim-val right">TB 级</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">LSM-Tree（写优化）</span></div>
+          <div class="dim-label">存储引擎</div>
+          <div class="dim-val right">WiredTiger（B-Tree）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">按 RowKey 范围扫描</div>
+          <div class="dim-label">查询方式</div>
+          <div class="dim-val right"><span class="highlight">灵活查询 + 聚合</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">行级强一致</span></div>
+          <div class="dim-label">一致性</div>
+          <div class="dim-val right">最终一致（可配置）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">运维重（依赖 HDFS/ZK）</div>
+          <div class="dim-label">运维</div>
+          <div class="dim-val right"><span class="highlight">相对简单</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warn">
+      <strong>核心区别</strong>：HBase 适合<strong>海量结构化数据的顺序写+范围读</strong>（时序数据、用户行为日志），需要 Hadoop 生态配合。MongoDB 适合<strong>灵活 Schema 的通用 CRUD</strong>，开发体验好。如果数据量不到 PB 级、不需要 Hadoop 生态，优先选 MongoDB。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Scenario Guide -->
+    <!-- ============================================================ -->
+    <h2 id="scenario"><span class="icon">🎯</span>场景选型指南</h2>
+
+    <div class="when-grid">
+      <div class="when-card" style="border-color:#38bdf8;">
+        <div class="wc-title" style="color:#38bdf8;">🐬 选 MySQL</div>
+        <div class="wc-scene">
+          • 业务 OLTP 主库，数据量 < 1TB<br>
+          • 需要成熟稳定的事务支持<br>
+          • 团队有 MySQL DBA<br>
+          • 典型：电商订单、用户系统、CMS
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#38bdf8;">
+        <div class="wc-title" style="color:#38bdf8;">🐘 选 PostgreSQL</div>
+        <div class="wc-scene">
+          • 需要 GIS 地理查询<br>
+          • 复杂 SQL + JSONB 混合查询<br>
+          • 需要丰富的扩展（全文检索、向量）<br>
+          • 典型：地图服务、数据仓库、科学计算
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#818cf8;">
+        <div class="wc-title" style="color:#818cf8;">🔗 选 TiDB</div>
+        <div class="wc-scene">
+          • MySQL 数据量 > 1TB，分库分表太痛<br>
+          • 需要 HTAP 混合负载<br>
+          • 不想改 SQL 代码，平滑迁移<br>
+          • 典型：大规模电商、金融核心、实时分析
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">🔴 选 Redis</div>
+        <div class="wc-scene">
+          • 需要极致读写性能（10万+ QPS）<br>
+          • 缓存、会话、排行榜、分布式锁<br>
+          • 数据可丢失或可从 DB 恢复<br>
+          • 典型：几乎所有后端项目的标配
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">🍃 选 MongoDB</div>
+        <div class="wc-scene">
+          • Schema 不固定，字段经常变化<br>
+          • 文档嵌套复杂，关系型建模痛苦<br>
+          • 需要水平扩展但不想分库分表<br>
+          • 典型：内容管理、用户画像、日志存储
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">🔍 选 Elasticsearch</div>
+        <div class="wc-scene">
+          • 需要全文检索、模糊搜索<br>
+          • 日志收集 + 实时分析（ELK）<br>
+          • 需要复杂的聚合统计<br>
+          • 典型：电商搜索、日志平台、APM
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#f87171;">
+        <div class="wc-title" style="color:#f87171;">📊 选 HBase</div>
+        <div class="wc-scene">
+          • 数据量 PB 级，需要海量存储<br>
+          • 写多读少，按 RowKey 范围查询<br>
+          • 已有 Hadoop 生态（HDFS/Hive/Spark）<br>
+          • 典型：用户行为日志、时序数据、画像
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Interview Questions -->
+    <!-- ============================================================ -->
+    <h2 id="interview"><span class="icon">🎤</span>面试高频对比题</h2>
+
+    <div class="qa">
+      <div class="q">MySQL 和 MongoDB 该选哪个？</div>
+      <div class="a">
+        <strong>参考答案</strong>：看数据模型。如果数据是结构化的、关系明确的（订单、用户、商品），用 MySQL，事务和 JOIN 支持好。如果数据是半结构化的、Schema 经常变（用户画像、内容、日志），用 MongoDB，文档模型灵活，不用每次改表结构。两者可以混用：MySQL 做主业务库，MongoDB 做日志/内容存储。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Elasticsearch 能替代 MySQL 吗？</div>
+      <div class="a">
+        <strong>参考答案</strong>：不能。ES 是搜索引擎，擅长检索和分析，但：① 不支持事务，写入不是实时可搜索（refresh 间隔 1 秒）；② 不适合频繁更新（每次更新本质是标记删除+重新索引）；③ 没有 JOIN 能力。正确用法是 ES 做二级存储，数据从 MySQL/业务库同步过来做检索。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">什么时候该从 MySQL 迁移到 TiDB？</div>
+      <div class="a">
+        <strong>参考答案</strong>：三个信号：① 单实例数据量 > 1TB，分库分表维护成本太高；② 写入 TPS 持续增长，单机瓶颈明显；③ 需要实时分析（HTAP），不想维护单独的数据仓库。TiDB 兼容 MySQL 协议，迁移成本低，但要注意：跨 Region 事务有延迟，小数据量反而不如 MySQL 快。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Redis 和 MySQL 缓存方案怎么配合？</div>
+      <div class="a">
+        <strong>参考答案</strong>：经典 Cache Aside Pattern——读请求先查 Redis，命中返回，未命中查 MySQL 并回写 Redis（设 TTL）；写请求先更新 MySQL，再删除 Redis 缓存（而非更新，避免并发不一致）。进阶方案：Read/Write Through（缓存层代理 DB）、Write Behind（异步写回 DB，适合写密集）。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">MongoDB 和 HBase 都能存海量数据，怎么选？</div>
+      <div class="a">
+        <strong>参考答案</strong>：MongoDB 是通用文档数据库，CRUD 均衡，查询灵活，适合 TB 级以内的通用场景。HBase 是列式存储，写入极快、按 RowKey 范围扫描高效，适合 PB 级时序数据和行为日志，但查询不够灵活（只能按 RowKey 查）、运维依赖 Hadoop 生态。简单说：数据量 < 1TB 选 MongoDB，> 1PB 且有 Hadoop 生态选 HBase。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">如何设计一个多数据源的存储架构？</div>
+      <div class="a">
+        <strong>参考答案</strong>：典型的分层存储——<strong>MySQL</strong> 做业务主库（订单、用户、商品），<strong>Redis</strong> 做缓存和会话层，<strong>Elasticsearch</strong> 做搜索和日志分析，<strong>MongoDB</strong> 做非结构化内容存储（用户画像、评论、日志）。数据同步：MySQL → Binlog → Canal → ES/MongoDB。各司其职，不要用一个数据库解决所有问题。
+      </div>
+    </div>
+
+    <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
+      <a href="index.html" style="color:var(--accent); text-decoration:none;">← 返回知识库目录</a>
+      <br><br>
+      数据库对比 · 面试知识复习库 · Last updated 2026-06-02
+    </div>
+
+  </div>
+
+</body>
+</html>
