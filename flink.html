@@ -16,20 +16,21 @@
         <div class="sidebar-title">📑 目录导航</div>
         <ul>
           <li><a href="#p1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#p1-0">版本演进</a></li>
           <li class="sub"><a href="#p1-1">整体架构</a></li>
           <li class="sub"><a href="#p1-2">核心概念</a></li>
           <li class="sub"><a href="#p1-3">Window 机制</a></li>
-          <li class="sub"><a href="#p1-4">Watermark 机制</a></li>
+          <li class="sub"><a href="#p1-4">Watermark</a></li>
           <li class="sub"><a href="#p1-5">State 管理</a></li>
-          <li class="sub"><a href="#p1-6">Checkpoint 机制</a></li>
-          <li class="sub"><a href="#p1-7">背压与内存</a></li>
+          <li class="sub"><a href="#p1-6">Checkpoint</a></li>
+          <li class="sub"><a href="#p1-7">Flink SQL</a></li>
           <li class="sub"><a href="#p1-8">Flink vs Spark</a></li>
           <li><a href="#p2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#p2-1">实时 ETL</a></li>
           <li class="sub"><a href="#p2-2">实时数仓</a></li>
-          <li class="sub"><a href="#p2-3">CEP 实时风控</a></li>
+          <li class="sub"><a href="#p2-3">CEP 风控</a></li>
           <li class="sub"><a href="#p2-4">双流 Join</a></li>
-          <li class="sub"><a href="#p2-5">CDC 数据同步</a></li>
+          <li class="sub"><a href="#p2-5">CDC</a></li>
           <li class="sub"><a href="#p2-6">性能调优</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
         </ul>
@@ -39,40 +40,59 @@
         <!-- ================= PART 1 ================= -->
         <h2 id="p1"><span class="icon">🔬</span>第一部分：技术原理</h2>
 
+        <h3 id="p1-0">0. 版本演进 — 从流批分离到流批统一</h3>
+        <div class="diagram">
+          <div class="diagram-title">Flink 版本演进与技术方向</div>
+          <div class="layer-stack">
+            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>1.0 (2016)</strong> — 首个正式版 · DataStream API · DataSet API（批处理）· 基础 Window/State</div>
+            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>1.5 (2018)</strong> — Blink planner 引入（SQL 性能大幅提升）· 状态后端改进</div>
+            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>1.9 / 1.11 (2019-2020)</strong> — Table API / SQL 统一 · PyFlink · CDC 支持 · Kubernetes 集成</div>
+            <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>1.12 / 1.13 (2020-2021)</strong> — Batch 执行模式 · DataSet API 弃用方向 · Window TVF · 动态表</div>
+            <div class="layer" style="border-color:var(--accent5);background:rgba(244,114,182,0.08)"><strong>1.14 / 1.15 (2021-2022)</strong> — Unaligned Checkpoint · Application Mode · Reactive Scaling</div>
+            <div class="layer" style="border-color:var(--danger);background:rgba(239,68,68,0.08)"><strong>1.17+ / 2.0 (2023-2025)</strong> — 流批一体成熟 · SQL 优先 · 云原生部署 · 性能持续优化</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>技术演进思想</h4>
+          <ul>
+            <li><strong>流批分离 → 流批统一</strong>：早期 DataSet（批）和 DataStream（流）两套 API，1.12+ 统一为流执行，批只是有界流</li>
+            <li><strong>API 优先 → SQL 优先</strong>：SQL/Table API 成为一等公民，降低使用门槛</li>
+            <li><strong>Aligned → Unaligned Checkpoint</strong>：背压下也能快速完成快照（1.14+）</li>
+            <li><strong>Session 集群 → Application Mode</strong>：每个 Job 独立集群，更好的资源隔离</li>
+            <li><strong>方向</strong>：云原生、SQL 优先、流批一体、易用性提升</li>
+          </ul>
+        </div>
+
         <h3 id="p1-1">1.1 整体架构</h3>
         <div class="diagram">
           <div class="diagram-title">Flink 运行时架构</div>
           <div class="arch-container">
             <div class="arch-row">
               <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
-                <strong>Client 客户端</strong>
+                <strong>Client</strong>
                 <div class="arch-label">提交 Job → 解析 → 生成 ExecutionGraph → 提交给 JobManager</div>
               </div>
             </div>
             <div class="arch-connector">⬇️</div>
             <div class="arch-row">
               <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
-                <strong>JobManager</strong><br>（Master）
+                <strong>JobManager</strong><br>Master
                 <div class="arch-label">JobGraph→ExecutionGraph<br>任务调度<br>Checkpoint 协调<br>故障恢复</div>
               </div>
               <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
                 <strong>ResourceManager</strong>
-                <div class="arch-label">资源管理<br>Slot 分配<br>Standalone / YARN / K8s</div>
+                <div class="arch-label">资源管理<br>Slot 分配<br>Standalone/YARN/K8s</div>
               </div>
             </div>
-            <div class="arch-connector">⬇️ 分配 Task</div>
+            <div class="arch-connector">⬇️</div>
             <div class="arch-row">
               <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
-                <strong>TaskManager 1</strong><br>（Worker）
-                <div class="arch-label">Task Slot × N<br>执行算子<br>State 存储<br>网络缓冲</div>
+                <strong>TaskManager 1</strong>
+                <div class="arch-label">Task Slot × N<br>执行算子<br>State 存储</div>
               </div>
               <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
-                <strong>TaskManager 2</strong><br>（Worker）
-                <div class="arch-label">Task Slot × N<br>执行算子<br>State 存储<br>网络缓冲</div>
-              </div>
-              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
-                <strong>TaskManager N</strong><br>（Worker）
-                <div class="arch-label">Task Slot × N<br>执行算子<br>State 存储<br>网络缓冲</div>
+                <strong>TaskManager 2</strong>
+                <div class="arch-label">Task Slot × N<br>执行算子<br>State 存储</div>
               </div>
             </div>
           </div>
@@ -82,79 +102,80 @@
         <div class="card">
           <h4>时间语义</h4>
           <table>
-            <thead><tr><th>时间类型</th><th>含义</th><th>场景</th></tr></thead>
+            <thead><tr><th>时间</th><th>含义</th><th>场景</th></tr></thead>
             <tbody>
-              <tr><td><strong>Event Time</strong></td><td>事件实际发生的时间（数据自带）</td><td>⭐ 推荐，结果可重放、可重现</td></tr>
-              <tr><td><strong>Processing Time</strong></td><td>数据被处理的时间</td><td>简单但结果不可重现</td></tr>
-              <tr><td><strong>Ingestion Time</strong></td><td>数据进入 Flink 的时间</td><td>折中方案（少用）</td></tr>
+              <tr><td><strong>Event Time</strong> ⭐</td><td>事件实际发生时间（数据自带）</td><td>结果可重放、可重现</td></tr>
+              <tr><td><strong>Processing Time</strong></td><td>数据被处理的时间</td><td>简单但不可重现</td></tr>
+              <tr><td><strong>Ingestion Time</strong></td><td>进入 Flink 的时间</td><td>折中（少用）</td></tr>
             </tbody>
           </table>
-        </div>
-        <div class="card">
-          <h4>编程模型层次</h4>
-          <div class="layer-stack">
-            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>SQL / Table API</strong> — 最高层，类 SQL 查询</div>
-            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>DataStream API</strong> — 流处理核心 API</div>
-            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>ProcessFunction</strong> — 最底层，完全控制</div>
-          </div>
         </div>
 
         <h3 id="p1-3">1.3 Window 机制</h3>
         <div class="diagram">
-          <div class="diagram-title">Window 类型对比</div>
+          <div class="diagram-title">Window 类型</div>
           <table>
             <thead><tr><th>类型</th><th>特点</th><th>示例</th></tr></thead>
             <tbody>
-              <tr><td><span class="badge badge-blue">Tumbling</span></td><td>固定大小，不重叠</td><td>每 5 秒统计一次点击量</td></tr>
-              <tr><td><span class="badge badge-green">Sliding</span></td><td>固定大小，有滑动步长</td><td>窗口 10s，每 5s 滑动一次</td></tr>
-              <tr><td><span class="badge badge-orange">Session</span></td><td>按活跃间隔分组</td><td>用户会话：超过 30min 无活动则关闭</td></tr>
-              <tr><td><span class="badge badge-purple">Count</span></td><td>按元素数量</td><td>每 100 条消息触发一次</td></tr>
-              <tr><td><span class="badge badge-red">Global</span></td><td>所有数据进同一窗口</td><td>配合自定义 Trigger 使用</td></tr>
+              <tr><td><span class="badge badge-blue">Tumbling</span></td><td>固定大小，不重叠</td><td>每 5 秒统计点击量</td></tr>
+              <tr><td><span class="badge badge-green">Sliding</span></td><td>固定大小，有滑动步长</td><td>窗口 10s，每 5s 滑动</td></tr>
+              <tr><td><span class="badge badge-orange">Session</span></td><td>按活跃间隔分组</td><td>用户会话：30min 无活动关闭</td></tr>
+              <tr><td><span class="badge badge-purple">Count</span></td><td>按元素数量</td><td>每 100 条触发一次</td></tr>
+              <tr><td><span class="badge badge-red">Global</span></td><td>所有数据进同一窗口</td><td>配合自定义 Trigger</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="diagram">
-          <div class="diagram-title">Tumbling vs Sliding Window</div>
-          <div style="font-family:'SF Mono',monospace;font-size:0.82rem;line-height:2;text-align:center">
-            <div style="color:var(--text-dim)">时间轴：  0    5    10   15   20   25   30</div>
-            <div style="color:var(--accent)">Tumbling: [====W1====][====W2====][====W3====]</div>
-            <div style="color:var(--accent3)">Sliding:  [====W1====]<br>            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[====W2====]<br>                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[====W3====]</div>
-          </div>
+        <div class="card">
+          <h4>Window Function</h4>
+          <table>
+            <thead><tr><th>函数</th><th>特点</th><th>适用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>ReduceFunction</strong></td><td>增量聚合，输入输出同类型</td><td>求和、求最大值</td></tr>
+              <tr><td><strong>AggregateFunction</strong></td><td>增量聚合，输入输出可不同</td><td>求平均值</td></tr>
+              <tr><td><strong>ProcessWindowFunction</strong></td><td>全量聚合，可访问窗口元信息</td><td>需要窗口上下文</td></tr>
+              <tr><td><strong>增量 + 全量组合</strong> ⭐</td><td>增量计算 + 最终 Process</td><td>兼顾性能和灵活性</td></tr>
+            </tbody>
+          </table>
         </div>
 
         <h3 id="p1-4">1.4 Watermark 机制</h3>
         <div class="diagram">
-          <div class="diagram-title">Watermark 解决乱序问题</div>
+          <div class="diagram-title">Watermark 解决乱序 + 三层防线</div>
           <div class="arch-container">
             <div class="arch-row">
               <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
                 <strong>乱序数据流</strong>：ts=3, ts=1, ts=5, ts=2, ts=4, ts=8, ts=6 ...
               </div>
             </div>
-            <div class="arch-connector">⬇️ Watermark 设定：最大允许延迟 3 秒</div>
+            <div class="arch-connector">⬇️</div>
             <div class="arch-row">
               <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
-                <strong>Watermark = 5</strong><br>
-                <div class="arch-label">表示 "时间 ≤ 5 的数据<br>基本到齐了"</div>
+                <strong>① Watermark</strong>
+                <div class="arch-label">允许延迟 3 秒<br>Watermark=5 表示<br>"≤5 的数据基本到齐"</div>
               </div>
               <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
-                <strong>Allowed Lateness</strong><br>
-                <div class="arch-label">窗口触发后<br>再等一段时间<br>处理迟到数据</div>
+                <strong>② Allowed Lateness</strong>
+                <div class="arch-label">窗口触发后再等 1min<br>新到数据重新计算</div>
               </div>
               <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
-                <strong>Side Output</strong><br>
-                <div class="arch-label">超过迟到阈值<br>的数据输出到<br>侧输出流</div>
+                <strong>③ Side Output</strong>
+                <div class="arch-label">超过迟到阈值<br>输出到侧输出流<br>不丢弃</div>
               </div>
             </div>
           </div>
         </div>
         <div class="card">
-          <h4>三层防线处理迟到数据</h4>
-          <ul>
-            <li><strong>Watermark</strong>：允许一定延迟（如 3 秒），Watermark 到达后才触发窗口计算</li>
-            <li><strong>Allowed Lateness</strong>：窗口触发后再等一段时间（如 1 分钟），期间新到的数据会重新计算</li>
-            <li><strong>Side Output</strong>：超过 Allowed Lateness 的数据输出到侧输出流，不丢弃</li>
-          </ul>
+          <h4>Watermark 生成策略</h4>
+          <table>
+            <thead><tr><th>策略</th><th>方式</th><th>适用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Periodic</strong></td><td>每隔固定时间生成一次</td><td>默认方式，每 200ms</td></tr>
+              <tr><td><strong>Punctuated</strong></td><td>每条数据判断是否生成</td><td>特殊标记的数据</td></tr>
+              <tr><td><strong>BoundedOutOfOrderness</strong></td><td>允许最大乱序时间</td><td>⭐ 最常用</td></tr>
+              <tr><td><strong>Monotonous</strong></td><td>假设数据不乱序</td><td>数据已排序的场景</td></tr>
+            </tbody>
+          </table>
+          <p class="tip"><strong>Idle Source</strong>：如果某个 Source 分区长时间无数据，Watermark 不会前进，导致窗口不触发。设置 <code>withIdleness(Duration.ofMinutes(1))</code> 让空闲 Source 跳过，不阻塞全局 Watermark。</p>
         </div>
 
         <h3 id="p1-5">1.5 State 管理</h3>
@@ -166,22 +187,34 @@
               <tr><td><strong>ValueState&lt;T&gt;</strong></td><td>单个值</td><td>计数器、累加器</td></tr>
               <tr><td><strong>ListState&lt;T&gt;</strong></td><td>元素列表</td><td>最近 N 条记录</td></tr>
               <tr><td><strong>MapState&lt;K,V&gt;</strong></td><td>Key-Value 映射</td><td>用户行为计数</td></tr>
-              <tr><td><strong>ReducingState&lt;T&gt;</strong></td><td>聚合值</td><td>求和、求最大值</td></tr>
-              <tr><td><strong>AggregatingState&lt;I,O&gt;</strong></td><td>聚合值（输入输出类型不同）</td><td>求平均值</td></tr>
+              <tr><td><strong>ReducingState&lt;T&gt;</strong></td><td>聚合值（同类型）</td><td>求和</td></tr>
+              <tr><td><strong>AggregatingState&lt;I,O&gt;</strong></td><td>聚合值（不同类型）</td><td>求平均</td></tr>
             </tbody>
           </table>
         </div>
         <div class="diagram">
-          <div class="diagram-title">State Backend 对比</div>
+          <div class="diagram-title">State Backend 选型</div>
           <table>
-            <thead><tr><th>Backend</th><th>存储位置</th><th>State 大小</th><th>特点</th></tr></thead>
+            <thead><tr><th>Backend</th><th>存储</th><th>State 大小</th><th>增量 Checkpoint</th><th>GC 影响</th></tr></thead>
             <tbody>
-              <tr><td><strong>HashMap</strong></td><td>JVM Heap</td><td>小（MB 级）</td><td>最快，但受 GC 影响</td></tr>
-              <tr><td><strong>EmbeddedRocksDB</strong></td><td>本地磁盘 + 内存</td><td>大（GB~TB 级）⭐</td><td>支持增量 Checkpoint</td></tr>
+              <tr><td><strong>HashMap</strong></td><td>JVM Heap</td><td>小（MB）</td><td>不支持</td><td>有</td></tr>
+              <tr><td><strong>RocksDB</strong> ⭐</td><td>本地磁盘+内存</td><td>大（GB~TB）</td><td>✅ 支持</td><td>无</td></tr>
             </tbody>
           </table>
+          <p><strong>决策</strong>：State &lt; 100MB 且无 GC 问题 → HashMap；State &gt; 1GB 或需要增量 Checkpoint → RocksDB。</p>
         </div>
-        <div class="tip">生产环境推荐 <strong>EmbeddedRocksDB</strong>：State 存磁盘不受 GC 影响，支持增量 Checkpoint（只同步变化部分，减少 Checkpoint 时间）。大状态场景（>1GB）必须用 RocksDB。</div>
+        <div class="card">
+          <h4>State TTL（过期清理）</h4>
+          <p>设置 State 的过期时间，自动清理不再需要的数据：</p>
+          <table>
+            <thead><tr><th>策略</th><th>行为</th><th>适用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>UpdateOnCreateAndWrite</strong></td><td>创建和写入时更新 TTL</td><td>⭐ 默认，读不影响过期</td></tr>
+              <tr><td><strong>OnReadAndWrite</strong></td><td>读和写都更新 TTL</td><td>读取也算"活跃"</td></tr>
+            </tbody>
+          </table>
+          <p class="warn">State TTL 只清理 Keyed State，Operator State 不支持 TTL。RocksDB 后台 compaction 负责实际清理，可能有延迟。</p>
+        </div>
 
         <h3 id="p1-6">1.6 Checkpoint 机制</h3>
         <div class="diagram">
@@ -189,45 +222,63 @@
           <div class="flow">
             <div class="flow-box flow-blue">JobManager<br><span style="font-size:0.7rem">注入 Barrier</span></div>
             <div class="flow-arrow">→</div>
-            <div class="flow-box flow-purple">Source 算子<br><span style="font-size:0.7rem">快照状态</span></div>
+            <div class="flow-box flow-purple">Source<br><span style="font-size:0.7rem">快照状态</span></div>
             <div class="flow-arrow">→</div>
             <div class="flow-box flow-green">Barrier 对齐<br><span style="font-size:0.7rem">所有输入到齐</span></div>
             <div class="flow-arrow">→</div>
-            <div class="flow-box flow-orange">快照状态<br><span style="font-size:0.7rem">写入 State Backend</span></div>
+            <div class="flow-box flow-orange">快照写入<br><span style="font-size:0.7rem">State Backend</span></div>
             <div class="flow-arrow">→</div>
-            <div class="flow-box flow-pink">Checkpoint 完成</div>
+            <div class="flow-box flow-pink">完成</div>
           </div>
         </div>
         <div class="card">
-          <h4>Checkpoint 配置要点</h4>
-          <ul>
-            <li><strong>间隔</strong>：Checkpoint 间隔（如 1 分钟），太频繁影响性能，太稀疏恢复慢</li>
-            <li><strong>超时</strong>：Checkpoint 超时时间，防止卡住</li>
-            <li><strong>最小间隔</strong>：两次 Checkpoint 之间的最小间隔</li>
-            <li><strong>并发数</strong>：同时进行的 Checkpoint 数量（默认 1）</li>
-            <li><strong>模式</strong>：EXACTLY_ONCE（Barrier 对齐）或 AT_LEAST_ONCE（不对齐，更快）</li>
-          </ul>
+          <h4>Aligned vs Unaligned Checkpoint（1.14+）</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">Aligned（传统）</h4>
+              <ul>
+                <li>Barrier 必须等待所有输入到齐</li>
+                <li>保证 Exactly-Once</li>
+                <li><strong>问题</strong>：背压时 Barrier 排在数据后面，Checkpoint 超时</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Unaligned（1.14+）⭐</h4>
+              <ul>
+                <li>Barrier 超越缓冲区中的数据</li>
+                <li>背压下也能快速完成 Checkpoint</li>
+                <li>代价：Checkpoint 文件更大（含缓冲数据）</li>
+                <li><code>execution.checkpointing.unaligned.enabled=true</code></li>
+              </ul>
+            </div>
+          </div>
+          <p class="tip">思想演进：旧版"精确对齐"在背压下变成瓶颈，新版"不对齐"用存储换时间。这体现了<strong>"在不同约束间做权衡"</strong>的工程思想。</p>
         </div>
         <div class="compare-row">
           <div class="compare-box" style="border-color:var(--accent)">
             <h4 style="color:var(--accent)">Checkpoint</h4>
-            <p>Flink 自动触发，定期保存</p>
-            <p>Job 取消后默认删除</p>
-            <p>用于故障恢复</p>
+            <p>Flink 自动触发 · Job 取消后默认删除 · 用于故障恢复</p>
           </div>
           <div class="compare-box" style="border-color:var(--accent3)">
             <h4 style="color:var(--accent3)">Savepoint</h4>
-            <p>用户手动触发</p>
-            <p>不会自动删除</p>
-            <p>用于版本升级、A/B 测试、集群迁移</p>
+            <p>用户手动触发 · 不自动删除 · 用于版本升级、A/B 测试、集群迁移</p>
           </div>
         </div>
 
-        <h3 id="p1-7">1.7 背压与内存管理</h3>
+        <h3 id="p1-7">1.7 Flink SQL / Table API</h3>
         <div class="card">
-          <h4>背压 (Backpressure)</h4>
-          <p>当下游算子处理速度跟不上上游时，网络缓冲区满，上游被阻塞。Flink 基于<strong>信用-based 流控</strong>：下游告诉上游自己还能接收多少数据。</p>
-          <p><strong>排查</strong>：Flink Web UI → 反压面板，红色表示高背压。<strong>解决</strong>：增加并行度、优化算子逻辑、增加内存。</p>
+          <h4>核心概念</h4>
+          <ul>
+            <li><strong>动态表 (Dynamic Table)</strong>：流数据映射为持续更新的表</li>
+            <li><strong>持续查询 (Continuous Query)</strong>：对动态表的查询，结果也是动态表</li>
+            <li><strong>Window TVF（1.13+）</strong>：窗口作为 Table-Valued Function，SQL 原生支持窗口</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>与 DataStream 互操作</h4>
+          <p>Table → DataStream：<code>toDataStream()</code> / <code>toChangelogStream()</code><br>
+          DataStream → Table：<code>fromDataStream()</code><br>
+          复杂逻辑用 DataStream，简单聚合用 SQL，两者可以灵活切换。</p>
         </div>
 
         <h3 id="p1-8">1.8 Flink vs Spark Streaming</h3>
@@ -235,15 +286,14 @@
           <table>
             <thead><tr><th>维度</th><th>🌊 Flink</th><th>⚡ Spark Streaming</th></tr></thead>
             <tbody>
-              <tr><td>计算模型</td><td><span class="badge badge-green">真正的流（逐条）</span></td><td>微批（Micro-Batch）</td></tr>
+              <tr><td>计算模型</td><td><span class="badge badge-green">真正流（逐条）</span></td><td>微批（Micro-Batch）</td></tr>
               <tr><td>延迟</td><td><span class="badge badge-green">ms 级</span></td><td>秒级</td></tr>
-              <tr><td>时间语义</td><td><span class="badge badge-green">Event Time 天然支持</span></td><td>Processing Time 为主</td></tr>
-              <tr><td>Watermark</td><td><span class="badge badge-green">原生支持</span></td><td>无原生</td></tr>
-              <tr><td>State</td><td><span class="badge badge-green">丰富的 Keyed State</span></td><td>DStream 无原生 State</td></tr>
-              <tr><td>Exactly-Once</td><td><span class="badge badge-green">Checkpoint + 两阶段提交</span></td><td>微批 + 幂等</td></tr>
+              <tr><td>Event Time</td><td><span class="badge badge-green">天然支持</span></td><td>支持但不如 Flink 原生</td></tr>
+              <tr><td>State</td><td><span class="badge badge-green">丰富的 Keyed State</span></td><td>无原生 State</td></tr>
+              <tr><td>Exactly-Once</td><td><span class="badge badge-green">Checkpoint + 2PC</span></td><td>微批 + 幂等</td></tr>
               <tr><td>SQL</td><td>Table API / SQL</td><td><span class="badge badge-green">Spark SQL 更成熟</span></td></tr>
               <tr><td>机器学习</td><td>较弱</td><td><span class="badge badge-green">MLlib 成熟</span></td></tr>
-              <tr><td>批处理</td><td>支持（DataSet API）</td><td><span class="badge badge-green">原生强项</span></td></tr>
+              <tr><td>批处理</td><td>支持（有界流）</td><td><span class="badge badge-green">原生强项</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -252,106 +302,109 @@
         <h2 id="p2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
 
         <h3 id="p2-1">2.1 实时 ETL</h3>
-        <div class="diagram">
-          <div class="diagram-title">Kafka → Flink → 存储</div>
-          <div class="flow">
-            <div class="flow-box flow-blue">Kafka Source</div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-purple">清洗/转换<br><span style="font-size:0.7rem">Filter / Map / FlatMap</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-green">窗口聚合<br><span style="font-size:0.7rem">sum / count / avg</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-orange">Sink<br><span style="font-size:0.7rem">MySQL / ES / HBase</span></div>
-          </div>
+        <div class="flow">
+          <div class="flow-box flow-blue">Kafka Source</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-purple">清洗/转换</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-green">窗口聚合</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-orange">Sink</div>
         </div>
 
         <h3 id="p2-2">2.2 实时数仓分层</h3>
-        <div class="diagram">
-          <div class="diagram-title">实时数仓架构</div>
-          <div class="layer-stack">
-            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>ADS 应用层</strong> — 实时大屏 / 报表 / 推荐</div>
-            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>DWS 汇总层</strong> — 多维聚合 / 宽表</div>
-            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>DWD 明细层</strong> — 清洗 / 关联 / 维度补全</div>
-            <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>ODS 贴源层</strong> — Kafka 原始数据 / CDC</div>
-          </div>
+        <div class="layer-stack">
+          <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>ADS 应用层</strong> — 实时大屏 / 报表 / 推荐（SQL / Table API）</div>
+          <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>DWS 汇总层</strong> — 多维聚合 / 宽表（SQL Window 聚合）</div>
+          <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>DWD 明细层</strong> — 清洗 / 关联 / 维度补全（DataStream + Lookup Join）</div>
+          <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>ODS 贴源层</strong> — Kafka 原始数据 / CDC（Flink CDC Source）</div>
         </div>
 
         <h3 id="p2-3">2.3 CEP 实时风控</h3>
         <div class="card">
-          <h4>Flink CEP 复杂事件处理</h4>
-          <p>通过模式匹配检测异常行为序列。例如：</p>
-          <ul>
-            <li><strong>登录异常</strong>：5 分钟内从 3 个不同城市登录 → 触发告警</li>
-            <li><strong>刷单检测</strong>：10 秒内同一用户下单 > 5 次 → 标记可疑</li>
-            <li><strong>支付欺诈</strong>：短时间内多次支付失败后成功 → 二次验证</li>
-          </ul>
+          <p><strong>登录异常</strong>：5 分钟内从 3 个不同城市登录 → 告警。<br>
+          <strong>刷单检测</strong>：10 秒内同一用户下单 &gt; 5 次 → 标记。<br>
+          <strong>支付欺诈</strong>：短时间多次失败后成功 → 二次验证。</p>
         </div>
 
         <h3 id="p2-4">2.4 双流 Join</h3>
         <div class="diagram">
-          <div class="diagram-title">四种 Join 方式</div>
           <table>
             <thead><tr><th>方式</th><th>特点</th><th>场景</th></tr></thead>
             <tbody>
-              <tr><td><strong>Window Join</strong></td><td>两个流在同一窗口内 Join</td><td>相同时间窗口的订单+支付</td></tr>
-              <tr><td><strong>Interval Join</strong></td><td>基于时间区间关联</td><td>下单后 30 分钟内的支付</td></tr>
-              <tr><td><strong>Temporal Join</strong></td><td>关联维表的版本</td><td>关联商品维度表（版本变化）</td></tr>
-              <tr><td><strong>Lookup Join</strong></td><td>实时查询外部维表</td><td>实时关联 MySQL 维表</td></tr>
+              <tr><td><strong>Window Join</strong></td><td>同一窗口内 Join</td><td>同时间窗口的订单+支付</td></tr>
+              <tr><td><strong>Interval Join</strong></td><td>基于时间区间</td><td>下单后 30min 内的支付</td></tr>
+              <tr><td><strong>Temporal Join</strong></td><td>关联维表版本</td><td>商品维度表版本变化</td></tr>
+              <tr><td><strong>Lookup Join</strong></td><td>实时查询外部维表</td><td>关联 MySQL 维表</td></tr>
             </tbody>
           </table>
         </div>
 
         <h3 id="p2-5">2.5 CDC 数据同步</h3>
-        <div class="diagram">
-          <div class="diagram-title">Flink CDC 2.x 架构</div>
-          <div class="flow">
-            <div class="flow-box flow-blue">MySQL Binlog</div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-green">Flink CDC Source<br><span style="font-size:0.7rem">Debezium 内嵌</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-orange">Flink 计算<br><span style="font-size:0.7rem">ETL / Join / 聚合</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-purple">Sink<br><span style="font-size:0.7rem">Doris / ES / Iceberg</span></div>
-          </div>
+        <div class="flow">
+          <div class="flow-box flow-blue">MySQL Binlog</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-green">Flink CDC Source</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-orange">Flink 计算</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box flow-purple">Sink</div>
         </div>
-        <div class="tip">Flink CDC 2.x 支持<strong>全量 + 增量一体化同步</strong>：先全量快照读取历史数据，无缝切换到 Binlog 增量读取，无需额外组件。</div>
+        <div class="card">
+          <h4>Flink CDC 2.x vs 3.x</h4>
+          <table>
+            <thead><tr><th>维度</th><th>CDC 2.x</th><th>CDC 3.x</th></tr></thead>
+            <tbody>
+              <tr><td>架构</td><td>内嵌 Debezium</td><td>自研增量快照算法</td></tr>
+              <tr><td>并行读取</td><td>单并行度全量</td><td>表级并行全量读取</td></tr>
+              <tr><td>锁</td><td>FTWRL 全局锁</td><td>无锁（基于 Binlog Position）</td></tr>
+              <tr><td>Schema 变更</td><td>部分支持</td><td>完整 DDL 同步</td></tr>
+            </tbody>
+          </table>
+          <p class="tip">CDC 3.x 的核心改进：<strong>无锁并行快照</strong>——不需要 FTWRL，通过 Binlog Position 实现一致性读取，对生产库影响更小。</p>
+        </div>
 
         <h3 id="p2-6">2.6 性能调优</h3>
         <div class="card">
-          <h4>调优要点</h4>
           <ul>
             <li><strong>并行度</strong>：算子并行度 = min(Partition 数, Slot 数)</li>
-            <li><strong>算子链</strong>：相邻算子合并为一个 Task，减少网络开销（<code>startNewChain</code> / <code>disableChain</code>）</li>
-            <li><strong>Slot Sharing</strong>：同一 Job 的不同算子共享 Slot，提高资源利用率</li>
-            <li><strong>内存配置</strong>：TaskManager 内存 = 框架堆 + Task 堆 + 网络缓冲 + 管理内存 + RocksDB</li>
-            <li><strong>反压处理</strong>：增加并行度、优化算子逻辑、增加网络缓冲区</li>
+            <li><strong>算子链</strong>：相邻算子合并减少网络开销</li>
+            <li><strong>Mini-Batch</strong>：SQL 层微批聚合，减少 State 访问</li>
+            <li><strong>State Backend</strong>：大状态用 RocksDB + 增量 Checkpoint</li>
+            <li><strong>反压</strong>：增加并行度、优化算子逻辑、增加网络缓冲区</li>
           </ul>
         </div>
 
         <!-- ================= PART 3 ================= -->
         <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
 
-        <div class="qa"><div class="q">Flink 和 Spark Streaming 最本质的区别？</div><div class="a">计算模型不同。Flink 是<strong>真正的流处理</strong>，数据逐条到达逐条处理，延迟 ms 级。Spark Streaming 是<strong>微批处理</strong>，把流数据切成小批次（如 1 秒一批），本质上还是批处理。这导致 Flink 天然支持 Event Time、Watermark、完善的 State 管理和 Exactly-Once Checkpoint。</div></div>
+        <div class="qa"><div class="q">Flink 和 Spark Streaming 最本质的区别？</div><div class="a">计算模型：Flink 是真正流处理（逐条），延迟 ms 级。Spark Streaming 是微批处理，延迟秒级。这导致 Flink 天然支持 Event Time、Watermark、完善的 State 管理和 Exactly-Once Checkpoint。</div></div>
 
-        <div class="qa"><div class="q">什么是 Watermark？为什么需要它？</div><div class="a">Watermark 是一个时间戳，表示"在此之前的数据基本到齐了"。网络传输可能导致数据乱序到达，Watermark 告诉 Flink "可以触发窗口计算了"。设置 Watermark 延迟（如 3 秒）可以容忍乱序，但会增加端到端延迟。配合 Allowed Lateness + Side Output 处理迟到数据。</div></div>
+        <div class="qa"><div class="q">什么是 Watermark？为什么需要它？</div><div class="a">Watermark 是时间戳，表示"在此之前的数据基本到齐了"。网络传输导致乱序，Watermark 告诉 Flink 可以触发窗口。配合 Allowed Lateness + Side Output 处理迟到数据。BoundedOutOfOrderness 是最常用的策略。</div></div>
 
-        <div class="qa"><div class="q">Flink 的 Checkpoint 机制？</div><div class="a">基于 Chandy-Lamport 分布式快照算法。JobManager 定期向 Source 注入 Barrier，Barrier 随数据流向下游传播。当算子收到所有输入的 Barrier 后，快照自己的 State 到 State Backend（如 HDFS/RocksDB）。故障恢复时从最近的 Checkpoint 恢复 State，重放 Source 数据。</div></div>
+        <div class="qa"><div class="q">Flink 的 Checkpoint 机制？</div><div class="a">基于 Chandy-Lamport 分布式快照。JobManager 注入 Barrier，Barrier 随数据传播，算子收到所有 Barrier 后快照 State。1.14+ 引入 Unaligned Checkpoint：Barrier 超越数据，背压下也能快速完成。</div></div>
 
-        <div class="qa"><div class="q">如何保证端到端 Exactly-Once？</div><div class="a">需要 Source 和 Sink 都支持——① <strong>Source</strong>：可重放（如 Kafka，记录 offset）；② <strong>算子</strong>：Checkpoint 保证 State 一致性；③ <strong>Sink</strong>：两阶段提交（2PC）或幂等写入。Flink 的 TwoPhaseCommitSinkFunction 在 Pre-commit 写入临时文件，Checkpoint 完成后 Commit 真正写入。</div></div>
+        <div class="qa"><div class="q">如何保证端到端 Exactly-Once？</div><div class="a">Source 可重放（Kafka offset）+ Checkpoint 保证 State 一致性 + Sink 两阶段提交（2PC）或幂等写入。Flink 的 TwoPhaseCommitSinkFunction：Pre-commit 写临时文件，Checkpoint 完成后 Commit。</div></div>
 
-        <div class="qa"><div class="q">Flink 的 Window 有哪些类型？</div><div class="a">Tumbling（固定不重叠）、Sliding（固定有滑动）、Session（按活跃间隔）、Count（按数量）、Global（所有数据进同一窗口，配合 Trigger）。按驱动方式分为 Time Window 和 Count Window。最常用的是 Tumbling + Event Time + Watermark。</div></div>
+        <div class="qa"><div class="q">Window 有哪些类型？</div><div class="a">Tumbling（固定不重叠）、Sliding（有滑动步长）、Session（按活跃间隔）、Count（按数量）、Global（配合 Trigger）。Window Function：ReduceFunction、AggregateFunction、ProcessWindowFunction，可增量+全量组合。</div></div>
 
-        <div class="qa"><div class="q">什么是 State？有哪些类型？</div><div class="a">State 是算子在处理数据过程中需要记住的信息。Keyed State 绑定在 KeyedStream 的每个 Key 上：ValueState（单值）、ListState（列表）、MapState（映射）、ReducingState（聚合）、AggregatingState（聚合，输入输出不同）。Operator State 绑定在算子实例上，如 Source 的 offset。</div></div>
+        <div class="qa"><div class="q">State 有哪些类型？</div><div class="a">Keyed State：ValueState（单值）、ListState（列表）、MapState（映射）、ReducingState（聚合同类型）、AggregatingState（聚合不同类型）。Operator State：绑定在算子实例上，如 Source 的 offset。</div></div>
 
-        <div class="qa"><div class="q">State Backend 怎么选？</div><div class="a">HashMap State Backend：State 存 JVM Heap，最快但受 GC 影响，适合小 State（<100MB）。EmbeddedRocksDB State Backend：State 存本地磁盘 + 内存，不受 GC 影响，支持增量 Checkpoint，适合大 State（GB~TB 级）。生产环境推荐 RocksDB。</div></div>
+        <div class="qa"><div class="q">State Backend 怎么选？</div><div class="a">HashMap：State 存 JVM Heap，最快但受 GC 影响，适合小 State（&lt;100MB）。RocksDB：State 存磁盘，不受 GC，支持增量 Checkpoint，适合大 State（GB~TB）。生产推荐 RocksDB。</div></div>
 
-        <div class="qa"><div class="q">什么是背压？Flink 怎么处理？</div><div class="a">下游算子处理速度跟不上上游，缓冲区满导致上游阻塞。Flink 基于信用-based 流控：下游告诉上游自己还能接收多少数据。排查：Web UI 反压面板。解决：① 增加并行度；② 优化算子逻辑（减少外部调用）；③ 增加网络缓冲区；④ 检查是否有数据倾斜。</div></div>
+        <div class="qa"><div class="q">Aligned vs Unaligned Checkpoint？</div><div class="a">Aligned：Barrier 对齐，保证 Exactly-Once，但背压时超时。Unaligned（1.14+）：Barrier 超越数据，背压下也能快速完成，代价是 Checkpoint 文件更大。思想：用存储换时间，在不同约束间做权衡。</div></div>
 
-        <div class="qa"><div class="q">Flink CDC 是什么？</div><div class="a">基于 Debezium 的 Change Data Capture 组件，读取 MySQL Binlog 实现全量+增量一体化同步。2.x 版本：单并行度读取全量快照，无缝切换到增量 Binlog。优势：无需 Canal/Debezium 等额外组件，Flink 直接消费 CDC 数据流。</div></div>
+        <div class="qa"><div class="q">Flink SQL 和 DataStream 怎么选？</div><div class="a">SQL 适合：标准 ETL、聚合、Join、简单逻辑。DataStream 适合：复杂状态逻辑、CEP、自定义 Trigger、需要低级控制。两者可互操作：Table→DataStream（toDataStream）和 DataStream→Table（fromDataStream）。建议：能用 SQL 就用 SQL，复杂逻辑用 DataStream。</div></div>
 
-        <div class="qa"><div class="q">如何处理迟到数据？</div><div class="a">三层防线——① <strong>Watermark</strong>：设置允许延迟（如 3 秒），Watermark 到达后才触发窗口；② <strong>Allowed Lateness</strong>：窗口触发后再等一段时间（如 1 分钟），新到数据重新计算；③ <strong>Side Output</strong>：超过 Allowed Lateness 的数据输出到侧输出流，不丢弃，可后续处理。</div></div>
+        <div class="qa"><div class="q">State TTL 的两种策略？</div><div class="a">UpdateOnCreateAndWrite（默认）：创建和写入时更新 TTL，读不影响过期。OnReadAndWrite：读和写都更新 TTL。选择看业务：读取也算"活跃"就用后者，否则用默认。注意：TTL 只支持 Keyed State，RocksDB 后台 compaction 负责实际清理。</div></div>
 
-        <div class="qa"><div class="q">Checkpoint 和 Savepoint 的区别？</div><div class="a"><strong>Checkpoint</strong>：Flink 自动触发，定期保存，Job 取消后默认删除，用于故障恢复。<strong>Savepoint</strong>：用户手动触发，不会自动删除，用于版本升级（改代码后从 Savepoint 恢复）、A/B 测试、集群迁移。Savepoint 本质上也是一种 Checkpoint，但更"持久"。</div></div>
+        <div class="qa"><div class="q">Operator Chain 和 Slot Sharing？</div><div class="a"><strong>Operator Chain</strong>：相邻算子合并为一个 Task，减少网络开销和序列化。可通过 startNewChain/disableChain 控制。<strong>Slot Sharing</strong>：同一 Job 的不同算子共享 Slot，提高资源利用率。一个 Slot 可以运行整个 Pipeline。</div></div>
+
+        <div class="qa"><div class="q">Flink CDC 2.x 和 3.x 的区别？</div><div class="a">2.x 内嵌 Debezium，单并行度全量读取，需要 FTWRL 全局锁。3.x 自研增量快照算法，表级并行读取，无锁（基于 Binlog Position），完整 DDL 同步。核心改进：无锁并行快照，对生产库影响更小。</div></div>
+
+        <div class="qa"><div class="q">如何处理迟到数据？</div><div class="a">三层防线：① Watermark（允许延迟，如 3 秒）；② Allowed Lateness（窗口触发后再等 1 分钟）；③ Side Output（超过阈值输出到侧输出流）。三层配合：Watermark 触发窗口 → Allowed Lateness 处理轻微迟到 → Side Output 兜底严重迟到。</div></div>
+
+        <div class="qa"><div class="q">什么是背压？Flink 怎么处理？</div><div class="a">下游处理速度跟不上上游，缓冲区满导致阻塞。Flink 基于信用-based 流控。排查：Web UI 反压面板。解决：增加并行度、优化算子逻辑、增加网络缓冲、检查数据倾斜。</div></div>
 
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>

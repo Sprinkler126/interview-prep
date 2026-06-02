@@ -88,16 +88,46 @@
           </ul>
         </div>
 
+        <div class="card">
+          <h4>🔄 版本演进</h4>
+          <table>
+            <thead><tr><th>版本</th><th>关键变化</th><th>面试要点</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">3.7 及之前</span></td>
+                <td>Mnesia 存储元数据、镜像队列（Mirror Queue）实现 HA</td>
+                <td>经典架构，面试常问镜像队列缺陷</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">3.8</span></td>
+                <td>引入 <strong>Quorum Queue</strong>（基于 Raft 的分布式队列）、TLS 增强、Prometheus 监控插件</td>
+                <td>里程碑版本，面试高频：Quorum Queue 原理</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">3.9</span></td>
+                <td>引入 <strong>Stream Queue</strong>（类 Kafka 日志队列）、Khepri 元数据存储（取代 Mnesia）、OAuth 2.0 支持</td>
+                <td>Stream Queue 概念、Khepri 是什么</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">3.10+</span></td>
+                <td>Stream Queue 增强（支持更多客户端）、性能优化、经典队列逐步弃用镜像模式</td>
+                <td>未来方向：Quorum + Stream 双轨并行</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="margin-top:0.8rem"><strong>思想方向</strong>：镜像队列（异步复制，可能丢数据）→ Quorum Queue（Raft 多数派，强一致）→ Stream Queue（日志型，高吞吐可回溯）。面试时能说清这条演进线会加分。</p>
+        </div>
+
         <h3 id="p1-2">1.2 Exchange 类型</h3>
         <div class="diagram">
           <div class="diagram-title">四种 Exchange 类型</div>
           <table>
-            <thead><tr><th>类型</th><th>路由规则</th><th>典型场景</th></tr></thead>
+            <thead><tr><th>类型</th><th>路由规则</th><th>匹配算法</th><th>典型场景</th></tr></thead>
             <tbody>
-              <tr><td><span class="badge badge-blue">Direct</span></td><td>精确匹配 routing key</td><td>点对点、任务分发</td></tr>
-              <tr><td><span class="badge badge-green">Fanout</span></td><td>广播到所有绑定队列（忽略 routing key）</td><td>广播通知、日志分发</td></tr>
-              <tr><td><span class="badge badge-orange">Topic</span></td><td>通配符匹配：<code>*</code> 匹配一个词，<code>#</code> 匹配零或多个词</td><td>按规则订阅、分类路由</td></tr>
-              <tr><td><span class="badge badge-purple">Headers</span></td><td>根据消息 header 属性匹配</td><td>复杂属性匹配（少用）</td></tr>
+              <tr><td><span class="badge badge-blue">Direct</span></td><td>精确匹配 routing key</td><td>O(1) 哈希查找</td><td>点对点、任务分发</td></tr>
+              <tr><td><span class="badge badge-green">Fanout</span></td><td>广播到所有绑定队列（忽略 routing key）</td><td>O(n) 遍历绑定列表</td><td>广播通知、日志分发</td></tr>
+              <tr><td><span class="badge badge-orange">Topic</span></td><td>通配符匹配：<code>*</code> 匹配一个词，<code>#</code> 匹配零或多个词</td><td>O(n) 逐个模式匹配</td><td>按规则订阅、分类路由</td></tr>
+              <tr><td><span class="badge badge-purple">Headers</span></td><td>根据消息 header 属性匹配（x-match=all/any）</td><td>O(n) 遍历 header</td><td>复杂属性匹配（少用）</td></tr>
             </tbody>
           </table>
         </div>
@@ -112,6 +142,35 @@
             <div class="flow-box flow-blue">Q2: order.#.cn<br><span style="font-size:0.7rem">匹配 ✅</span></div>
             <div class="flow-box flow-red">Q3: payment.*<br><span style="font-size:0.7rem">不匹配 ❌</span></div>
           </div>
+        </div>
+        <div class="card">
+          <h4>Dead Letter Exchange 完整配置示例</h4>
+          <pre><code>// 声明死信 Exchange 和死信队列
+channel.exchangeDeclare("dlx.exchange", "direct");
+channel.queueDeclare("dlx.queue", true, false, false, null);
+channel.queueBind("dlx.queue", "dlx.exchange", "dlx");
+
+// 声明业务队列时绑定 DLX
+Map&lt;String, Object&gt; args = new HashMap&lt;&gt;();
+args.put("x-dead-letter-exchange", "dlx.exchange");
+args.put("x-dead-letter-routing-key", "dlx");
+args.put("x-message-ttl", 60000);           // 队列级别 TTL 60s
+args.put("x-max-length", 10000);            // 队列最大长度
+channel.queueDeclare("order.queue", true, false, false, args);</code></pre>
+        </div>
+        <div class="card">
+          <h4>Alternate Exchange（备用交换机）</h4>
+          <p>当消息无法路由到任何队列时（无匹配 binding），会被发送到 Alternate Exchange，避免消息"静默丢失"。</p>
+          <pre><code>// 声明 Exchange 时设置备用交换机
+Map&lt;String, Object&gt; args = new HashMap&lt;&gt;();
+args.put("alternate-exchange", "ae.exchange");
+channel.exchangeDeclare("order.exchange", "direct", true, false, args);
+
+// 备用交换机绑定一个兜底队列
+channel.exchangeDeclare("ae.exchange", "fanout");
+channel.queueDeclare("unrouted.queue", true, false, false, null);
+channel.queueBind("unrouted.queue", "ae.exchange", "");</code></pre>
+          <p class="tip">Alternate Exchange 兜底了路由失败的消息，配合监控可及时发现配置错误。</p>
         </div>
 
         <h3 id="p1-3">1.3 消息确认机制</h3>
@@ -135,6 +194,48 @@
           </div>
         </div>
         <div class="card">
+          <h4>Publisher Confirm 三种模式</h4>
+          <table>
+            <thead><tr><th>模式</th><th>实现方式</th><th>吞吐量</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">同步确认</span></td>
+                <td><code>channel.waitForConfirms()</code>，逐条等待</td>
+                <td><span class="badge badge-red">低</span></td>
+                <td>简单场景、少量消息</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">批量确认</span></td>
+                <td><code>channel.waitForConfirmsOrDie()</code>，批量等待</td>
+                <td><span class="badge badge-orange">中</span></td>
+                <td>批量发送，一条失败全部重发</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">异步回调</span></td>
+                <td><code>channel.addConfirmListener(ackCallback, nackCallback)</code></td>
+                <td><span class="badge badge-green">高</span></td>
+                <td><strong>生产推荐</strong>，高性能 + 可精确处理失败</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code>// 异步 Confirm（推荐）
+channel.confirmSelect();
+channel.addConfirmListener(
+    (deliveryTag, multiple) -&gt; {
+        // ACK：消息已到达 Broker 并持久化
+        if (multiple) {
+            confirmSet.headSet(deliveryTag + 1).clear();
+        } else {
+            confirmSet.remove(deliveryTag);
+        }
+    },
+    (deliveryTag, multiple) -&gt; {
+        // NACK：Broker 处理失败，需重发
+        log.error("消息 {} 被 NACK", deliveryTag);
+    }
+);</code></pre>
+        </div>
+        <div class="card">
           <h4>Consumer ACK 模式</h4>
           <table>
             <thead><tr><th>模式</th><th>行为</th><th>可靠性</th></tr></thead>
@@ -144,6 +245,29 @@
               <tr><td><code>auto（ prefetch ）</code></td><td>处理完一条再推下一条</td><td><span class="badge badge-orange">较好</span></td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="card">
+          <h4>Prefetch（QoS）设置</h4>
+          <p><code>channel.basicQos(prefetchCount)</code> 控制 Broker 向 Consumer 推送的未确认消息数量上限。</p>
+          <ul>
+            <li><code>prefetchCount=1</code>：处理完一条才推下一条，公平分发，但吞吐低</li>
+            <li><code>prefetchCount=10~100</code>：批量预取，吞吐高，但可能不均匀</li>
+            <li><strong>推荐</strong>：根据消费速率调整，一般 10~50。消费慢设小，消费快设大</li>
+            <li><code>prefetchSize</code>：按字节限制（部分客户端不支持）</li>
+            <li><code>global=true</code>：整个 Channel 级别限制；<code>false</code>（默认）：每个 Consumer 级别</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>basic.ack vs basic.reject vs basic.nack</h4>
+          <table>
+            <thead><tr><th>方法</th><th>作用</th><th>requeue</th><th>批量</th></tr></thead>
+            <tbody>
+              <tr><td><code>basicAck</code></td><td>确认消息处理成功</td><td>无（已确认）</td><td>multiple 参数支持批量</td></tr>
+              <tr><td><code>basicReject</code></td><td>拒绝单条消息</td><td>requeue=true/false</td><td>❌ 仅单条</td></tr>
+              <tr><td><code>basicNack</code></td><td>拒绝消息（可批量）</td><td>requeue=true/false</td><td>✅ multiple 参数</td></tr>
+            </tbody>
+          </table>
+          <p class="warn"><strong>requeue=true 的陷阱</strong>：消息被拒绝后重新入队，再次投递给消费者，如果消费逻辑本身有 bug，会导致消息反复重试 → 队列积压 → 内存告警。生产环境必须 <code>requeue=false</code>，失败消息进死信队列。</p>
         </div>
         <div class="tip"><strong>生产推荐</strong>：手动 ACK + <code>basicNack(requeue=false)</code> 失败消息进入死信队列，不要 requeue=true（会反复重试导致消息堆积）。</div>
 
@@ -156,6 +280,12 @@
             <li><strong>Message 持久化</strong>：<code>deliveryMode=2</code>，消息写入磁盘</li>
           </ul>
           <p class="warn">三者缺一不可！Exchange 和 Queue 不持久化，重启后结构丢失；消息不持久化，重启后内容丢失。</p>
+          <h4>持久化性能影响</h4>
+          <ul>
+            <li>消息持久化需要写磁盘，比纯内存操作慢 10~100 倍</li>
+            <li>RabbitMQ 使用 <strong>journal + lazy free</strong> 优化：先写 WAL 日志再异步刷盘</li>
+            <li>可选 <code>queueDeclare(x-queue-mode=lazy)</code>：消息尽量存磁盘，减少内存占用（适合大量堆积场景）</li>
+          </ul>
         </div>
 
         <h3 id="p1-5">1.5 死信队列 (DLX)</h3>
@@ -196,6 +326,24 @@
             <div class="flow-box flow-green">DLX 死信队列<br><span style="font-size:0.7rem">消费者处理</span></div>
           </div>
           <p>典型：<strong>订单 30 分钟未支付自动取消</strong>。下单时发消息到业务队列（TTL=30min），超时后进入死信队列，消费者检查订单状态并取消。</p>
+          <pre><code>// TTL + DLX 延迟队列完整配置
+// 1. 声明死信交换机和队列
+channel.exchangeDeclare("delay.dlx", "direct");
+channel.queueDeclare("delay.process.queue", true, false, false, null);
+channel.queueBind("delay.process.queue", "delay.dlx", "delay");
+
+// 2. 声明延迟队列（绑定 DLX，不消费）
+Map&lt;String, Object&gt; args = new HashMap&lt;&gt;();
+args.put("x-dead-letter-exchange", "delay.dlx");
+args.put("x-dead-letter-routing-key", "delay");
+channel.queueDeclare("delay.queue.30min", true, false, false, args);
+
+// 3. 发送消息时设置 TTL
+AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
+    .expiration("1800000")  // 30 分钟
+    .build();
+channel.basicPublish("", "delay.queue.30min", props, body);
+// 消息 30min 后过期 → 进入 delay.process.queue → 消费者处理</code></pre>
         </div>
         <div class="card">
           <h4>方案二：延迟插件（rabbitmq_delayed_message_exchange）</h4>
@@ -213,6 +361,88 @@
             <li><strong>磁盘告警</strong>：磁盘剩余空间低于阈值（默认 50MB），Broker 阻塞写入</li>
             <li>告警解除后自动恢复</li>
           </ul>
+          <h4>关键配置参数</h4>
+          <table>
+            <thead><tr><th>参数</th><th>默认值</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>vm_memory_high_watermark</code></td><td>0.4（40%）</td><td>内存使用超此比例触发告警，阻塞生产者</td></tr>
+              <tr><td><code>vm_memory_high_watermark_paging_ratio</code></td><td>0.5</td><td>达到此比例开始将消息换页到磁盘</td></tr>
+              <tr><td><code>disk_free_limit</code></td><td>50MB</td><td>磁盘剩余低于此值触发告警</td></tr>
+              <tr><td><code>disk_free_limit relative</code></td><td>1.0</td><td>相对内存的倍数（如 1.5 表示磁盘至少留 1.5 倍内存）</td></tr>
+            </tbody>
+          </table>
+          <p class="warn">内存告警触发时，<strong>所有连接</strong>（不仅是触发告警的那个连接）的生产者都会被阻塞。消费者不受影响，可继续消费以释放内存。</p>
+        </div>
+
+        <div class="card">
+          <h4>🆕 Quorum Queue 详解（3.8+）</h4>
+          <p>Quorum Queue 是 RabbitMQ 3.8 引入的基于 <strong>Raft 共识协议</strong>的分布式队列，用于替代镜像队列。</p>
+          <h4>Raft 日志复制流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Producer<br><span style="font-size:0.7rem">发送消息</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Leader 节点<br><span style="font-size:0.7rem">写入 Raft 日志</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Follower 节点<br><span style="font-size:0.7rem">复制日志</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">多数派确认<br><span style="font-size:0.7rem">N/2+1 ACK</span></div>
+          </div>
+          <h4>与镜像队列对比</h4>
+          <table>
+            <thead><tr><th>特性</th><th>镜像队列（Mirror）</th><th>Quorum Queue</th></tr></thead>
+            <tbody>
+              <tr><td>一致性协议</td><td>异步复制</td><td><strong>Raft 多数派</strong></td></tr>
+              <tr><td>数据安全</td><td>Master 宕机可能丢数据</td><td><strong>多数派存活不丢数据</strong></td></tr>
+              <tr><td>吞吐量</td><td>中等</td><td><strong>更高</strong>（减少同步开销）</td></tr>
+              <tr><td>消息确认</td><td>单点确认</td><td>多数派确认</td></tr>
+              <tr><td>消费者优先级</td><td>✅ 支持</td><td>❌ 不支持</td></tr>
+              <tr><td>TTL 即时过期</td><td>✅ 支持</td><td>❌ 仅队列级别 TTL</td></tr>
+              <tr><td>消息回溯</td><td>❌ 不支持</td><td>❌ 不支持</td></tr>
+              <tr><td>惰性模式</td><td>✅ 支持</td><td>❌ 默认惰性</td></tr>
+            </tbody>
+          </table>
+          <h4>投递计数（Delivery Count）</h4>
+          <p>Quorum Queue 会记录每条消息的投递次数。当消费者 nack 后，<code>delivery_count</code> 递增。可结合 <code>x-delivery-limit</code> 设置最大重试次数，超过后消息直接进入死信队列，避免无限重试。</p>
+          <pre><code>// 声明 Quorum Queue
+Map&lt;String, Object&gt; args = new HashMap&lt;&gt;();
+args.put("x-queue-type", "quorum");
+args.put("x-delivery-limit", 3);  // 最多重试 3 次
+channel.queueDeclare("order.quorum.queue", true, false, false, args);</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>🆕 Stream Queue（3.9+）</h4>
+          <p>Stream Queue 是 RabbitMQ 3.9 引入的<strong>日志型队列</strong>，类似 Kafka 的设计理念，消息持久化到磁盘日志中，消费后<strong>不删除</strong>。</p>
+          <h4>核心特点</h4>
+          <ul>
+            <li><strong>消息保留</strong>：消费后不删除，可按时间或大小策略保留</li>
+            <li><strong>消息回溯</strong>：消费者可从任意位置（offset）开始消费</li>
+            <li><strong>多消费者</strong>：同一消息可被多个消费者独立消费</li>
+            <li><strong>高吞吐</strong>：底层使用顺序写日志，吞吐量远超经典队列</li>
+            <li><strong>只追加</strong>：不支持消息删除和 nack（只能 ack 或忽略）</li>
+          </ul>
+          <pre><code>// 声明 Stream Queue
+Map&lt;String, Object&gt; args = new HashMap&lt;&gt;();
+args.put("x-queue-type", "stream");
+args.put("x-max-length-bytes", 1073741824);  // 保留 1GB 数据
+args.put("x-stream-max-segment-size-bytes", 134217728);  // 每段 128MB
+channel.queueDeclare("events.stream", true, false, false, args);
+
+// 消费时指定 offset
+Map&lt;String, Object&gt; consumerArgs = new HashMap&lt;&gt;();
+consumerArgs.put("x-stream-offset", "first");  // 从头消费
+// 也可以用 "last" 或具体 offset 数值
+channel.basicConsume("events.stream", false, consumerArgs, consumer);</code></pre>
+          <h4>Stream Queue vs Kafka</h4>
+          <table>
+            <thead><tr><th>特性</th><th>Stream Queue</th><th>Kafka</th></tr></thead>
+            <tbody>
+              <tr><td>定位</td><td>RabbitMQ 内置能力</td><td>独立流处理平台</td></tr>
+              <tr><td>分区</td><td>单队列（不支持分区）</td><td>多 Partition</td></tr>
+              <tr><td>生态</td><td>AMQP 协议兼容</td><td>丰富的 Connectors、Streams API</td></tr>
+              <tr><td>适用场景</td><td>中等规模、需要回溯</td><td>大规模日志/事件流</td></tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- ================= PART 2 ================= -->
@@ -252,7 +482,7 @@
 
         <h3 id="p2-4">2.4 全链路可靠性保障</h3>
         <div class="diagram">
-          <div class="diagram-title">可靠性三板斧</div>
+          <div class="diagram-title">可靠性全链路图</div>
           <div class="arch-container">
             <div class="arch-row">
               <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
@@ -269,6 +499,25 @@
               </div>
             </div>
           </div>
+        </div>
+        <div class="card">
+          <h4>消息可靠性全链路（详细版）</h4>
+          <div class="flow" style="flex-wrap:wrap;gap:0.5rem">
+            <div class="flow-box flow-blue">Producer 发送</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Confirm 回调<br><span style="font-size:0.7rem">确认 Broker 收到</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Exchange 路由</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Queue 持久化<br><span style="font-size:0.7rem">写磁盘</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Consumer 消费</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">ACK 确认</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">失败→DLX<br><span style="font-size:0.7rem">死信队列兜底</span></div>
+          </div>
+          <p><strong>任何一步失败都有兜底</strong>：Confirm 失败 → Producer 重发；持久化失败 → 配合 Confirm 重发；消费失败 → DLX 死信队列收集异常消息。</p>
         </div>
         <div class="card">
           <h4>消息幂等性</h4>
@@ -305,26 +554,57 @@
           </ul>
         </div>
 
+        <div class="card">
+          <h4>🆕 RabbitMQ vs RocketMQ 对比</h4>
+          <table>
+            <thead><tr><th>特性</th><th>RabbitMQ</th><th>RocketMQ</th></tr></thead>
+            <tbody>
+              <tr><td>开发语言</td><td>Erlang</td><td>Java</td></tr>
+              <tr><td>协议</td><td>AMQP</td><td>自研协议</td></tr>
+              <tr><td>消息模型</td><td>Exchange + Queue 灵活路由</td><td>Topic + Tag + Queue</td></tr>
+              <tr><td>延迟消息</td><td>需 TTL+DLX 或插件</td><td><strong>原生支持 18 个级别</strong></td></tr>
+              <tr><td>事务消息</td><td>不支持</td><td><strong>支持（半消息）</strong></td></tr>
+              <tr><td>消息回溯</td><td>仅 Stream Queue</td><td><strong>支持按时间回溯</strong></td></tr>
+              <tr><td>吞吐量</td><td>万级~十万级/s</td><td><strong>十万级~百万级/s</strong></td></tr>
+              <tr><td>延迟</td><td>μs 级</td><td>ms 级</td></tr>
+              <tr><td>适用场景</td><td>中小规模、复杂路由、低延迟业务消息</td><td>大规模、电商、金融、事务消息</td></tr>
+              <tr><td>社区</td><td>VMware 维护，国际主流</td><td>Apache 顶级项目，国内主流</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <!-- ================= PART 3 ================= -->
         <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
 
-        <div class="qa"><div class="q">RabbitMQ 的 Exchange 有哪些类型？分别什么场景？</div><div class="a"><strong>Direct</strong>：精确匹配 routing key，点对点任务分发。<strong>Fanout</strong>：广播到所有绑定队列，日志分发。<strong>Topic</strong>：通配符匹配（*一个词，#零或多词），按规则订阅。<strong>Headers</strong>：按 header 属性匹配（少用）。</div></div>
+        <div class="qa"><div class="q">RabbitMQ 的 Exchange 有哪些类型？分别什么场景？</div><div class="a"><strong>Direct</strong>：精确匹配 routing key，点对点任务分发。<strong>Fanout</strong>：广播到所有绑定队列，日志分发。<strong>Topic</strong>：通配符匹配（*一个词，#零或多词），按规则订阅。<strong>Headers</strong>：按 header 属性匹配（少用）。此外还有 <strong>Alternate Exchange</strong> 兜底路由失败的消息。</div></div>
 
-        <div class="qa"><div class="q">如何保证消息不丢失？</div><div class="a">三个环节——① <strong>Producer</strong>：开启 Publisher Confirm，异步回调确认 Broker 已收到；② <strong>Broker</strong>：Exchange + Queue + Message 三者都持久化（durable + deliveryMode=2）；③ <strong>Consumer</strong>：手动 ACK，处理完再确认；失败用 basicNack(requeue=false) 进死信队列。</div></div>
+        <div class="qa"><div class="q">如何保证消息不丢失？</div><div class="a">三个环节——① <strong>Producer</strong>：开启 Publisher Confirm，异步回调确认 Broker 已收到；② <strong>Broker</strong>：Exchange + Queue + Message 三者都持久化（durable + deliveryMode=2）；③ <strong>Consumer</strong>：手动 ACK，处理完再确认；失败用 basicNack(requeue=false) 进死信队列。推荐使用 Quorum Queue 进一步保障数据一致性。</div></div>
 
         <div class="qa"><div class="q">如何保证消息顺序性？</div><div class="a">单 Queue 单 Consumer 有序。如果需要并行消费但保证部分有序：将同一业务 key 的消息发到同一 Queue（用 key hash 路由）。注意：Consumer ACK 失败后 requeue 可能导致乱序，建议失败进死信队列。</div></div>
 
-        <div class="qa"><div class="q">什么是死信队列？怎么用？</div><div class="a">消息在三种情况下成为死信：① 被 reject/nack（requeue=false）；② TTL 过期；③ 队列满。死信会路由到指定的 DLX（Dead Letter Exchange）绑定的队列。用途：延迟任务（TTL+DLX）、失败消息重试、异常消息告警。</div></div>
+        <div class="qa"><div class="q">什么是死信队列？怎么用？</div><div class="a">消息在三种情况下成为死信：① 被 reject/nack（requeue=false）；② TTL 过期；③ 队列满。死信会路由到指定的 DLX（Dead Letter Exchange）绑定的队列。用途：延迟任务（TTL+DLX）、失败消息重试、异常消息告警。配置时在队列声明参数中设置 <code>x-dead-letter-exchange</code> 和 <code>x-dead-letter-routing-key</code>。</div></div>
 
         <div class="qa"><div class="q">RabbitMQ 如何实现延迟队列？</div><div class="a">两种方案——① <strong>TTL + DLX</strong>：消息设 TTL 发到无消费者的队列，过期后进死信队列被消费。② <strong>延迟插件</strong>：安装 delayed_message_exchange，消息带 x-delay header，Broker 到时间才投递。方案一简单但只能队列级别设 TTL；方案二灵活支持任意延迟时间。</div></div>
 
-        <div class="qa"><div class="q">镜像队列和 Quorum Queue 有什么区别？</div><div class="a"><strong>镜像队列</strong>：主从模式，写入 Master 后同步到 Slave，Master 宕机从 Slave 选新 Master。问题：同步是异步的，可能丢消息。<strong>Quorum Queue</strong>（3.8+）：基于 Raft，多数派确认才算成功，数据一致性更好，吞吐量更高。推荐用 Quorum Queue 替代镜像队列。</div></div>
+        <div class="qa"><div class="q">镜像队列和 Quorum Queue 有什么区别？</div><div class="a"><strong>镜像队列</strong>：主从模式，写入 Master 后同步到 Slave，Master 宕机从 Slave 选新 Master。问题：同步是异步的，可能丢消息。<strong>Quorum Queue</strong>（3.8+）：基于 Raft，多数派确认才算成功，数据一致性更好，吞吐量更高。推荐用 Quorum Queue 替代镜像队列。但 Quorum Queue 不支持消费者优先级和消息级别的 TTL。</div></div>
 
         <div class="qa"><div class="q">消息幂等性怎么保证？</div><div class="a">Producer 发送时携带全局唯一 ID（如 UUID）。Consumer 处理前查去重表（Redis Set 或 DB 表），已处理则跳过。注意：去重表要设过期时间（如 24h），防止无限增长。</div></div>
 
-        <div class="qa"><div class="q">RabbitMQ 和 Kafka 的区别？什么场景用哪个？</div><div class="a"><strong>RabbitMQ</strong>：传统消息代理，灵活路由（4 种 Exchange），低延迟（μs 级），消息消费后删除，适合业务消息。<strong>Kafka</strong>：分布式流平台，高吞吐（百万级/s），消息保留可回溯，Pull 模式，适合大数据/日志。简单说：业务消息选 RabbitMQ，大数据选 Kafka。</div></div>
+        <div class="qa"><div class="q">RabbitMQ 和 Kafka 的区别？什么场景用哪个？</div><div class="a"><strong>RabbitMQ</strong>：传统消息代理，灵活路由（4 种 Exchange），低延迟（μs 级），消息消费后删除，适合业务消息。<strong>Kafka</strong>：分布式流平台，高吞吐（百万级/s），消息保留可回溯，Pull 模式，适合大数据/日志。简单说：业务消息选 RabbitMQ，大数据选 Kafka。RabbitMQ 3.9+ 的 Stream Queue 在尝试缩小差距。</div></div>
 
         <div class="qa"><div class="q">消息积压怎么处理？</div><div class="a">紧急：① 增加消费者数量；② 提高 prefetch 值；③ 临时跳过非关键消息。根本：① 优化消费逻辑（减少 DB 调用、批量处理）；② 异步化非关键操作。预防：监控队列长度和消费速率，设置告警阈值。</div></div>
+
+        <div class="qa"><div class="q">Quorum Queue 的 Raft 机制是怎么工作的？</div><div class="a">Quorum Queue 使用 Raft 共识协议：① 集群中一个节点选举为 <strong>Leader</strong>，其余为 <strong>Follower</strong>；② Producer 发送消息到 Leader，Leader 将消息写入 Raft 日志；③ Leader 将日志复制到 Follower 节点；④ <strong>多数派（N/2+1）</strong>节点确认后，消息才被标记为已提交；⑤ Consumer 从 Leader 消费已提交的消息。如果 Leader 宕机，Follower 重新选举新 Leader。消息确认（ACK）也走 Raft 共识，确保 ACK 不丢失。</div></div>
+
+        <div class="qa"><div class="q">Stream Queue 是什么？适合什么场景？</div><div class="a">Stream Queue 是 RabbitMQ 3.9 引入的<strong>日志型队列</strong>，类似 Kafka 设计：① 消息消费后<strong>不删除</strong>，持久化在磁盘日志中；② 支持<strong>消息回溯</strong>，消费者可从任意 offset 开始消费；③ 支持<strong>多消费者</strong>独立消费同一消息流；④ 吞吐量远超经典队列。适合场景：事件溯源、审计日志、需要回溯的高吞吐场景。限制：不支持 nack（只支持 ack）、不支持消息优先级。</div></div>
+
+        <div class="qa"><div class="q">prefetch 怎么设置？设多少合适？</div><div class="a"><code>channel.basicQos(prefetchCount)</code> 设置 Broker 向每个 Consumer 推送的未确认消息上限。<code>prefetchCount=1</code> 最公平但吞吐最低；<code>10~50</code> 是常见范围。设置原则：① 消费处理快（如内存操作）→ 设大（50~200）；② 消费处理慢（如调外部 API）→ 设小（1~5）；③ <code>global=false</code>（默认）是每个 Consumer 级别，<code>global=true</code> 是整个 Channel 级别。经验值：从 10 开始，根据监控数据调整。</div></div>
+
+        <div class="qa"><div class="q">消息堆积时 RabbitMQ 和 Kafka 表现差异？</div><div class="a"><strong>RabbitMQ</strong>：消息堆积到一定量后，内存告警触发，生产者被阻塞。即使使用 lazy queue（消息写磁盘），大量堆积仍影响路由性能。<strong>Kafka</strong>：消息天然写磁盘（顺序写），堆积只是多占磁盘空间，对性能几乎无影响。结论：<strong>大量堆积场景（百万级）首选 Kafka</strong>；RabbitMQ 适合消费速率接近生产速率的场景。RabbitMQ 3.9+ 的 Stream Queue 改善了堆积能力，但仍不如 Kafka。</div></div>
+
+        <div class="qa"><div class="q">Publisher Confirm 的异步模式怎么实现？为什么推荐？</div><div class="a">异步模式通过 <code>channel.addConfirmListener(ackCallback, nackCallback)</code> 实现。Broker 确认消息后回调 ackCallback（包含 deliveryTag），失败回调 nackCallback。优势：① 不阻塞发送线程，吞吐量最高；② 可按 deliveryTag 精确定位失败消息并重发；③ 配合 <code>ConcurrentSkipListSet</code> 记录未确认消息，定期重发超时消息。注意：要处理 <code>multiple=true</code> 的情况（Broker 批量确认）。</div></div>
+
+        <div class="qa"><div class="q">RabbitMQ 的版本演进方向是什么？</div><div class="a">三条主线：① <strong>高可用</strong>：镜像队列（异步复制）→ Quorum Queue（Raft 强一致），镜像队列已在 3.10+ 标记为弃用；② <strong>高吞吐</strong>：Stream Queue（日志型队列）对标 Kafka 的流处理能力；③ <strong>元数据存储</strong>：Khepri（3.9+）逐步取代 Mnesia，提升集群扩展性和稳定性。面试能讲清这条演进线，说明你对 RabbitMQ 有深度理解。</div></div>
 
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
