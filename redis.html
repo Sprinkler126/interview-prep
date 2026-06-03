@@ -401,15 +401,70 @@ end</code></pre>
             </div>
           </div>
         </div>
-        <div class="diagram">
-          <div class="diagram-title">Cluster 数据分片</div>
-          <div class="flow">
-            <div class="flow-box flow-blue">Client<br><span style="font-size:0.7rem">key: "user:1001"</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-purple">CRC16(key) % 16384<br><span style="font-size:0.7rem">计算 slot</span></div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-green">路由到对应节点<br><span style="font-size:0.7rem">MOVED 重定向</span></div>
+
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">🏠 主从复制 (Master-Slave)</h4>
+            <p><strong>原理</strong>：Slave 连接 Master 后发送 <code>PSYNC runid offset</code>，Master 回复数据</p>
+            <ul>
+              <li><strong>全量同步</strong>：首次连接或 offset 失效 → Master 执行 <code>BGSAVE</code> 生成 RDB → 发送给 Slave → 后续命令通过 repl buffer 增量同步</li>
+              <li><strong>增量同步</strong>：网络断开重连 → Master 检查 <code>repl_backlog</code> 中是否还有 offset 对应的数据 → 有则只发断线期间的增量</li>
+              <li><strong>repl_backlog</strong>：环形缓冲区（默认 1MB），断线时间过长或写入量太大导致 offset 被覆盖 → 退化为全量同步</li>
+            </ul>
+            <p class="warn" style="margin-top:0.5rem">❌ Master 宕机后需<strong>手动</strong>将某个 Slave 提升为 Master，服务中断时间长</p>
           </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">🛡️ 哨兵 (Sentinel)</h4>
+            <p><strong>原理</strong>：Sentinel 进程监控 Redis 节点，自动故障转移</p>
+            <ul>
+              <li><strong>监控</strong>：每秒 PING 所有 Master/Slave，超过 <code>down-after-milliseconds</code>（默认 30s）未响应标记为主观下线（SDOWN）</li>
+              <li><strong>客观下线</strong>：Sentinel 之间互相询问，<strong>quorum</strong>（多数派）都认为 Master 下线 → ODOWN</li>
+              <li><strong>Leader 选举</strong>：Raft 协议选举 Sentinel Leader，由 Leader 执行故障转移</li>
+              <li><strong>故障转移</strong>：选 Slave（优先级 → offset → runid）→ <code>SLAVEOF NO ONE</code> 提升为新 Master → 其余 Slave 指向新 Master</li>
+            </ul>
+            <div class="tip" style="margin-top:0.5rem">至少 <strong>3 个 Sentinel</strong>（奇数），部署在不同机器/可用区，避免脑裂</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>🔗 Redis Cluster 集群</h4>
+          <p><strong>核心思路</strong>：数据分片 + 去中心化，解决单机内存和写入瓶颈</p>
+          <div class="diagram">
+            <div class="diagram-title">Cluster 数据分片</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">Client<br><span style="font-size:0.7rem">key: "user:1001"</span></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">CRC16(key) % 16384<br><span style="font-size:0.7rem">计算 slot</span></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">路由到对应节点<br><span style="font-size:0.7rem">MOVED 重定向</span></div>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>要素</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>slot 分片</strong></td><td>16384 个 slot，<code>CRC16(key) % 16384</code> 分配到节点，每个 Master 负责一段 slot 范围</td></tr>
+              <tr><td><strong>节点结构</strong></td><td>最少 6 节点（3 主 3 从），每个 Master 有一个 Slave 用于故障转移</td></tr>
+              <tr><td><strong>Gossip 协议</strong></td><td>节点间互相 PING/PONG 交换状态信息（slot 分配、节点健康），去中心化无中心代理</td></tr>
+              <tr><td><strong>MOVED 重定向</strong></td><td>Client 访问的 slot 不在当前节点 → 返回 <code>MOVED slot ip:port</code>，Client 重定向到正确节点并缓存路由</td></tr>
+              <tr><td><strong>ASK 重定向</strong></td><td>slot 正在迁移（resharding）中 → 返回 <code>ASK</code>，Client 临时访问目标节点，不更新本地路由表</td></tr>
+              <tr><td><strong>hash_tag</strong></td><td><code>{user}:1001</code> 和 <code>{user}:1002</code> 中 <code>{user}</code> 决定 slot，保证相关 key 落同一节点（支持 multi-key 操作）</td></tr>
+            </tbody>
+          </table>
+          <p class="warn" style="margin-top:0.8rem">⚠️ Cluster 限制：不支持跨 slot 的多 key 操作（MGET/DEL/Lua 脚本中的多个 key 必须同 slot）；不支持 SELECT 多数据库（只有 db 0）</p>
+        </div>
+
+        <div class="card">
+          <h4>对比总结</h4>
+          <table>
+            <thead><tr><th>维度</th><th>主从复制</th><th>Sentinel</th><th>Cluster</th></tr></thead>
+            <tbody>
+              <tr><td><strong>数据分片</strong></td><td>❌ 无，全量复制</td><td>❌ 无，全量复制</td><td>✅ 16384 slot 分片</td></tr>
+              <tr><td><strong>自动故障转移</strong></td><td>❌ 需手动</td><td>✅ Sentinel 自动切换</td><td>✅ Slave 自动顶上</td></tr>
+              <tr><td><strong>写入扩展</strong></td><td>❌ 只有 Master 写</td><td>❌ 只有 Master 写</td><td>✅ 多 Master 并行写</td></tr>
+              <tr><td><strong>节点数量</strong></td><td>1 主 + N 从</td><td>至少 3 Sentinel + 1 主 N 从</td><td>最少 6 节点（3主3从）</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>读多写少，小规模</td><td>中等规模，高可用</td><td>大规模，高写入 + 海量数据</td></tr>
+            </tbody>
+          </table>
         </div>
 
         <h3 id="s2-5">2.5 限流与排行榜</h3>
