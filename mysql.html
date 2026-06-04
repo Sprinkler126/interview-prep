@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MySQL - 面试知识复习库</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">📚 面试知识复习库</a>
+      <a class="back" href="index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🐬 MySQL</h1>
+    <p class="subtitle">全球最流行的开源关系型数据库 · InnoDB · 索引优化 · 事务与锁 · 高可用架构</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">MySQL 整体架构</a></li>
+          <li class="sub"><a href="#s1-2">InnoDB 存储引擎架构</a></li>
+          <li class="sub"><a href="#s1-3">三种日志机制</a></li>
+          <li class="sub"><a href="#s1-4">索引原理</a></li>
+          <li class="sub"><a href="#s1-5">事务与 MVCC</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">锁机制</a></li>
+          <li class="sub"><a href="#s2-2">SQL 优化实战</a></li>
+          <li class="sub"><a href="#s2-3">分库分表</a></li>
+          <li class="sub"><a href="#s2-4">主从复制与高可用</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 MySQL 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">MySQL 服务器架构（四层）</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>① 连接层</strong>
+                <div class="arch-label">连接管理 · 认证鉴权 · 连接池（线程池） · 安全校验</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ SQL 请求</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06);">
+                📝 解析器<div class="arch-label">词法分析 · 语法分析<br>生成解析树</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                🧠 优化器<div class="arch-label">CBO 基于代价<br>选择最优执行计划</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                ⚡ 执行器<div class="arch-label">调用存储引擎接口<br>逐行/批量获取数据</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 查询缓存（8.0 已移除）</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06);">
+                <strong>② 存储引擎层</strong>
+                <div class="arch-label">InnoDB（默认） · MyISAM · Memory · Archive · 引擎可插拔</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--border);background:var(--surface2);">
+                <strong>③ 文件系统层</strong>
+                <div class="arch-label">数据文件(.ibd/.MYD) · 日志文件(redo/undo/binlog) · 配置文件</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>连接层详解</h4>
+          <ul>
+            <li><strong>连接管理</strong>：每个客户端连接分配一个线程，8.0+ 使用线程池（<code>thread_pool</code>）复用线程</li>
+            <li><strong>认证鉴权</strong>：基于用户名、密码、主机地址的三元组认证，支持 <code>caching_sha2_password</code>（8.0 默认）</li>
+            <li><strong>连接方式</strong>：TCP/IP（跨机器）或 Unix Socket（本机），长连接需定期清理（<code>wait_timeout</code>）</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>优化器的工作</h4>
+          <ul>
+            <li><strong>等价变换</strong>：子查询转 JOIN、OR 转 UNION、常量折叠</li>
+            <li><strong>选择最优计划</strong>：根据统计信息（索引基数、数据分布）估算代价，选择扫描行数最少的方案</li>
+            <li><strong>选择索引</strong>：决定使用哪个索引、是否走索引下推（ICP）</li>
+            <li><strong>JOIN 顺序</strong>：多表 JOIN 时决定表的连接顺序，减少中间结果集</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>InnoDB vs MyISAM 对比</h4>
+          <table>
+            <thead><tr><th>特性</th><th>InnoDB</th><th>MyISAM</th></tr></thead>
+            <tbody>
+              <tr><td><strong>事务支持</strong></td><td><span class="badge badge-green">✅ ACID</span></td><td><span class="badge badge-red">❌ 不支持</span></td></tr>
+              <tr><td><strong>行级锁</strong></td><td><span class="badge badge-green">✅ 支持</span></td><td><span class="badge badge-red">❌ 仅表锁</span></td></tr>
+              <tr><td><strong>外键</strong></td><td><span class="badge badge-green">✅ 支持</span></td><td><span class="badge badge-red">❌ 不支持</span></td></tr>
+              <tr><td><strong>MVCC</strong></td><td><span class="badge badge-green">✅ 支持</span></td><td><span class="badge badge-red">❌ 不支持</span></td></tr>
+              <tr><td><strong>崩溃恢复</strong></td><td><span class="badge badge-green">✅ redo log</span></td><td><span class="badge badge-red">❌ 无保障</span></td></tr>
+              <tr><td><strong>全文索引</strong></td><td><span class="badge badge-blue">5.6+ 支持</span></td><td><span class="badge badge-green">✅ 原生支持</span></td></tr>
+              <tr><td><strong>索引结构</strong></td><td>聚簇索引（B+ 树）</td><td>非聚簇索引（B+ 树）</td></tr>
+              <tr><td><strong>存储文件</strong></td><td>.frm + .ibd</td><td>.frm + .MYD + .MYI</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>OLTP、高并发写入</td><td>OLAP、读密集、只读数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip">MySQL 5.5 起 InnoDB 成为默认引擎。MySQL 8.0 彻底移除查询缓存（Query Cache），因为其在高并发下命中率低且维护锁竞争严重。</div>
+
+        <h3 id="s1-2">1.2 InnoDB 存储引擎架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">InnoDB 内存与磁盘架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>Buffer Pool（缓冲池）</strong>
+                <div class="arch-label">数据页 · 索引页 · 自适应哈希索引 · Change Buffer · 数据字典</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                <strong>Change Buffer</strong>
+                <div class="arch-label">缓存非唯一二级索引<br>页的 DML 操作</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06);">
+                <strong>Log Buffer</strong>
+                <div class="arch-label">redo log 缓冲区<br>定期刷盘</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                <strong>Adaptive Hash</strong>
+                <div class="arch-label">自动将热点页构建<br>为哈希索引 O(1)</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 脏页刷盘 / 刷日志</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06);">
+                <strong>系统表空间</strong>
+                <div class="arch-label">ibdata1<br>数据字典 · undo log（旧版本）</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>独立表空间</strong>
+                <div class="arch-label">*.ibd<br>数据 + 聚簇索引<br>每表一个文件（innodb_file_per_table）</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                <strong>Redo Log</strong>
+                <div class="arch-label">ib_logfile0/1<br>顺序写 · WAL · 崩溃恢复</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                <strong>Undo Log</strong>
+                <div class="arch-label">undo_001 / undo_002<br>事务回滚 · MVCC</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06);">
+                <strong>Doublewrite</strong>
+                <div class="arch-label">双写缓冲区<br>防止部分写失效</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06);">
+                <strong>Binlog</strong>
+                <div class="arch-label">binlog.000001<br>Server 层 · 主从复制 · 数据恢复</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Buffer Pool 工作机制</h4>
+          <ul>
+            <li><strong>页管理</strong>：以 16KB 数据页为单位管理，使用改进的 LRU 算法（young 区 + old 区，比例 63:37）</li>
+            <li><strong>LRU 优化</strong>：新读入的页先放 old 区头部，只有再次被访问（超过 1 秒<code>innodb_old_blocks_time</code>）才移入 young 区，防止全表扫描冲刷热点数据</li>
+            <li><strong>脏页刷新</strong>：Buffer Pool 中被修改但未写入磁盘的页，通过后台线程异步刷盘（<code>innodb_io_capacity</code> 控制刷盘速度）</li>
+            <li><strong>Change Buffer</strong>：当修改非唯一二级索引页且该页不在 Buffer Pool 时，先缓存到 Change Buffer，后台合并（merge）到磁盘，减少随机 IO</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 三种日志机制</h3>
+        <div class="diagram">
+          <div class="diagram-title">Redo Log / Undo Log / Binlog 对比</div>
+          <table>
+            <thead><tr><th>维度</th><th>Redo Log（重做日志）</th><th>Undo Log（回滚日志）</th><th>Binlog（归档日志）</th></tr></thead>
+            <tbody>
+              <tr><td><strong>所属层</strong></td><td><span class="badge badge-orange">InnoDB 引擎层</span></td><td><span class="badge badge-orange">InnoDB 引擎层</span></td><td><span class="badge badge-blue">Server 层</span></td></tr>
+              <tr><td><strong>日志内容</strong></td><td>物理日志（页的修改）</td><td>逻辑日志（行的旧值）</td><td>逻辑日志（SQL 或行变更）</td></tr>
+              <tr><td><strong>写入方式</strong></td><td>循环写（固定大小）</td><td>追加写（可清理）</td><td>追加写（文件滚动）</td></tr>
+              <tr><td><strong>主要作用</strong></td><td>崩溃恢复（crash-safe）</td><td>事务回滚 + MVCC</td><td>主从复制 + 数据恢复</td></tr>
+              <tr><td><strong>生命周期</strong></td><td>事务提交后可被覆盖</td><td>无活跃事务引用后可清理</td><td>根据 <code>expire_logs_days</code> 保留</td></tr>
+              <tr><td><strong>文件</strong></td><td>ib_logfile0 / ib_logfile1</td><td>undo_001 / undo_002</td><td>binlog.00000N</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>WAL 机制（Write-Ahead Logging）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">事务修改数据</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">写 Buffer Pool（脏页）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">写 Log Buffer</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">刷 redo log 到磁盘</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">提交完成</div>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li><strong>核心思想</strong>：先写日志再写数据页，保证事务的持久性</li>
+            <li><strong>redo log 刷盘策略</strong>（<code>innodb_flush_log_at_trx_commit</code>）：
+              <ul>
+                <li><code>0</code>：每秒刷盘 → 速度快，最多丢 1 秒数据</li>
+                <li><code>1</code>（默认）：每次提交刷盘 → 数据最安全</li>
+                <li><code>2</code>：每次提交写 OS 缓存，每秒 fsync → 速度和安全性居中</li>
+              </ul>
+            </li>
+            <li><strong>checkpoint 机制</strong>：当 redo log 空间不足时，将脏页刷盘并推进 checkpoint，释放已刷盘的 redo log 空间</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>两阶段提交（2PC）— 保证 Redo Log 和 Binlog 一致性</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">InnoDB 写 redo log（prepare）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Server 写 binlog</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">InnoDB redo log（commit）</div>
+          </div>
+          <table style="margin-top:0.8rem">
+            <thead><tr><th>崩溃场景</th><th>状态</th><th>恢复策略</th></tr></thead>
+            <tbody>
+              <tr><td>redo log prepare，<strong>无 binlog</strong></td><td>不一致</td><td>回滚事务</td></tr>
+              <tr><td>redo log prepare，<strong>有 binlog</strong></td><td>一致</td><td>提交事务</td></tr>
+              <tr><td>redo log commit</td><td>已完成</td><td>无需处理</td></tr>
+            </tbody>
+          </table>
+          <p class="tip" style="margin-top:0.5rem">判断 binlog 是否完整：binlog 末尾有 XID event 表示写入完整。MySQL 5.7+ 引入 <code>binlog_group_commit</code> 优化，批量刷盘减少 IO。</p>
+        </div>
+
+        <h3 id="s1-4">1.4 索引原理</h3>
+        <div class="card">
+          <h4>B+ 树结构</h4>
+          <div class="diagram">
+            <div class="diagram-title">InnoDB B+ 树索引结构</div>
+            <pre style="font-family:'SF Mono',monospace;font-size:0.85rem;line-height:1.8;text-align:center;color:var(--text-dim);">
+                     ┌──────────────────────┐
+                     │   [20]  [40]  [60]   │  ← 非叶子节点（只存 key + 指针）
+                     └──┬─────┬─────┬──────┘
+                        │     │     │
+              ┌─────────┤     │     ├──────────┐
+              ▼         ▼     ▼     ▼          ▼
+         ┌─────────┐ ┌───────┐ ┌───────┐ ┌─────────┐
+         │10,15,20 │ │25,30,40│ │45,50,60│ │65,70,80 │  ← 叶子节点（存完整数据行）
+         └────┬────┘ └───┬───┘ └───┬───┘ └────┬────┘
+              │          │         │          │
+              ←──────────←────────←──────────←─────── 双向链表（支持范围查询）
+            </pre>
+          </div>
+          <ul>
+            <li><strong>非叶子节点</strong>：只存储索引键值和子节点指针，不存数据，扇出高（单页可存更多 key）</li>
+            <li><strong>叶子节点</strong>：存储完整数据行（聚簇索引）或主键值（二级索引），叶子节点间用双向链表连接</li>
+            <li><strong>树高度</strong>：通常 2~4 层，千万级数据只需 3~4 次磁盘 IO（每层一次 IO）</li>
+            <li><strong>页大小</strong>：默认 16KB，按 bigint 主键（8B）计算，单页约存 1170 个 key，三层可存约 2000 万行</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>聚簇索引 vs 非聚簇索引（二级索引）</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">🔑 聚簇索引（主键索引）</h4>
+              <ul>
+                <li>叶子节点存储<strong>完整数据行</strong></li>
+                <li>每张表<strong>只有一个</strong>聚簇索引</li>
+                <li>默认使用主键，无主键则使用 UNIQUE NOT NULL 列，都没有则生成隐藏 row_id</li>
+                <li>数据按主键顺序物理存储</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">📋 二级索引（辅助索引）</h4>
+              <ul>
+                <li>叶子节点存储<strong>索引列值 + 主键值</strong></li>
+                <li>查询非索引列需要<strong>回表</strong>：先查二级索引得到主键，再查聚簇索引得到完整行</li>
+                <li>每张表可建多个二级索引</li>
+                <li>二级索引越多，写入成本越高（需维护索引页）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">SELECT * WHERE name='Tom'</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">查 idx_name 二级索引</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">得到主键 id=5</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">回表查聚簇索引 id=5</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">返回完整行</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>覆盖索引 & 联合索引 & 前缀索引</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">覆盖索引（Covering Index）</h4>
+              <p>查询列全部在索引中，<strong>无需回表</strong>。EXPLAIN 中 Extra 显示 <code>Using index</code></p>
+              <pre><code>-- idx_name_age(name, age)
+SELECT name, age FROM user WHERE name = 'Tom';
+-- 索引已包含 name 和 age，无需回表</code></pre>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">联合索引（Composite Index）</h4>
+              <p>多列组合索引，遵循<strong>最左前缀原则</strong></p>
+              <pre><code>-- idx_a_b_c(a, b, c) 可匹配：
+WHERE a=1               -- ✅ 用 a
+WHERE a=1 AND b=2       -- ✅ 用 a,b
+WHERE a=1 AND b=2 AND c=3  -- ✅ 用 a,b,c
+WHERE b=2               -- ❌ 跳过 a
+WHERE a=1 AND c=3       -- ⚠️ 只用 a</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>索引失效的常见场景</h4>
+          <table>
+            <thead><tr><th>场景</th><th>示例</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">函数操作</span></td><td><code>WHERE YEAR(create_time)=2024</code></td><td>对索引列使用函数，破坏 B+ 树有序性</td></tr>
+              <tr><td><span class="badge badge-red">隐式类型转换</span></td><td><code>WHERE phone=13800138000</code>（phone 是 varchar）</td><td>MySQL 自动对列做 CAST，等同于函数</td></tr>
+              <tr><td><span class="badge badge-red">隐式字符集转换</span></td><td>JOIN 两表字符集不同（utf8 vs utf8mb4）</td><td>驱动表的索引列被隐式转换</td></tr>
+              <tr><td><span class="badge badge-orange">前导模糊查询</span></td><td><code>WHERE name LIKE '%tom'</code></td><td>前缀不确定，无法利用索引有序性</td></tr>
+              <tr><td><span class="badge badge-orange">OR 连接非索引列</span></td><td><code>WHERE indexed_col=1 OR non_indexed=2</code></td><td>必须全表扫描 non_indexed</td></tr>
+              <tr><td><span class="badge badge-orange">违反最左前缀</span></td><td>联合索引 (a,b,c)，<code>WHERE b=2</code></td><td>跳过了最左列 a</td></tr>
+              <tr><td><span class="badge badge-blue">不等于查询</span></td><td><code>WHERE status != 0</code></td><td>优化器可能判断全扫更优</td></tr>
+              <tr><td><span class="badge badge-blue">IS NULL / IS NOT NULL</span></td><td><code>WHERE col IS NULL</code></td><td>取决于 NULL 值比例，比例高则放弃索引</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip"><strong>强制/忽略索引</strong>：<code>SELECT * FROM t FORCE INDEX(idx_name)</code> 可强制使用指定索引；<code>IGNORE INDEX(idx_name)</code> 忽略索引。生产慎用，先用 EXPLAIN 分析。</div>
+
+        <h3 id="s1-5">1.5 事务与 MVCC</h3>
+        <div class="card">
+          <h4>ACID 特性</h4>
+          <table>
+            <thead><tr><th>特性</th><th>含义</th><th>InnoDB 实现机制</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">A 原子性</span></td><td>事务要么全部成功，要么全部回滚</td><td>undo log（回滚日志）</td></tr>
+              <tr><td><span class="badge badge-green">C 一致性</span></td><td>事务前后数据满足完整性约束</td><td>由 AID 共同保证</td></tr>
+              <tr><td><span class="badge badge-orange">I 隔离性</span></td><td>并发事务互不干扰</td><td>MVCC + 锁机制</td></tr>
+              <tr><td><span class="badge badge-purple">D 持久性</span></td><td>提交后数据不丢失</td><td>redo log（WAL）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>四种隔离级别</h4>
+          <table>
+            <thead><tr><th>隔离级别</th><th>脏读</th><th>不可重复读</th><th>幻读</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-red">READ UNCOMMITTED</span></td>
+                <td>❌ 有</td><td>❌ 有</td><td>❌ 有</td><td>最低级别，几乎不用</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">READ COMMITTED (RC)</span></td>
+                <td>✅ 无</td><td>❌ 有</td><td>❌ 有</td><td>每次 SELECT 生成新 ReadView，Oracle 默认</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">REPEATABLE READ (RR) ⭐</span></td>
+                <td>✅ 无</td><td>✅ 无</td>
+                <td>⚠️ InnoDB 通过 MVCC + Next-Key Lock 解决</td>
+                <td>InnoDB 默认级别</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">SERIALIZABLE</span></td>
+                <td>✅ 无</td><td>✅ 无</td><td>✅ 无</td>
+                <td>串行执行，性能最差</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tip" style="margin-top:0.5rem">
+            <strong>脏读</strong>：读到未提交事务的数据<br>
+            <strong>不可重复读</strong>：同一事务两次读同一行结果不同（被其他事务 UPDATE）<br>
+            <strong>幻读</strong>：同一事务两次同样条件查询结果行数不同（被其他事务 INSERT）
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>MVCC 实现原理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">事务 BEGIN</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">获取 Read View</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">读 undo log 版本链</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">可见性判断</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">返回可见版本</div>
+          </div>
+          <div class="diagram" style="margin-top:1rem">
+            <div class="diagram-title">Read View 结构</div>
+            <table>
+              <thead><tr><th>字段</th><th>含义</th></tr></thead>
+              <tbody>
+                <tr><td><code>m_ids</code></td><td>生成 Read View 时，所有<strong>活跃（未提交）事务 ID 列表</strong></td></tr>
+                <tr><td><code>min_trx_id</code></td><td>活跃事务中最小的事务 ID</td></tr>
+                <tr><td><code>max_trx_id</code></td><td>系统应分配的下一个事务 ID（最大事务 ID + 1）</td></tr>
+                <tr><td><code>creator_trx_id</code></td><td>创建该 Read View 的事务 ID</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="diagram" style="margin-top:1rem">
+            <div class="diagram-title">可见性判断规则</div>
+            <table>
+              <thead><tr><th>条件</th><th>判断</th></tr></thead>
+              <tbody>
+                <tr><td>trx_id == creator_trx_id</td><td>自己修改的 → <span class="badge badge-green">可见</span></td></tr>
+                <tr><td>trx_id &lt; min_trx_id</td><td>在 Read View 前已提交 → <span class="badge badge-green">可见</span></td></tr>
+                <tr><td>trx_id &ge; max_trx_id</td><td>在 Read View 后才开始 → <span class="badge badge-red">不可见</span></td></tr>
+                <tr><td>trx_id 在 m_ids 中</td><td>生成 Read View 时还未提交 → <span class="badge badge-red">不可见</span></td></tr>
+                <tr><td>trx_id 不在 m_ids 中</td><td>生成 Read View 前已提交 → <span class="badge badge-green">可见</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li><strong>RC 与 RR 的区别</strong>：RC 每次 SELECT 都生成新 Read View；RR 只在事务首次 SELECT 时生成，后续复用</li>
+            <li><strong>当前读 vs 快照读</strong>：普通 SELECT 是快照读（读历史版本）；INSERT/UPDATE/DELETE/SELECT ... FOR UPDATE/LOCK IN SHARE MODE 是当前读（读最新数据，加锁）</li>
+          </ul>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 锁机制</h3>
+        <div class="card">
+          <h4>MySQL 锁分类</h4>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>MySQL 锁体系</strong>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>全局锁</strong>
+                <div class="arch-label">FTWRL<br>全库只读<br>用于全库备份</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>表级锁</strong>
+                <div class="arch-label">表锁 · MDL 元数据锁<br>意向锁 · AUTO-INC 锁</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>行级锁（InnoDB）</strong>
+                <div class="arch-label">Record Lock · Gap Lock<br>Next-Key Lock · Insert Intention Lock</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>InnoDB 行锁详解</h4>
+          <table>
+            <thead><tr><th>锁类型</th><th>锁定范围</th><th>作用</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">Record Lock（记录锁）</span></td>
+                <td>锁定索引上的一条记录</td>
+                <td>防止其他事务修改或删除</td>
+                <td>等值查询命中唯一索引</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">Gap Lock（间隙锁）</span></td>
+                <td>锁定索引记录之间的间隙</td>
+                <td>防止其他事务在间隙中插入新记录（防幻读）</td>
+                <td>等值查询未命中，或范围查询</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">Next-Key Lock（临键锁）</span></td>
+                <td>Record Lock + Gap Lock</td>
+                <td>锁定记录本身和前面的间隙</td>
+                <td>RR 级别下的默认行锁类型</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">Insert Intention Lock（插入意向锁）</span></td>
+                <td>间隙中等待插入</td>
+                <td>多个事务插入同一间隙不同位置时互不阻塞</td>
+                <td>INSERT 被 Gap Lock 阻塞时</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>加锁规则（RR 隔离级别下）</h4>
+          <table>
+            <thead><tr><th>查询类型</th><th>唯一索引</th><th>非唯一索引</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>等值查询（命中）</strong></td>
+                <td>Record Lock</td>
+                <td>Next-Key Lock + 右侧 Gap Lock</td>
+              </tr>
+              <tr>
+                <td><strong>等值查询（未命中）</strong></td>
+                <td>Gap Lock</td>
+                <td>Gap Lock</td>
+              </tr>
+              <tr>
+                <td><strong>范围查询</strong></td>
+                <td>Next-Key Lock（遍历到不满足条件为止）</td>
+                <td>Next-Key Lock + 右侧 Gap Lock</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="warn" style="margin-top:0.5rem">
+            <strong>⚠️ 死锁</strong>：两个事务互相等待对方持有的锁。InnoDB 自动检测死锁（<code>innodb_deadlock_detect=ON</code>），回滚代价较小的事务。<br>
+            <strong>避免死锁</strong>：① 固定加锁顺序 ② 缩短事务 ③ 使用低隔离级别 ④ 合理设计索引减少锁范围
+          </div>
+        </div>
+
+        <h3 id="s2-2">2.2 SQL 优化实战</h3>
+        <div class="card">
+          <h4>EXPLAIN 各字段含义</h4>
+          <table>
+            <thead><tr><th>字段</th><th>关键值</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>type</strong></td>
+                <td>
+                  <code>system</code> &gt; <code>const</code> &gt; <code>eq_ref</code> &gt; <code>ref</code> &gt;
+                  <code>range</code> &gt; <code>index</code> &gt; <span class="badge badge-red">ALL</span>
+                </td>
+                <td>访问类型，从好到差排列。ALL 为全表扫描，需优化</td>
+              </tr>
+              <tr>
+                <td><strong>key</strong></td>
+                <td>实际使用的索引名 / NULL</td>
+                <td>NULL 表示未使用索引</td>
+              </tr>
+              <tr>
+                <td><strong>rows</strong></td>
+                <td>估算扫描行数</td>
+                <td>值越小越好，是优化器基于统计信息估算的</td>
+              </tr>
+              <tr>
+                <td><strong>filtered</strong></td>
+                <td>百分比</td>
+                <td>经过条件过滤后剩余行的比例</td>
+              </tr>
+              <tr>
+                <td><strong>Extra</strong></td>
+                <td>
+                  <code>Using index</code> <span class="badge badge-green">好</span> ·
+                  <code>Using where</code> ·
+                  <code>Using filesort</code> <span class="badge badge-orange">注意</span> ·
+                  <code>Using temporary</code> <span class="badge badge-red">注意</span>
+                </td>
+                <td>Using index=覆盖索引；filesort/temporary 可能需要优化</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>常见 SQL 优化手段</h4>
+          <table>
+            <thead><tr><th>场景</th><th>问题</th><th>优化方案</th></tr></thead>
+            <tbody>
+              <tr><td><strong>分页查询</strong></td><td><code>LIMIT 1000000, 10</code> 需扫描前 100 万行</td><td>延迟关联：<code>SELECT * FROM t INNER JOIN (SELECT id FROM t LIMIT 1000000,10) tmp ON t.id=tmp.id</code></td></tr>
+              <tr><td><strong>SELECT *</strong></td><td>读取不需要的列，浪费 IO 和内存</td><td>只查需要的列，利用覆盖索引</td></tr>
+              <tr><td><strong>子查询</strong></td><td>相关子查询每行执行一次</td><td>改写为 JOIN 或使用 EXISTS</td></tr>
+              <tr><td><strong>OR 条件</strong></td><td>可能导致全表扫描</td><td>改写为 UNION / UNION ALL</td></tr>
+              <tr><td><strong>NOT IN</strong></td><td>子查询不走索引</td><td>改写为 LEFT JOIN ... IS NULL 或 NOT EXISTS</td></tr>
+              <tr><td><strong>COUNT(*)</strong></td><td>InnoDB 需遍历统计</td><td>用近似值（<code>SHOW TABLE STATUS</code>）或维护计数器</td></tr>
+              <tr><td><strong>ORDER BY</strong></td><td>filesort 排序开销大</td><td>利用索引有序性，避免 <code>Using filesort</code></td></tr>
+              <tr><td><strong>大事务</strong></td><td>长时间持有锁和 undo log</td><td>拆分大事务，批量提交</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>慢查询日志配置</h4>
+          <pre><code># my.cnf 配置
+slow_query_log = 1                        # 开启慢查询日志
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 1                       # 超过 1 秒记录
+log_queries_not_using_indexes = 1         # 记录未使用索引的查询
+min_examined_row_limit = 100              # 扫描超过 100 行才记录</code></pre>
+          <p style="margin-top:0.5rem">使用 <code>mysqldumpslow</code> 或 <code>pt-query-digest</code> 分析慢查询日志，找出 Top N 慢 SQL。</p>
+        </div>
+
+        <h3 id="s2-3">2.3 分库分表</h3>
+        <div class="card">
+          <h4>垂直拆分 vs 水平拆分</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">📐 垂直拆分</h4>
+              <p><strong>垂直分库</strong>：按业务模块拆分（用户库、订单库、商品库）</p>
+              <p><strong>垂直分表</strong>：大表拆分为 主表（常用字段）+ 扩展表（不常用字段）</p>
+              <ul>
+                <li>✅ 降低单库/单表复杂度</li>
+                <li>✅ 业务解耦，便于独立扩展</li>
+                <li>❌ 无法解决单表数据量过大</li>
+                <li>❌ 跨库 JOIN 复杂</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">📊 水平拆分</h4>
+              <p><strong>水平分库</strong>：同一业务数据分散到多个库</p>
+              <p><strong>水平分表</strong>：同一张大表拆分为多张结构相同的小表（如 order_0 ~ order_9）</p>
+              <ul>
+                <li>✅ 解决单表数据量过大</li>
+                <li>✅ 分散 IO 压力</li>
+                <li>❌ 分布式事务复杂</li>
+                <li>❌ 跨片查询困难</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>分片策略</h4>
+          <table>
+            <thead><tr><th>策略</th><th>原理</th><th>优点</th><th>缺点</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">Range 范围分片</span></td>
+                <td>按 ID 范围分（0~100 万 → 分片 1）</td>
+                <td>扩容简单，新增分片即可</td>
+                <td>容易数据不均，热点问题</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">Hash 取模分片</span></td>
+                <td><code>shard = hash(id) % N</code></td>
+                <td>数据均匀分布</td>
+                <td>扩容时数据大规模迁移</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">一致性 Hash</span></td>
+                <td>哈希环 + 虚拟节点</td>
+                <td>扩容只迁移部分数据</td>
+                <td>实现复杂，需要虚拟节点</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>分布式 ID 生成 — 雪花算法（Snowflake）</h4>
+          <div class="diagram">
+            <div class="diagram-title">Snowflake 64 位 ID 结构</div>
+            <pre style="font-family:'SF Mono',monospace;font-size:0.85rem;line-height:1.8;text-align:center;color:var(--text-dim);">
+  0 │ 00000000 00000000 00000000 00000000 00000000 0 │ 00000 00000 │ 000000000000
+    │←──────────── 41 位时间戳 ──────────────────→│←─ 10位机器 →│←── 12位序列 ─→│
+    │        毫秒级（69 年）                        │   ID（1024） │  每 ms 4096 个 │
+            </pre>
+          </div>
+          <ul>
+            <li><strong>优点</strong>：趋势递增（对 B+ 树友好）、高性能（纯内存计算）、不依赖 DB</li>
+            <li><strong>时钟回拨问题</strong>：NTP 校时可能导致时间戳回退，需特殊处理（等待或抛异常）</li>
+            <li><strong>常见变种</strong>：美团 Leaf、百度 UidGenerator、滴滴 TinyID</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>跨库 JOIN 解决方案</h4>
+          <table>
+            <thead><tr><th>方案</th><th>说明</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>全局表（字典表）</strong></td><td>小表在每个分片都存一份</td><td>配置表、字典表</td></tr>
+              <tr><td><strong>冗余字段</strong></td><td>常用关联字段冗余到业务表</td><td>查询频率高、数据变化少</td></tr>
+              <tr><td><strong>应用层组装</strong></td><td>多次查询后在内存组装</td><td>数据量不大</td></tr>
+              <tr><td><strong>ER 分片</strong></td><td>关联数据分到同一分片（如按 user_id 分片）</td><td>关联关系明确</td></tr>
+              <tr><td><strong>中间件</strong></td><td>ShardingSphere / MyCat 等中间件聚合</td><td>复杂场景</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-4">2.4 主从复制与高可用</h3>
+        <div class="card">
+          <h4>主从复制原理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Master 写 binlog</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Slave IO 线程拉取 binlog</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">写入 relay log</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Slave SQL 线程重放</div>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li><strong>异步复制</strong>（默认）：Master 提交后不等 Slave 确认，主从可能数据不一致</li>
+            <li><strong>半同步复制</strong>（Semi-sync）：Master 等待至少一个 Slave 确认收到 binlog 再提交，<code>rpl_semi_sync_master_wait_for_slave_count=1</code></li>
+            <li><strong>组复制 MGR</strong>（MySQL 5.7.17+）：基于 Paxos 协议，多数节点确认即提交，强一致性</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>主从延迟原因与解决方案</h4>
+          <table>
+            <thead><tr><th>原因</th><th>说明</th><th>解决方案</th></tr></thead>
+            <tbody>
+              <tr><td><strong>大事务</strong></td><td>一个大事务在 Master 执行很久</td><td>拆分大事务，批量提交</td></tr>
+              <tr><td><strong>单线程重放</strong></td><td>Slave SQL 线程单线程回放 binlog</td><td>开启并行复制（<code>slave_parallel_workers</code>）</td></tr>
+              <tr><td><strong>网络延迟</strong></td><td>主从之间网络抖动</td><td>同机房部署，专线网络</td></tr>
+              <tr><td><strong>机器性能差异</strong></td><td>Slave 配置低于 Master</td><td>Slave 配置不低于 Master</td></tr>
+              <tr><td><strong>从库压力大</strong></td><td>大量查询拖慢 SQL 线程</td><td>读写分离，专用从库做备份</td></tr>
+            </tbody>
+          </table>
+          <div class="tip" style="margin-top:0.5rem"><strong>并行复制</strong>（MySQL 5.7+）：<code>slave_parallel_type=LOGICAL_CLOCK</code> + <code>slave_parallel_workers=8</code>，同一组提交的事务可并行重放，大幅减少延迟。</div>
+        </div>
+
+        <div class="card">
+          <h4>读写分离实现方式</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">应用层路由</h4>
+              <p>代码中配置多个数据源，写操作走 Master，读操作走 Slave</p>
+              <ul>
+                <li>✅ 简单直接，无额外中间件</li>
+                <li>✅ 无中间件性能损耗</li>
+                <li>❌ 代码侵入性强</li>
+                <li>❌ 切换数据源逻辑重复</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">中间件代理</h4>
+              <p>使用 ProxySQL / MySQL Router / ShardingSphere-Proxy 等中间件</p>
+              <ul>
+                <li>✅ 应用无感知，SQL 自动路由</li>
+                <li>✅ 支持负载均衡和故障转移</li>
+                <li>✅ 统一管理连接池</li>
+                <li>❌ 增加网络跳数和延迟</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn" style="margin-top:0.5rem">
+            <strong>⚠️ 主从延迟下的读写分离问题</strong>：写入 Master 后立即读 Slave 可能读不到最新数据。<br>
+            <strong>解决方案</strong>：① 关键读走 Master ② 判断 <code>Seconds_Behind_Master</code> 延迟超过阈值则读 Master ③ 使用半同步复制保证一致性
+          </div>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">MySQL 的索引为什么使用 B+ 树而不是 B 树、红黑树或 Hash？</div>
+          <div class="a">
+            <strong>参考</strong>：① B+ 树叶子节点用链表连接，支持高效范围查询，B 树不支持；② B+ 树非叶子节点不存数据，扇出更高，树更矮，IO 次数更少；③ 红黑树是二叉树，数据量大时树过高导致大量 IO；④ Hash 索引不支持范围查询和排序，且存在哈希冲突。
+            <br><strong>追问：Hash 索引在什么场景下有用？</strong>InnoDB 的自适应哈希索引（AHI）自动对热点等值查询建立 Hash 索引，O(1) 查找。Memory 引擎也支持显式 Hash 索引，适合纯等值查询场景。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">MVCC 是怎么实现的？RC 和 RR 的区别是什么？</div>
+          <div class="a">
+            <strong>参考</strong>：InnoDB 在每行记录后面隐藏两个字段：trx_id（最近修改的事务 ID）和 roll_pointer（指向 undo log 版本链）。读取数据时，根据 Read View 判断哪个版本对当前事务可见。
+            <br><strong>RC vs RR</strong>：RC 每次 SELECT 都生成新的 Read View，所以能看到其他已提交事务的最新修改；RR 只在第一次 SELECT 时生成 Read View，后续复用，所以能看到一致的快照。
+            <br><strong>追问：RR 级别下真的完全不会幻读吗？</strong>快照读通过 MVCC 避免幻读；当前读（SELECT ... FOR UPDATE）通过 Next-Key Lock 阻止其他事务插入，从而避免幻读。但如果先快照读再当前读，可能出现"幻象"。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是覆盖索引和索引下推（ICP）？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>覆盖索引</strong>：查询所需的所有列都在索引中，不需要回表查询聚簇索引，EXPLAIN 显示 <code>Using index</code>。
+            <br><strong>索引下推 ICP</strong>（Index Condition Pushdown，5.6+）：将 WHERE 条件中索引列的过滤下推到存储引擎层，在索引遍历时直接过滤，减少回表次数。EXPLAIN 显示 <code>Using index condition</code>。
+            <br><strong>追问</strong>：<code>idx_name_age(name, age)</code>，<code>WHERE name LIKE 'T%' AND age=20</code>，没有 ICP 时只能用 name 前缀查出所有 'T%' 开头的记录再回表过滤 age；有 ICP 后，在 idx_name_age 索引上直接同时判断 name LIKE 'T%' AND age=20，减少回表。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">MySQL 有哪些锁？什么场景下会触发行锁升级为表锁？</div>
+          <div class="a">
+            <strong>参考</strong>：MySQL 有全局锁（FTWRL）、表锁（表锁、MDL 锁、意向锁、AUTO-INC 锁）、行锁（Record Lock、Gap Lock、Next-Key Lock）。InnoDB 的行锁是加在索引上的，如果 SQL 没有走索引，行锁会退化为<strong>表锁</strong>（锁住所有行，因为扫描全表）。
+            <br><strong>追问：MDL 锁是什么？</strong>元数据锁（Metadata Lock），DML 操作自动加 MDL 读锁，DDL 操作加 MDL 写锁。长事务持有 MDL 读锁不释放时，DDL 会被阻塞，且后续所有查询都会被 DDL 的 MDL 写锁请求阻塞，可能导致连接耗尽。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何优化一个慢 SQL？说说你的排查思路。</div>
+          <div class="a">
+            <strong>参考</strong>：① 开启慢查询日志，用 <code>pt-query-digest</code> 定位 Top N 慢 SQL；② <code>EXPLAIN</code> 分析执行计划，重点看 type（是否 ALL）、key（是否用索引）、rows（扫描行数）、Extra（filesort/temporary）；③ 检查是否缺少索引或索引失效；④ 优化 SQL 写法（避免 SELECT *、子查询改 JOIN、分页优化）；⑤ 考虑表结构优化（拆大字段、分表）。
+            <br><strong>追问：type=ref 和 type=range 哪个好？</strong><code>const</code> 最好（主键/唯一索引等值查询），<code>eq_ref</code>（JOIN 时主键匹配），<code>ref</code>（非唯一索引等值），<code>range</code>（索引范围扫描）。一般来说 ref 优于 range，因为 ref 是精确匹配。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">分库分表后有哪些问题？怎么解决？</div>
+          <div class="a">
+            <strong>参考</strong>：① <strong>分布式事务</strong>：XA 事务（性能差）或 TCC/SAGA 模式；② <strong>跨库 JOIN</strong>：全局表冗余、应用层组装、ER 分片；③ <strong>排序分页</strong>：各分片查询后归并排序，深分页性能差；④ <strong>全局唯一 ID</strong>：雪花算法；⑤ <strong>扩容迁移</strong>：一致性 Hash 或成倍扩容。
+            <br><strong>追问：什么时候该分库分表？</strong>单表超过 1000 万行或超过 10GB 考虑分表；单库写 QPS 持续超过 5000 或数据量超过 1TB 考虑分库。优先考虑读写分离、缓存、SQL 优化，分库分表是最后手段。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">MySQL 主从复制有哪些模式？半同步复制是什么？</div>
+          <div class="a">
+            <strong>参考</strong>：① <strong>异步复制</strong>（默认）：Master 提交即返回，不等 Slave 确认，可能丢数据；② <strong>半同步复制</strong>（Semi-sync）：Master 等至少一个 Slave 确认收到 binlog 才返回客户端，保证至少有一个 Slave 有最新数据；③ <strong>组复制 MGR</strong>：基于 Paxos 的多节点一致性协议，多数节点确认即提交，支持多主模式。
+            <br><strong>追问：半同步的退化问题？</strong>如果所有 Slave 都超时未确认，半同步自动退化为异步复制，不阻塞 Master 写入。可通过 <code>rpl_semi_sync_master_timeout</code> 设置超时时间（默认 10 秒）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">InnoDB 的 Buffer Pool 如何工作？LRU 有什么优化？</div>
+          <div class="a">
+            <strong>参考</strong>：Buffer Pool 以 16KB 数据页为单位缓存数据和索引。传统 LRU 的问题是全表扫描会把热点数据冲刷掉。InnoDB 使用<strong>改进 LRU</strong>：将 LRU 列表分为 young 区（热数据，约 63%）和 old 区（冷数据，约 37%）。新读入的页放在 old 区头部，只有在 old 区停留超过 1 秒（<code>innodb_old_blocks_time</code>）后再次被访问，才移到 young 区。
+            <br><strong>追问：Buffer Pool 多大合适？</strong>专用数据库服务器建议设置为物理内存的 70%~80%。用 <code>SHOW ENGINE INNODB STATUS</code> 查看 Buffer Pool 命中率，正常应 &gt; 99%。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          MySQL · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>
