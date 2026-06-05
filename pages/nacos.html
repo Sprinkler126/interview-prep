@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nacos - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>📋 Nacos</h1>
+    <p class="subtitle">Dynamic Naming and Configuration Service · 服务注册与发现 · 配置管理 · 健康检查</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Nacos 整体架构</a></li>
+          <li class="sub"><a href="#s1-2">服务注册与发现</a></li>
+          <li class="sub"><a href="#s1-3">健康检查机制</a></li>
+          <li class="sub"><a href="#s1-4">配置管理</a></li>
+          <li class="sub"><a href="#s1-5">与其他注册中心对比</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">集群部署</a></li>
+          <li class="sub"><a href="#s2-2">命名空间与环境隔离</a></li>
+          <li class="sub"><a href="#s2-3">服务治理实践</a></li>
+          <li class="sub"><a href="#s2-4">与 Spring Cloud 集成</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 Nacos 整体架构 -->
+        <h3 id="s1-1">Nacos 整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Nacos 架构总览</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">服务消费者<br><small>Discovery Client</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">服务提供者<br><small>Registration Client</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">配置客户端<br><small>Config Client</small></div>
+            </div>
+            <div class="arch-connector">↓ Open API / gRPC / HTTP ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">Nacos Server 集群（Name Server）</div>
+            </div>
+            <div class="arch-connector">↓ 内部模块 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Naming Service<br><small>服务注册与发现</small></div>
+              <div class="arch-box" style="margin-left:1rem">Config Service<br><small>配置管理</small></div>
+              <div class="arch-box" style="margin-left:1rem">Health Check<br><small>健康检查</small></div>
+            </div>
+            <div class="arch-connector">↓ 持久化 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">内存注册表<br><small>ConcurrentHashMap</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">持久化存储<br><small>MySQL / Derby</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心架构要点</h4>
+          <p>Nacos 是阿里巴巴开源的动态服务发现、配置管理和服务管理平台，主要提供两大功能：</p>
+          <p><strong>Naming Service（服务注册与发现）：</strong>服务端维护内存注册表 <code>ConcurrentHashMap&lt;ServiceName, Map&lt;Cluster, List&lt;Instance&gt;&gt;&gt;</code>，客户端通过 Open API 或 gRPC 与服务端交互。</p>
+          <p><strong>Configuration Service（配置管理）：</strong>支持配置的 CRUD、灰度发布、版本管理、监听机制，底层数据持久化到 MySQL 或内嵌 Derby 数据库。</p>
+        </div>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>临时实例（Ephemeral）</h4>
+            <p><span class="badge badge-blue">AP 模式</span> 默认类型</p>
+            <ul>
+              <li>客户端主动发送心跳维持注册（默认 5 秒）</li>
+              <li>超过 15 秒未心跳标记不健康，超过 30 秒摘除</li>
+              <li>使用 <strong>Distro 协议</strong>（AP）同步数据</li>
+              <li>不健康实例不会被持久化，服务端重启后丢失</li>
+              <li>适合大规模微服务、对可用性要求高的场景</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>持久化实例（Persistent）</h4>
+            <p><span class="badge badge-green">CP 模式</span> 需手动设置</p>
+            <ul>
+              <li>服务端主动发起健康检查（TCP/HTTP 探测）</li>
+              <li>数据持久化到数据库，服务端重启不丢失</li>
+              <li>使用 <strong>Raft 协议</strong>（CP）保证数据一致性</li>
+              <li>需要选出 Leader，写入需多数节点确认</li>
+              <li>适合需要强一致性的场景（如数据库服务）</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>CP（Raft）与 AP（Distro）选择</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>AP 模式（Distro）</th><th>CP 模式（Raft）</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>协议</td><td>Distro（类 Gossip）</td><td>Raft（强 Leader）</td></tr>
+              <tr><td>一致性</td><td>最终一致性</td><td>强一致性</td></tr>
+              <tr><td>可用性</td><td>高（分区容忍）</td><td>可能因选举短暂不可用</td></tr>
+              <tr><td>实例类型</td><td>临时实例</td><td>持久化实例</td></tr>
+              <tr><td>数据同步</td><td>全量同步 + 校验和</td><td>日志复制</td></tr>
+              <tr><td>适用场景</td><td>微服务注册发现</td><td>配置管理、持久化服务</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Nacos 2.x 中 Naming 模块默认使用 Distro（AP），Config 模块使用 Raft（CP）。Distro 协议是 Nacos 自研的去中心化协议，每个节点负责一部分数据，定期与其他节点全量同步。</div>
+        </div>
+
+        <!-- 1-2 服务注册与发现 -->
+        <h3 id="s1-2">服务注册与发现</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">服务注册流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端启动</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">调用注册 API<br><small>POST /nacos/v1/ns/instance</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Nacos Server<br>写入注册表</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">客户端发送心跳<br><small>默认 5s 一次</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">服务发现（其他客户端）</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>注册表核心数据结构</h4>
+          <pre><code>// ServiceManager 核心结构
+Map&lt;Namespace, Map&lt;Group, Map&lt;ServiceName, Service&gt;&gt;&gt; serviceMap;
+
+// Service 内部
+class Service {
+    String name;
+    String groupName;
+    Map&lt;String, Cluster&gt; clusterMap;  // clusterName -> Cluster
+    List&lt;Instance&gt; ephemeralInstances; // 临时实例
+    List&lt;Instance&gt; persistentInstances; // 持久化实例
+}
+
+// 客户端注册请求参数
+instance: {
+    ip: "192.168.1.100",
+    port: 8080,
+    serviceName: "user-service",
+    clusterName: "DEFAULT",
+    groupName: "DEFAULT_GROUP",
+    namespaceId: "dev",
+    weight: 1.0,
+    healthy: true,
+    ephemeral: true,
+    metadata: {"version":"v1"}
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>服务发现机制</h4>
+          <p>Nacos 采用 <strong>Push + Pull 结合</strong>的方式实现服务发现：</p>
+          <ul>
+            <li><strong>Pull（客户端定时拉取）：</strong>客户端默认每 10 秒从服务端拉取一次服务列表（HTTP 长轮询）</li>
+            <li><strong>Push（UDP 推送）：</strong>当服务实例发生变更时，服务端通过 UDP 主动推送变更事件给订阅了该服务的客户端</li>
+            <li><strong>Nacos 2.x gRPC：</strong>客户端与服务端建立长连接，服务端可直接通过 gRPC 长连接推送变更</li>
+          </ul>
+          <div class="tip">Nacos 2.x 用 gRPC 取代了 HTTP 长轮询，通信效率更高。默认连接超时 5 秒，客户端每 10 秒发送心跳保持连接。</div>
+        </div>
+
+        <!-- 1-3 健康检查 -->
+        <h3 id="s1-3">健康检查机制</h3>
+
+        <div class="card">
+          <h4>临时实例健康检查（客户端心跳模式）</h4>
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>超时时间</th><th>行为</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>正常</td><td>心跳间隔 ≤ 5s</td><td>healthy = true，正常提供服务</td></tr>
+              <tr><td>疑似不健康</td><td>15s 未收到心跳</td><td>healthy = false，标记不健康但不摘除</td></tr>
+              <tr><td>摘除</td><td>30s 未收到心跳</td><td>从注册表中移除实例</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 客户端心跳任务
+@Scheduled(fixedDelay = 5000)
+public void sendHeartbeat() {
+    // POST /nacos/v1/ns/instance/beat
+    // 参数：serviceName, ip, port, clusterName
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>持久化实例健康检查（服务端主动探测）</h4>
+          <ul>
+            <li><strong>TCP 探测：</strong>服务端尝试 TCP 连接实例的 IP + Port，成功则健康</li>
+            <li><strong>HTTP 探测：</strong>发送 HTTP GET 请求到指定 URL，返回 2xx 则健康</li>
+            <li>探测间隔默认 5 秒，连续失败 3 次标记不健康</li>
+            <li>持久化实例即使不健康也不会自动摘除（需手动删除）</li>
+          </ul>
+        </div>
+
+        <!-- 1-4 配置管理 -->
+        <h3 id="s1-4">配置管理</h3>
+
+        <div class="card">
+          <h4>配置模型三级结构</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Namespace<br><small>环境隔离</small><br><small>dev / test / prod</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Group<br><small>业务分组</small><br><small>DEFAULT_GROUP</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">DataId<br><small>配置文件标识</small><br><small>user-service.yml</small></div>
+          </div>
+          <p><code>DataId</code> 通常对应配置文件名（如 <code>application.yml</code>），<code>Group</code> 用于业务维度分组，<code>Namespace</code> 用于环境隔离。三者唯一确定一份配置。</p>
+        </div>
+
+        <div class="card">
+          <h4>长轮询机制（Long Polling）</h4>
+          <div class="diagram">
+            <div class="diagram-title">配置变更通知流程</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">客户端发起请求<br><small>携带 MD5 值</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">服务端对比 MD5<br><small>一致则挂起 30s</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">配置变更<br><small>或超时 30s</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">立即返回<br>最新配置</div>
+            </div>
+          </div>
+          <ul>
+            <li>客户端向服务端发起 HTTP 请求，携带本地配置的 MD5 摘要</li>
+            <li>服务端对比 MD5：若相同则 hold 住连接（最长 30 秒），期间配置变更则立即返回</li>
+            <li>若 30 秒内无变更，返回 304 Not Modified，客户端重新发起请求</li>
+            <li>客户端还有一层 <strong>定时拉取</strong> 作为兜底（默认每 15 秒）</li>
+          </ul>
+          <div class="warn">长轮询不是真正的 Push，本质是客户端发起长连接请求，服务端延迟响应。相比短轮询，大幅减少了无效请求。</div>
+        </div>
+
+        <div class="card">
+          <h4>配置灰度发布与加密</h4>
+          <p><strong>Beta 发布：</strong>支持将配置灰度推送给部分 IP 的实例，验证无误后再全量发布。灰度期间只有指定 IP 的客户端会拉取到新配置。</p>
+          <p><strong>配置加密：</strong>Nacos 2.1+ 支持加密插件，可对接 KMS 或自定义加密算法。配置项可标记为加密字段，存储和传输时自动加解密。</p>
+        </div>
+
+        <!-- 1-5 对比 -->
+        <h3 id="s1-5">与其他注册中心对比</h3>
+
+        <div class="card">
+          <h4>主流注册中心对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Nacos</th><th>Eureka</th><th>Consul</th><th>Zookeeper</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CAP 模型</td><td>AP + CP</td><td>AP</td><td>CP</td><td>CP</td></tr>
+              <tr><td>健康检查</td><td>客户端心跳 + 服务端探测</td><td>客户端心跳</td><td>TCP/HTTP/gRPC</td><td>Keep Alive</td></tr>
+              <tr><td>雪崩保护</td><td>✅ 支持</td><td>✅ 支持</td><td>❌</td><td>❌</td></tr>
+              <tr><td>多数据中心</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+              <tr><td>配置管理</td><td>✅ 内置</td><td>❌</td><td>✅ KV 存储</td><td>❌</td></tr>
+              <tr><td>通信协议</td><td>HTTP / gRPC</td><td>HTTP</td><td>HTTP / DNS</td><td>TCP</td></tr>
+              <tr><td>Spring Cloud 集成</td><td>✅ 原生支持</td><td>✅ 原生支持</td><td>✅</td><td>需 Curator</td></tr>
+              <tr><td>管理界面</td><td>✅ 自带控制台</td><td>❌</td><td>✅</td><td>❌</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">面试加分点：Nacos 的核心优势在于同时支持 AP 和 CP 模式，且内置配置管理功能，是 Spring Cloud Alibaba 的默认服务发现与配置中心。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 集群部署 -->
+        <h3 id="s2-1">集群部署</h3>
+
+        <div class="card">
+          <h4>三种部署模式</h4>
+          <table>
+            <thead>
+              <tr><th>模式</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">单机模式</span></td><td><code>standalone</code>，内嵌 Derby 数据库</td><td>本地开发、测试</td></tr>
+              <tr><td><span class="badge badge-blue">集群模式</span></td><td>多节点 + 外部 MySQL</td><td>生产环境</td></tr>
+              <tr><td><span class="badge badge-purple">多集群模式</span></td><td>多个 Nacos 集群 + VIP/DNS</td><td>多机房容灾</td></tr>
+            </tbody>
+          </table>
+          <pre><code># 单机模式启动
+sh startup.sh -m standalone
+
+# 集群模式配置 cluster.conf
+192.168.1.10:8848
+192.168.1.11:8848
+192.168.1.12:8848
+
+# 集群模式启动
+sh startup.sh</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>数据存储：内嵌 Derby vs 外部 MySQL</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>内嵌 Derby（默认）</h4>
+              <ul>
+                <li>单机模式使用，零配置</li>
+                <li>数据存储在本地文件</li>
+                <li>不支持集群数据共享</li>
+                <li>适合开发测试</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>外部 MySQL（生产推荐）</h4>
+              <ul>
+                <li>集群模式必须使用</li>
+                <li>支持主从复制高可用</li>
+                <li>所有节点共享同一数据库</li>
+                <li>建议 MySQL 5.7+ 或 8.0</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>集群节点间数据同步</h4>
+          <p><strong>AP 模式（Distro 协议）：</strong></p>
+          <ul>
+            <li>去中心化架构，每个节点负责一部分数据（根据 hash 分片）</li>
+            <li>注册请求由负责该数据的节点处理，然后异步同步给其他节点</li>
+            <li>节点间定期全量数据同步（每 10 秒），通过校验和（checksum）比对差异</li>
+            <li>新增节点加入时，从其他节点全量拉取数据</li>
+          </ul>
+          <p><strong>CP 模式（Raft 协议）：</strong></p>
+          <ul>
+            <li>强 Leader 架构，所有写操作必须经过 Leader</li>
+            <li>Leader 将日志复制到多数 Follower 后才返回成功</li>
+            <li>Leader 故障时触发选举（选举超时 15-30 秒）</li>
+            <li>Nacos 2.x 使用 JRaft（百度开源的 Java Raft 实现）</li>
+          </ul>
+        </div>
+
+        <!-- 2-2 命名空间 -->
+        <h3 id="s2-2">命名空间与环境隔离</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">命名空间隔离模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">Namespace: dev<br><small>开发环境</small></div>
+              <div class="arch-box" style="margin-left:1rem">Namespace: test<br><small>测试环境</small></div>
+              <div class="arch-box" style="margin-left:1rem">Namespace: prod<br><small>生产环境</small></div>
+            </div>
+            <div class="arch-connector">每个命名空间内 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Group: DEFAULT_GROUP<br><small>默认分组</small></div>
+              <div class="arch-box" style="margin-left:1rem">Group: ORDER_GROUP<br><small>订单业务组</small></div>
+              <div class="arch-box" style="margin-left:1rem">Group: USER_GROUP<br><small>用户业务组</small></div>
+            </div>
+            <div class="arch-connector">每个分组内 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">DataId: user-service.yml</div>
+              <div class="arch-box" style="margin-left:1rem">DataId: order-service.yml</div>
+              <div class="arch-box" style="margin-left:1rem">DataId: gateway.yml</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>多环境配置管理最佳实践</h4>
+          <ul>
+            <li><strong>Namespace：</strong>按环境划分（dev / test / staging / prod），不同环境的服务互不可见</li>
+            <li><strong>Group：</strong>按业务域划分（如订单组、用户组），同组配置统一管理</li>
+            <li><strong>DataId：</strong>按配置文件划分，格式为 <code>${spring.application.name}.${file-extension}</code></li>
+            <li><strong>公共配置：</strong>使用 <code>shared-configs</code> 或 <code>extension-configs</code> 共享通用配置（如数据库连接池）</li>
+          </ul>
+          <pre><code># Spring Cloud 配置
+spring:
+  cloud:
+    nacos:
+      config:
+        namespace: dev-namespace-id
+        group: DEFAULT_GROUP
+        file-extension: yml
+        # 共享配置
+        shared-configs:
+          - data-id: common.yml
+            group: SHARED_GROUP
+            refresh: true</code></pre>
+        </div>
+
+        <!-- 2-3 服务治理 -->
+        <h3 id="s2-3">服务治理实践</h3>
+
+        <div class="card">
+          <h4>权重配置（流量比例分配）</h4>
+          <p>权重范围 0~100，值越大分配的流量比例越高。权重为 0 时不接收流量（用于下线过渡）。</p>
+          <pre><code># 通过 API 设置权重
+curl -X PUT "http://localhost:8848/nacos/v1/ns/instance?\
+serviceName=user-service&ip=192.168.1.100&port=8080&weight=5"
+
+# 权重分配示例
+# 旧实例（权重 1）: 新实例（权重 9）= 10% : 90%</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>元数据管理</h4>
+          <p>元数据是附加在实例上的 Key-Value 键值对，用于服务路由、灰度等高级功能：</p>
+          <ul>
+            <li><code>version: v1</code> — 版本号，支持按版本路由</li>
+            <li><code>env: gray</code> — 灰度标识</li>
+            <li><code>region: hangzhou</code> — 区域信息</li>
+            <li>自定义业务标签，配合负载均衡策略使用</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>服务保护阈值</h4>
+          <p>保护阈值（protectThreshold）范围 0~1，默认 0。当健康实例比例低于阈值时，Nacos 会将不健康的实例也返回给消费者，防止流量全部打到少数健康实例导致雪崩。</p>
+          <pre><code># 设置保护阈值为 0.5（健康实例低于 50% 时触发保护）
+curl -X PUT "http://localhost:8848/nacos/v1/ns/service?\
+serviceName=user-service&protectThreshold=0.5"</code></pre>
+          <div class="warn">保护阈值是 Nacos 的雪崩保护机制，类似 Eureka 的自我保护模式。生产环境建议设置为 0.5~0.8。</div>
+        </div>
+
+        <div class="card">
+          <h4>优雅上下线</h4>
+          <p><strong>上线流程：</strong>服务先注册到 Nacos，待健康检查通过后再接入流量。</p>
+          <p><strong>下线流程：</strong></p>
+          <ul>
+            <li>先将权重设为 0，停止接收新流量</li>
+            <li>等待存量请求处理完成（优雅等待期）</li>
+            <li>调用下线 API 注销实例：<code>PUT /nacos/v1/ns/instance?enable=false</code></li>
+            <li>最后停止服务进程</li>
+          </ul>
+        </div>
+
+        <!-- 2-4 Spring Cloud 集成 -->
+        <h3 id="s2-4">与 Spring Cloud 集成</h3>
+
+        <div class="card">
+          <h4>@NacosValue 动态刷新</h4>
+          <pre><code>// 使用 @NacosValue 实现配置动态刷新
+@NacosValue(value = "${custom.timeout:3000}", autoRefreshed = true)
+private int timeout;
+
+// 传统 @Value 不支持动态刷新，需配合 @RefreshScope
+@Value("${custom.timeout}")
+private int timeout;</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>@RefreshScope 原理</h4>
+          <ul>
+            <li><code>@RefreshScope</code> 将 Bean 标记为 <code>RefreshScope</code>（一种特殊的 Scope）</li>
+            <li>配置变更时，Spring Cloud 发布 <code>EnvironmentChangeEvent</code></li>
+            <li><code>RefreshEventListener</code> 监听事件，销毁旧 Bean 并创建新实例</li>
+            <li>本质是 <strong>销毁 + 重建</strong> Bean，注入新的属性值</li>
+            <li>注意：正在执行中的方法仍使用旧值，新请求才会使用新值</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>bootstrap.yml 加载顺序</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">bootstrap.yml<br><small>最高优先级</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Nacos 远程配置<br><small>通过 ConfigService</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">application.yml<br><small>本地配置</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">@PropertySource<br><small>注解配置</small></div>
+          </div>
+          <ul>
+            <li><code>bootstrap.yml</code> 在 Spring 应用上下文创建之前加载，用于配置 Nacos 地址等连接信息</li>
+            <li>Nacos 配置通过 <code>PropertySourceLocator</code> 加入 <code>Environment</code></li>
+            <li>远程配置优先级高于本地 <code>application.yml</code></li>
+            <li>Spring Boot 2.4+ 需引入 <code>spring-cloud-starter-bootstrap</code> 依赖</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Nacos 作为注册中心，是如何保证服务实例信息的可用性和一致性的？</div>
+          <div class="a">
+            <strong>参考：</strong>Nacos 同时支持 AP 和 CP 两种模式。对于临时实例（默认），使用自研的 Distro 协议（AP），基于去中心化的最终一致性模型，每个节点负责部分数据并异步同步给其他节点，保证高可用。对于持久化实例，使用 Raft 协议（CP），写操作需经过 Leader 节点并复制到多数节点，保证强一致性。<br>
+            <strong>追问：Distro 协议是怎么实现的？</strong> Distro 类似 Gossip 协议的简化版，每个节点有自己负责的数据分片（通过 hash 路由），注册请求由负责节点处理后异步全量同步给其他节点。节点间每 10 秒交换一次数据校验和，发现不一致则拉取全量数据修复。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Nacos 的配置变更通知机制是怎样的？为什么不用 WebSocket？</div>
+          <div class="a">
+            <strong>参考：</strong>Nacos 1.x 使用 HTTP 长轮询机制：客户端发起请求，携带配置的 MD5 值，服务端对比一致则 hold 住连接最长 30 秒，期间配置有变更立即返回；超时则返回 304。客户端还有定时拉取作为兜底。Nacos 2.x 升级为 gRPC 长连接，服务端可主动推送变更。<br>
+            <strong>追问：为什么不用 WebSocket？</strong> 长轮询在 HTTP 层面即可实现，无需协议升级，对负载均衡和防火墙更友好。且配置变更是低频事件，长轮询的开销可接受。Nacos 2.x 选择 gRPC 而非 WebSocket，因为 gRPC 提供更好的类型安全、流式支持和连接管理。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Nacos 集群部署时，节点之间如何同步数据？</div>
+          <div class="a">
+            <strong>参考：</strong>集群中 Naming（服务注册）和 Config（配置管理）使用不同协议同步。Naming 模块默认使用 Distro 协议：每个节点按 hash 负责一部分数据，注册信息由负责节点处理后异步同步，节点间定期校验和比对。Config 模块使用 Raft 协议：所有写操作经 Leader 节点，日志复制到多数节点后才返回成功。集群配置通过 cluster.conf 文件指定所有节点 IP。<br>
+            <strong>追问：集群模式下数据库如何配置？</strong> 所有节点连接同一个 MySQL 实例（建议主从），通过数据库实现数据持久化和跨节点共享。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Nacos 的命名空间、Group、DataId 分别有什么作用？在实际项目中如何规划？</div>
+          <div class="a">
+            <strong>参考：</strong>Namespace 用于环境隔离（dev/test/prod），不同 Namespace 下的服务和配置完全隔离。Group 用于业务分组（如 DEFAULT_GROUP、ORDER_GROUP），可按微服务域划分。DataId 对应具体配置文件（如 user-service.yml）。三者唯一标识一份配置。实际项目中：Namespace 按环境划分，Group 按业务线划分，DataId 按服务名命名。公共配置通过 shared-configs 共享。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Nacos 如何实现雪崩保护？保护阈值的作用是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>Nacos 通过保护阈值（protectThreshold）实现雪崩保护。当健康实例占总实例的比例低于阈值时，Nacos 会将不健康的实例也返回给消费者，避免所有流量集中到少数健康实例导致级联故障。默认值为 0（不启用），生产建议设置为 0.5~0.8。这类似于 Eureka 的自我保护模式。<br>
+            <strong>追问：如果保护阈值触发了，返回不健康实例不会导致调用失败吗？</strong> 确实可能调用到不健康实例，但总比所有流量打垮少数健康实例要好。配合客户端的重试机制和熔断降级，可以保证整体可用性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Spring Cloud 应用启动时，Nacos 的配置是如何加载的？加载优先级是怎样的？</div>
+          <div class="a">
+            <strong>参考：</strong>加载顺序为：1）<code>bootstrap.yml</code> 最先加载，包含 Nacos Server 地址等连接配置；2）通过 <code>NacosPropertySourceLocator</code> 从 Nacos 拉取远程配置，注入 Environment；3）<code>application.yml</code> 加载，本地配置优先级低于远程配置；4）<code>@PropertySource</code> 等注解配置。远程配置可通过 <code>shared-configs</code>（共享配置）和 <code>extension-configs</code>（扩展配置）引入多个配置文件。<br>
+            <strong>追问：如果 bootstrap.yml 中没有配置 Nacos 地址会怎样？</strong> 将无法从 Nacos 拉取远程配置，Spring Boot 2.4+ 还需引入 <code>spring-cloud-starter-bootstrap</code> 依赖，否则 bootstrap.yml 不会被加载。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何实现 Nacos 配置的灰度发布？</div>
+          <div class="a">
+            <strong>参考：</strong>Nacos 控制台支持 Beta 发布功能：编辑配置后选择「灰度发布」，填写灰度 IP 列表。灰度期间，只有指定 IP 的客户端会拉取到新配置，其他客户端仍使用旧配置。验证无误后可「停止 Beta」全量发布或回滚。实现原理是服务端在返回配置时，根据客户端 IP 判断是否属于灰度列表，决定返回新版还是旧版配置。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Nacos · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>
