@@ -437,3 +437,13 @@ li { padding: 0.25rem 0; }
   table { font-size: 0.8rem; }
   th, td { padding: 0.5rem; }
 }
+
+/* ===== Inline light backgrounds: force dark text for readability ===== */
+/* These match hex-color inline backgrounds used in arch-box / diagram elements */
+[style*="background:#"] {
+  color: #1e293b !important;
+}
+[style*="background:#"] small,
+[style*="background:#"] .item-sub {
+  color: #475569 !important;
+}
