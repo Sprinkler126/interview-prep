@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 高级 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>☕ Java 高级</h1>
+    <p class="subtitle">并发编程 · JUC · 注解 · SPI · 线程池 · CompletableFuture</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">并发编程基础</a></li>
+          <li class="sub"><a href="#s1-2">synchronized 原理</a></li>
+          <li class="sub"><a href="#s1-3">volatile 原理</a></li>
+          <li class="sub"><a href="#s1-4">AQS 框架</a></li>
+          <li class="sub"><a href="#s1-5">JUC 工具类</a></li>
+          <li class="sub"><a href="#s1-6">线程池</a></li>
+          <li class="sub"><a href="#s1-7">CompletableFuture</a></li>
+          <li class="sub"><a href="#s1-8">并发容器</a></li>
+          <li class="sub"><a href="#s1-9">注解与 SPI</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">线程池调优</a></li>
+          <li class="sub"><a href="#s2-2">分布式 ID 生成</a></li>
+          <li class="sub"><a href="#s2-3">异步编排</a></li>
+          <li class="sub"><a href="#s2-4">并发安全最佳实践</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 并发编程基础 -->
+        <h3 id="s1-1">并发编程基础</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Java 线程状态转换</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">NEW（新建）<br><small>new Thread()，尚未 start()</small></div>
+            </div>
+            <div class="arch-connector">↓ start() ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">RUNNABLE（可运行）<br><small>包含 Ready 和 Running 两个子状态</small></div>
+            </div>
+            <div class="arch-connector">↓ 获得锁失败 / wait() / sleep() / join() / park() ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">BLOCKED<br><small>等待获取<br>synchronized 锁</small></div>
+              <div class="arch-box" style="margin-left:1rem">WAITING<br><small>wait() / join()<br>park()</small></div>
+              <div class="arch-box" style="margin-left:1rem">TIMED_WAITING<br><small>sleep(n) / wait(n)<br>join(n) / parkNanos</small></div>
+            </div>
+            <div class="arch-connector">↓ 获得锁 / notify() / 超时 / interrupt() ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">TERMINATED（终止）<br><small>run() 方法执行完毕或异常退出</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>线程状态详解</h4>
+          <table>
+            <thead>
+              <tr><th>状态</th><th>触发条件</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">NEW</span></td><td>new Thread()</td><td>线程对象已创建，尚未启动</td></tr>
+              <tr><td><span class="badge badge-green">RUNNABLE</span></td><td>start()</td><td>就绪或正在运行，由 CPU 调度</td></tr>
+              <tr><td><span class="badge badge-orange">BLOCKED</span></td><td>等待 synchronized 锁</td><td>进入 synchronized 块时锁被占用</td></tr>
+              <tr><td><span class="badge badge-purple">WAITING</span></td><td>wait() / join() / LockSupport.park()</td><td>无限等待，需显式唤醒</td></tr>
+              <tr><td><span class="badge badge-red">TIMED_WAITING</span></td><td>sleep(ms) / wait(ms) / join(ms)</td><td>超时等待，时间到自动恢复</td></tr>
+              <tr><td><span class="badge badge-blue">TERMINATED</span></td><td>run() 结束或异常</td><td>线程终止，不可重启</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>CAS 原理与 ABA 问题</h4>
+          <pre><code>// CAS（Compare And Swap）：无锁并发的核心
+// 操作：比较内存值 V 与期望值 E，相等则更新为新值 N，否则不做操作
+// Java 中通过 Unsafe 类的 compareAndSwapInt/compareAndSwapObject 实现
+// 底层是 CPU 的原子指令（x86: CMPXCHG）
+
+// AtomicInteger 使用示例
+AtomicInteger count = new AtomicInteger(0);
+count.incrementAndGet(); // CAS + 自旋，线程安全的 i++
+
+// ABA 问题：
+// 线程1：读取 V=A，准备 CAS(A, B)
+// 线程2：读取 V=A，CAS(A, C) 成功，再 CAS(C, A) 成功
+// 线程1：CAS(A, B) 成功，但值已经被改过
+
+// 解决方案：AtomicStampedReference（带版本号）
+AtomicStampedReference&lt;String&gt; ref = new AtomicStampedReference<>("A", 0);
+int[] stampHolder = new int[1];
+String val = ref.get(stampHolder); // 获取值和版本号
+int stamp = stampHolder[0];
+ref.compareAndSet("A", "B", stamp, stamp + 1); // 同时比较值和版本号
+
+// JDK 8+ LongAdder：高并发计数器
+// 思路：分散热点，内部维护 Cell[] 数组，不同线程写不同 Cell
+LongAdder adder = new LongAdder();
+adder.increment();
+long total = adder.sum(); // 最终一致性</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>ThreadLocal 原理与内存泄漏</h4>
+          <pre><code>// ThreadLocal 原理：
+// 每个 Thread 内部持有 ThreadLocalMap
+// ThreadLocalMap 的 Entry 继承 WeakReference&lt;ThreadLocal&lt;?&gt;&gt;
+// Key 是 ThreadLocal 对象的弱引用，Value 是实际存储的值
+
+// 结构：
+// Thread -> ThreadLocalMap -> Entry[] -> Entry(key=弱引用, value=强引用)
+
+// 内存泄漏场景：
+// 1. ThreadLocal 对象被 GC 回收（Key 变为 null）
+// 2. 但 Value 仍被 Entry 强引用，无法回收
+// 3. 如果线程是线程池中的核心线程，一直存活，Value 永远无法回收
+
+// 解决方案：用完后必须调用 remove()
+ThreadLocal&lt;User&gt; userContext = new ThreadLocal&lt;&gt;();
+try {
+    userContext.set(currentUser);
+    // 业务逻辑
+} finally {
+    userContext.remove(); // 必须在 finally 中清理
+}
+
+// 使用场景：
+// 1. 用户会话信息（Spring SecurityContextHolder）
+// 2. 数据库连接（每个线程独立 Connection）
+// 3. 日期格式化（SimpleDateFormat 非线程安全）
+// 4. 链路追踪（traceId 传递）</code></pre>
+          <div class="warn">ThreadLocal 内存泄漏是最常见的并发面试题之一。核心要点：Key 是弱引用，Value 是强引用，用完必须 remove()。线程池场景尤其危险，因为线程不会销毁。</div>
+        </div>
+
+        <!-- 1-2 synchronized 原理 -->
+        <h3 id="s1-2">synchronized 原理</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">synchronized 锁升级过程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">无锁状态<br><small>Mark Word 无锁标记</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">偏向锁<br><small>单线程反复获取</small><br><small>记录线程 ID</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">轻量级锁<br><small>多线程交替执行</small><br><small>CAS 自旋</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">重量级锁<br><small>多线程激烈竞争</small><br><small>OS Mutex Lock</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>锁升级详解</h4>
+          <table>
+            <thead>
+              <tr><th>锁状态</th><th>Mark Word 存储</th><th>触发条件</th><th>优缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">无锁</span></td><td>对象 hashcode、GC 分代年龄</td><td>对象刚创建</td><td>无开销</td></tr>
+              <tr><td><span class="badge badge-purple">偏向锁</span></td><td>偏向线程 ID + epoch</td><td>第一个线程获取锁</td><td>无 CAS 开销，适合单线程反复获取</td></tr>
+              <tr><td><span class="badge badge-orange">轻量级锁</span></td><td>指向栈中 Lock Record 的指针</td><td>第二个线程尝试获取</td><td>CAS 自旋，适合锁持有时间短</td></tr>
+              <tr><td><span class="badge badge-pink">重量级锁</span></td><td>指向 Monitor 对象的指针</td><td>自旋超过阈值（默认 10 次）</td><td>OS 互斥锁，线程阻塞/唤醒开销大</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// synchronized 在字节码层面：
+// 1. 同步代码块：monitorenter / monitorexit 指令
+// 2. 同步方法：方法标志 ACC_SYNCHRONIZED
+
+// Object Monitor 结构：
+// _Owner：持有锁的线程
+// _EntryList：等待获取锁的线程队列（BLOCKED 状态）
+// _WaitSet：调用 wait() 的线程集合（WAITING 状态）
+
+// 锁升级是不可逆的（JDK 15 可通过 -XX:-UseBiasedSyncing 关闭偏向锁）
+// 锁可以降级：重量级锁在 GC 时可以降级为轻量级锁</code></pre>
+        </div>
+
+        <!-- 1-3 volatile 原理 -->
+        <h3 id="s1-3">volatile 原理</h3>
+
+        <div class="card">
+          <h4>volatile 两大特性</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>保证可见性</h4>
+              <ul>
+                <li>写 volatile 变量时，立刻刷新到主内存</li>
+                <li>读 volatile 变量时，从主内存读取最新值</li>
+                <li>底层通过内存屏障（Memory Barrier）实现</li>
+                <li>x86 下对应 lock 前缀指令</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>禁止指令重排</h4>
+              <ul>
+                <li>volatile 写之前的操作不会被重排到写之后</li>
+                <li>volatile 读之后的操作不会被重排到读之前</li>
+                <li>通过 LoadLoad / LoadStore / StoreStore / StoreLoad 屏障实现</li>
+                <li>典型应用：DCL 单例模式</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>DCL 双重检查锁单例</h4>
+          <pre><code>// 正确的 DCL 单例（必须加 volatile）
+public class Singleton {
+    // volatile 关键！防止指令重排导致获取到未初始化的对象
+    private static volatile Singleton instance;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (instance == null) {                  // 第一次检查（无锁，避免不必要的同步）
+            synchronized (Singleton.class) {
+                if (instance == null) {          // 第二次检查（加锁后确认）
+                    instance = new Singleton();  // 非原子操作
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// new Singleton() 分为三步：
+// 1. 分配内存空间
+// 2. 初始化对象（执行构造方法）
+// 3. 将引用指向内存地址
+// 如果没有 volatile，步骤 2 和 3 可能重排，导致其他线程
+// 读到非 null 但未初始化完成的对象</code></pre>
+          <div class="warn">DCL 单例必须加 volatile！不加 volatile 时，由于指令重排，其他线程可能获取到一个半初始化的对象（引用非 null 但构造方法未执行完）。</div>
+        </div>
+
+        <!-- 1-4 AQS 框架 -->
+        <h3 id="s1-4">AQS 框架</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">AQS（AbstractQueuedSynchronizer）架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">AQS 核心：state（volatile int）+ CLH 双向队列</div>
+            </div>
+            <div class="arch-connector">↓ 子类实现 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">ReentrantLock<br><small>state=0 无锁</small><br><small>state>0 有锁</small></div>
+              <div class="arch-box" style="margin-left:1rem">ReentrantReadWriteLock<br><small>高16位=读锁计数</small><br><small>低16位=写锁计数</small></div>
+              <div class="arch-box" style="margin-left:1rem">CountDownLatch<br><small>state=初始计数</small><br><small>countDown: state-1</small></div>
+              <div class="arch-box" style="margin-left:1rem">Semaphore<br><small>state=许可数</small><br><small>acquire: state-1</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>ReentrantLock vs synchronized</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>synchronized</th><th>ReentrantLock</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>实现方式</td><td>JVM 内置（monitorenter/monitorexit）</td><td>Java API（AQS + CAS）</td></tr>
+              <tr><td>锁获取/释放</td><td>自动（进入/退出同步块）</td><td>手动（lock/unlock，必须 finally 释放）</td></tr>
+              <tr><td>可中断</td><td>不可中断</td><td>lockInterruptibly() 可中断</td></tr>
+              <tr><td>公平锁</td><td>只有非公平锁</td><td>支持公平/非公平（构造参数）</td></tr>
+              <tr><td>条件变量</td><td>只有一个 wait/notify</td><td>多个 Condition（精确唤醒）</td></tr>
+              <tr><td>锁升级</td><td>支持（偏向→轻量→重量）</td><td>不支持</td></tr>
+              <tr><td>性能</td><td>JDK 6+ 优化后差距不大</td><td>高竞争下略优</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// ReentrantLock 使用示例
+private final ReentrantLock lock = new ReentrantLock(true); // true=公平锁
+private final Condition notFull = lock.newCondition();
+private final Condition notEmpty = lock.newCondition();
+
+public void put(T item) throws InterruptedException {
+    lock.lock();
+    try {
+        while (count == items.length)
+            notFull.await();        // 队列满，等待
+        items[putIndex] = item;
+        notEmpty.signal();          // 通知消费者
+    } finally {
+        lock.unlock();              // 必须在 finally 中释放
+    }
+}</code></pre>
+        </div>
+
+        <!-- 1-5 JUC 工具类 -->
+        <h3 id="s1-5">JUC 工具类</h3>
+
+        <div class="card">
+          <h4>CountDownLatch / CyclicBarrier / Semaphore 对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>CountDownLatch</th><th>CyclicBarrier</th><th>Semaphore</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>功能</td><td>等 N 个任务完成</td><td>N 个线程互相等待</td><td>控制并发数</td></tr>
+              <tr><td>计数方式</td><td>减计数（N → 0）</td><td>减计数（到达屏障点）</td><td>许可数</td></tr>
+              <tr><td>是否可复用</td><td>不可复用（一次性）</td><td>可复用（自动重置）</td><td>可复用（release 归还）</td></tr>
+              <tr><td>触发时机</td><td>countDown() 减到 0 时</td><td>所有线程到达屏障点</td><td>acquire 获得许可</td></tr>
+              <tr><td>阻塞方法</td><td>await()</td><td>await()</td><td>acquire()</td></tr>
+              <tr><td>典型场景</td><td>主线程等子任务完成</td><td>多线程同时开始</td><td>限流、连接池</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// CountDownLatch：等待 N 个任务完成
+CountDownLatch latch = new CountDownLatch(3);
+for (int i = 0; i &lt; 3; i++) {
+    executor.submit(() -> {
+        try {
+            // 执行任务
+        } finally {
+            latch.countDown(); // 计数减 1
+        }
+    });
+}
+latch.await(); // 阻塞直到计数为 0
+// 可指定超时：latch.await(10, TimeUnit.SECONDS)
+
+// CyclicBarrier：所有线程同时开始
+CyclicBarrier barrier = new CyclicBarrier(3, () -> {
+    System.out.println("所有线程就绪，开始执行！");
+});
+for (int i = 0; i &lt; 3; i++) {
+    executor.submit(() -> {
+        barrier.await(); // 等待其他线程
+        // 所有线程同时到达这里
+    });
+}
+
+// Semaphore：限制并发数
+Semaphore semaphore = new Semaphore(10); // 最多 10 个并发
+for (int i = 0; i &lt; 100; i++) {
+    executor.submit(() -> {
+        semaphore.acquire(); // 获取许可
+        try {
+            // 执行任务
+        } finally {
+            semaphore.release(); // 归还许可
+        }
+    });
+}</code></pre>
+        </div>
+
+        <!-- 1-6 线程池 -->
+        <h3 id="s1-6">线程池</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">线程池工作流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">提交任务<br><small>execute() / submit()</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">核心线程未满？<br><small>创建核心线程执行</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">队列未满？<br><small>放入工作队列</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">最大线程未满？<br><small>创建非核心线程</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">触发拒绝策略</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>线程池 7 大参数</h4>
+          <pre><code>public ThreadPoolExecutor(
+    int corePoolSize,           // 1. 核心线程数（常驻线程，不会回收）
+    int maximumPoolSize,        // 2. 最大线程数（核心 + 非核心）
+    long keepAliveTime,         // 3. 非核心线程空闲存活时间
+    TimeUnit unit,              // 4. 时间单位
+    BlockingQueue&lt;Runnable&gt; workQueue, // 5. 工作队列
+    ThreadFactory threadFactory, // 6. 线程工厂（自定义线程名）
+    RejectedExecutionHandler handler  // 7. 拒绝策略
+)</code></pre>
+          <table>
+            <thead>
+              <tr><th>参数</th><th>说明</th><th>调优建议</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>corePoolSize</td><td>核心线程数</td><td>CPU 密集型：N+1；IO 密集型：2N</td></tr>
+              <tr><td>maximumPoolSize</td><td>最大线程数</td><td>根据压测确定，避免过大导致频繁上下文切换</td></tr>
+              <tr><td>keepAliveTime</td><td>非核心线程空闲存活时间</td><td>默认 60s，可根据任务频率调整</td></tr>
+              <tr><td>workQueue</td><td>任务队列</td><td>有界队列（ArrayBlockingQueue）防止 OOM</td></tr>
+              <tr><td>threadFactory</td><td>线程创建工厂</td><td>自定义线程名（便于排查问题）</td></tr>
+              <tr><td>handler</td><td>拒绝策略</td><td>根据业务选择，默认 AbortPolicy 抛异常</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>4 种拒绝策略</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>行为</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">AbortPolicy</span></td><td>抛出 RejectedExecutionException</td><td>默认策略，需感知任务被拒绝</td></tr>
+              <tr><td><span class="badge badge-orange">CallerRunsPolicy</span></td><td>由调用线程执行任务</td><td>不丢失任务，降低提交速度</td></tr>
+              <tr><td><span class="badge badge-blue">DiscardPolicy</span></td><td>静默丢弃任务</td><td>允许丢失的场景</td></tr>
+              <tr><td><span class="badge badge-purple">DiscardOldestPolicy</span></td><td>丢弃队列最老的任务</td><td>优先处理最新任务</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>execute vs submit</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>execute(Runnable)</h4>
+              <ul>
+                <li>提交 Runnable 任务</li>
+                <li>无返回值</li>
+                <li>异常直接抛出（UncaughtExceptionHandler）</li>
+                <li>底层直接调用 run()</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>submit(Runnable/Callable)</h4>
+              <ul>
+                <li>提交 Runnable 或 Callable</li>
+                <li>返回 Future 对象</li>
+                <li>异常封装在 Future 中，调用 get() 时抛出</li>
+                <li>底层包装为 FutureTask</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// 常用线程池工厂方法（不推荐生产使用）
+Executors.newFixedThreadPool(n);      // 固定线程数，LinkedBlockingQueue（无界！）
+Executors.newSingleThreadExecutor();  // 单线程，LinkedBlockingQueue
+Executors.newCachedThreadPool();      // 缓存线程池，SynchronousQueue，max=MAX_VALUE
+Executors.newScheduledThreadPool(n);  // 定时线程池
+
+// 生产推荐手动创建 ThreadPoolExecutor
+ThreadPoolExecutor pool = new ThreadPoolExecutor(
+    10, 20, 60, TimeUnit.SECONDS,
+    new ArrayBlockingQueue&lt;&gt;(1000),        // 有界队列
+    new ThreadFactoryBuilder().setNameFormat("biz-pool-%d").build(),
+    new ThreadPoolExecutor.CallerRunsPolicy() // 调用者执行
+);</code></pre>
+          <div class="warn">阿里开发规范禁止使用 Executors 创建线程池。newFixedThreadPool 和 newSingleThreadExecutor 使用无界 LinkedBlockingQueue，可能导致 OOM。newCachedThreadPool 最大线程数为 Integer.MAX_VALUE，可能创建大量线程。</div>
+        </div>
+
+        <!-- 1-7 CompletableFuture -->
+        <h3 id="s1-7">CompletableFuture</h3>
+
+        <div class="card">
+          <h4>CompletableFuture 核心 API</h4>
+          <pre><code>// 创建
+CompletableFuture&lt;String&gt; future = CompletableFuture.supplyAsync(() -> {
+    return queryFromDB(); // 异步执行
+}, executor);
+
+// 链式处理（同步）
+CompletableFuture&lt;Integer&gt; f1 = future
+    .thenApply(s -> s.length())        // 转换结果（有返回值）
+    .thenAccept(len -> print(len))     // 消费结果（无返回值）
+    .thenRun(() -> log("done"));       // 执行动作（无参数）
+
+// 链式处理（异步）
+future
+    .thenApplyAsync(s -> process(s), executor)  // 异步转换
+    .thenAcceptAsync(s -> save(s), executor);   // 异步消费
+
+// 组合（thenCompose = flatMap，展平嵌套）
+CompletableFuture&lt;String&gt; f2 = future.thenCompose(s ->
+    CompletableFuture.supplyAsync(() -> queryAnother(s))
+);
+
+// 合并两个结果（thenCombine = zip）
+CompletableFuture&lt;String&gt; nameFuture = getNameAsync();
+CompletableFuture&lt;Integer&gt; ageFuture = getAgeAsync();
+CompletableFuture&lt;String&gt; combined = nameFuture.thenCombine(ageFuture,
+    (name, age) -> name + " is " + age + " years old"
+);
+
+// 等待所有完成
+CompletableFuture.allOf(f1, f2, f3).join();
+
+// 任意一个完成
+CompletableFuture.anyOf(f1, f2, f3).join();
+
+// 异常处理
+future.exceptionally(ex -> "默认值")  // 异常时返回默认值
+    .handle((result, ex) -> {          // 统一处理结果和异常
+        if (ex != null) return "error";
+        return result;
+    });</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>方法对比速查</h4>
+          <table>
+            <thead>
+              <tr><th>方法</th><th>输入</th><th>输出</th><th>同步/异步</th><th>类似 Stream</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>thenApply</td><td>T</td><td>CompletableFuture&lt;U&gt;</td><td>同步</td><td>map</td></tr>
+              <tr><td>thenCompose</td><td>T</td><td>CompletableFuture&lt;U&gt;</td><td>同步</td><td>flatMap</td></tr>
+              <tr><td>thenAccept</td><td>T</td><td>CompletableFuture&lt;Void&gt;</td><td>同步</td><td>forEach</td></tr>
+              <tr><td>thenRun</td><td>无</td><td>CompletableFuture&lt;Void&gt;</td><td>同步</td><td>-</td></tr>
+              <tr><td>thenCombine</td><td>T, U</td><td>CompletableFuture&lt;V&gt;</td><td>同步</td><td>zip</td></tr>
+              <tr><td>allOf</td><td>多个 Future</td><td>CompletableFuture&lt;Void&gt;</td><td>-</td><td>-</td></tr>
+              <tr><td>anyOf</td><td>多个 Future</td><td>CompletableFuture&lt;Object&gt;</td><td>-</td><td>-</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-8 并发容器 -->
+        <h3 id="s1-8">并发容器</h3>
+
+        <div class="card">
+          <h4>并发容器一览</h4>
+          <table>
+            <thead>
+              <tr><th>容器</th><th>底层结构</th><th>线程安全方式</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>ConcurrentHashMap</td><td>数组+链表+红黑树</td><td>CAS + synchronized</td><td>高并发 Map</td></tr>
+              <tr><td>CopyOnWriteArrayList</td><td>数组（写时复制）</td><td>ReentrantLock</td><td>读多写少（监听器列表）</td></tr>
+              <tr><td>ConcurrentLinkedQueue</td><td>单向链表</td><td>CAS（无锁）</td><td>高并发无界队列</td></tr>
+              <tr><td>LinkedBlockingQueue</td><td>单向链表</td><td>两把 ReentrantLock</td><td>生产者-消费者</td></tr>
+              <tr><td>ArrayBlockingQueue</td><td>数组</td><td>一把 ReentrantLock</td><td>有界阻塞队列</td></tr>
+              <tr><td>PriorityBlockingQueue</td><td>堆</td><td>ReentrantLock</td><td>优先级阻塞队列</td></tr>
+              <tr><td>SynchronousQueue</td><td>无存储</td><td>CAS / Lock</td><td>直接传递（CachedThreadPool）</td></tr>
+              <tr><td>ConcurrentSkipListMap</td><td>跳表</td><td>CAS（无锁）</td><td>有序并发 Map</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>CopyOnWriteArrayList 原理</h4>
+          <pre><code>// 写时复制：写操作时复制整个数组，修改新数组，然后替换引用
+public boolean add(E e) {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        Object[] elements = getArray();
+        int len = elements.length;
+        Object[] newElements = Arrays.copyOf(elements, len + 1); // 复制
+        newElements[len] = e;
+        setArray(newElements); // 替换引用（volatile）
+        return true;
+    } finally {
+        lock.unlock();
+    }
+}
+
+// 读操作无锁，读的是快照（旧数组引用）
+// 适用场景：读多写少（如事件监听器列表、配置白名单）
+// 缺点：1）写操作开销大（数组拷贝）；2）读到的是旧数据（弱一致性）</code></pre>
+        </div>
+
+        <!-- 1-9 注解与 SPI -->
+        <h3 id="s1-9">注解与 SPI</h3>
+
+        <div class="card">
+          <h4>自定义注解 + 反射实现简单框架</h4>
+          <pre><code>// 自定义注解
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface RateLimit {
+    int value() default 100;  // 限流阈值
+    String key() default "";  // 限流 key
+}
+
+// 注解处理器（AOP 切面）
+@Aspect
+@Component
+public class RateLimitAspect {
+    @Around("@annotation(rateLimit)")
+    public Object around(ProceedingJoinPoint pjp, RateLimit rateLimit) throws Throwable {
+        String key = rateLimit.key();
+        int limit = rateLimit.value();
+        // 限流逻辑（令牌桶/滑动窗口）
+        if (!tryAcquire(key, limit)) {
+            throw new RateLimitException("请求过于频繁");
+        }
+        return pjp.proceed();
+    }
+}
+
+// 元注解说明：
+// @Retention：SOURCE（编译丢弃）/ CLASS（类文件保留）/ RUNTIME（运行时保留）
+// @Target：TYPE / METHOD / FIELD / PARAMETER / CONSTRUCTOR 等
+// @Inherited：子类继承父类注解
+// @Repeatable：可重复注解（JDK 8+）</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>SPI 机制（ServiceLoader）</h4>
+          <pre><code>// Java SPI（Service Provider Interface）
+// 1. 定义接口
+public interface Logger {
+    void log(String message);
+}
+
+// 2. 实现类
+public class FileLogger implements Logger {
+    public void log(String message) { /* 写文件 */ }
+}
+
+// 3. 配置文件 META-INF/services/com.example.Logger
+// 内容：com.example.FileLogger
+
+// 4. 使用 ServiceLoader 加载
+ServiceLoader&lt;Logger&gt; loaders = ServiceLoader.load(Logger.class);
+for (Logger logger : loaders) {
+    logger.log("hello");
+}
+
+// Java SPI 特点：
+// 1. 基于配置文件（META-INF/services/全限定接口名）
+// 2. 遍历所有实现类（全量加载，懒初始化）
+// 3. 线程不安全（Iterator 非线程安全）
+// 4. 无法按需获取特定实现
+
+// Dubbo SPI 改进：
+// 1. 配置文件改为 key=value 形式（META-INF/dubbo/全限定接口名）
+// 2. 支持按名获取：ExtensionLoader.getExtensionLoader(T.class).getExtension("name")
+// 3. 支持 AOP（Wrapper 自动装饰）、IoC（setter 注入）
+// 4. 支持 @Adaptive 自适应扩展（根据 URL 参数动态选择实现）</code></pre>
+          <div class="tip">面试加分点：Java SPI 的典型应用是 JDBC DriverManager（加载数据库驱动）、SLF4J（加载日志实现）。Dubbo SPI 是 Dubbo 框架可扩展性的核心。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 线程池调优 -->
+        <h3 id="s2-1">线程池调优</h3>
+
+        <div class="card">
+          <h4>线程池参数计算公式</h4>
+          <pre><code>// CPU 密集型任务（计算为主，如加密、排序）
+// 线程数 = N(CPU 核心数) + 1
+// +1 是为了当某个线程因为偶尔的缺页故障或其他原因暂停时，额外线程可利用 CPU 空闲时间
+int cpuCores = Runtime.getRuntime().availableProcessors();
+int cpuIntensiveThreads = cpuCores + 1;
+
+// IO 密集型任务（IO 为主，如数据库查询、HTTP 调用）
+// 线程数 = N(CPU 核心数) * 2（经验值）
+// 或者：N * (1 + W/C)，W=等待时间，C=计算时间
+// 如：任务 80% 时间在等待 IO → N * (1 + 80/20) = N * 5
+int ioIntensiveThreads = cpuCores * 2;
+
+// 混合型任务
+// 建议拆分为 CPU 密集和 IO 密集两个线程池，分别配置
+
+// 队列选择：
+// 1. ArrayBlockingQueue（有界）：防止 OOM，推荐
+// 2. LinkedBlockingQueue（可选有界/无界）：默认无界，慎用
+// 3. SynchronousQueue（无容量）：直接传递，配合 CachedThreadPool
+// 4. PriorityBlockingQueue：按优先级执行</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>线程池监控与动态调整</h4>
+          <pre><code>// 线程池监控指标
+ThreadPoolExecutor pool = ...;
+int activeCount = pool.getActiveCount();       // 活跃线程数
+int poolSize = pool.getPoolSize();              // 当前线程数
+long completedTask = pool.getCompletedTaskCount(); // 已完成任务数
+int queueSize = pool.getQueue().size();         // 队列积压数
+int largestPoolSize = pool.getLargestPoolSize(); // 历史最大线程数
+
+// 动态调整（运行时修改参数）
+pool.setCorePoolSize(20);      // 动态修改核心线程数
+pool.setMaximumPoolSize(50);   // 动态修改最大线程数
+pool.setKeepAliveTime(120, TimeUnit.SECONDS);
+
+// 生产推荐：美团线程池方案
+// 1. 线程池参数配置化（存入 Nacos/数据库）
+// 2. 定时采集线程池指标（活跃数、队列大小、完成数）
+// 3. 根据指标动态调整线程池参数
+// 4. 告警：队列积压 > 阈值、活跃线程数持续 = maxPoolSize</code></pre>
+        </div>
+
+        <!-- 2-2 分布式 ID 生成 -->
+        <h3 id="s2-2">分布式 ID 生成</h3>
+
+        <div class="card">
+          <h4>常见分布式 ID 方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>原理</th><th>优点</th><th>缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>UUID</td><td>128 位随机数</td><td>简单，无网络开销</td><td>无序，索引性能差，太长</td></tr>
+              <tr><td>数据库自增</td><td>auto_increment</td><td>有序，简单</td><td>单点瓶颈，分库分表困难</td></tr>
+              <tr><td>号段模式</td><td>批量获取 ID 段</td><td>减少数据库压力</td><td>需维护号段服务</td></tr>
+              <tr><td>雪花算法</td><td>时间戳+机器ID+序列号</td><td>有序，高性能，趋势递增</td><td>依赖时钟，时钟回拨问题</td></tr>
+              <tr><td>Leaf（美团）</td><td>号段+雪花双模式</td><td>高可用，高可靠</td><td>需部署额外服务</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 雪花算法（Snowflake）ID 结构（64 bit）
+// 0 | 41 位时间戳 | 10 位机器 ID | 12 位序列号
+// 符号位   毫秒级        1024 节点     每毫秒 4096 个 ID
+
+// 简化实现
+public class SnowflakeIdGenerator {
+    private final long startTimestamp = 1609459200000L; // 2021-01-01
+    private final long workerIdBits = 10L;
+    private final long sequenceBits = 12L;
+    private final long maxWorkerId = ~(-1L &lt;&lt; workerIdBits); // 1023
+    private final long sequenceMask = ~(-1L &lt;&lt; sequenceBits); // 4095
+
+    private long workerId;
+    private long sequence = 0L;
+    private long lastTimestamp = -1L;
+
+    public synchronized long nextId() {
+        long timestamp = System.currentTimeMillis();
+        if (timestamp == lastTimestamp) {
+            sequence = (sequence + 1) & sequenceMask;
+            if (sequence == 0) timestamp = waitNextMillis(lastTimestamp);
+        } else {
+            sequence = 0L;
+        }
+        lastTimestamp = timestamp;
+        return ((timestamp - startTimestamp) &lt;&lt; (workerIdBits + sequenceBits))
+             | (workerId &lt;&lt; sequenceBits)
+             | sequence;
+    }
+}</code></pre>
+        </div>
+
+        <!-- 2-3 异步编排 -->
+        <h3 id="s2-3">异步编排</h3>
+
+        <div class="card">
+          <h4>电商订单查询场景</h4>
+          <pre><code>// 查询订单详情：需要聚合用户信息、商品信息、物流信息
+// 串行：3 次 RPC 总耗时 = 100 + 150 + 80 = 330ms
+// 并行：3 次 RPC 总耗时 = max(100, 150, 80) = 150ms
+
+public OrderDetailVO getOrderDetail(String orderId) {
+    // 并行发起三个异步请求
+    CompletableFuture&lt;UserVO&gt; userFuture = CompletableFuture.supplyAsync(
+        () -> userService.getUser(orderId), executor);
+
+    CompletableFuture&lt;List&lt;ProductVO&gt;&gt; productFuture = CompletableFuture.supplyAsync(
+        () -> productService.getProducts(orderId), executor);
+
+    CompletableFuture&lt;LogisticsVO&gt; logisticsFuture = CompletableFuture.supplyAsync(
+        () -> logisticsService.getLogistics(orderId), executor);
+
+    // 等待所有完成，组装结果
+    CompletableFuture.allOf(userFuture, productFuture, logisticsFuture).join();
+
+    OrderDetailVO vo = new OrderDetailVO();
+    vo.setUser(userFuture.join());
+    vo.setProducts(productFuture.join());
+    vo.setLogistics(logisticsFuture.join());
+    return vo;
+}
+
+// 异常处理：某个服务失败不影响其他服务
+CompletableFuture&lt;UserVO&gt; userFuture = CompletableFuture.supplyAsync(
+    () -> userService.getUser(orderId), executor)
+    .exceptionally(ex -> {
+        log.warn("查询用户信息失败", ex);
+        return UserVO.empty(); // 返回默认值
+    });</code></pre>
+        </div>
+
+        <!-- 2-4 并发安全最佳实践 -->
+        <h3 id="s2-4">并发安全最佳实践</h3>
+
+        <div class="card">
+          <h4>常见并发问题与解决方案</h4>
+          <table>
+            <thead>
+              <tr><th>问题</th><th>场景</th><th>解决方案</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>竞态条件</td><td>多线程同时修改共享变量</td><td>synchronized / Lock / CAS / 原子类</td></tr>
+              <tr><td>死锁</td><td>多个线程互相等待对方锁</td><td>固定加锁顺序、tryLock 超时、死锁检测</td></tr>
+              <tr><td>线程饥饿</td><td>低优先级线程得不到执行</td><td>公平锁、避免线程池队列过长</td></tr>
+              <tr><td>内存泄漏</td><td>ThreadLocal 未清理</td><td>finally 中 remove()</td></tr>
+              <tr><td>伪共享</td><td>不同变量在同一缓存行</td><td>@Contended 注解或填充缓存行</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 死锁示例与解决方案
+// 死锁：线程1 持有 A 等 B，线程2 持有 B 等 A
+synchronized(lockA) {
+    synchronized(lockB) { /* ... */ } // 线程1
+}
+synchronized(lockB) {
+    synchronized(lockA) { /* ... */ } // 线程2
+
+// 解决方案 1：固定加锁顺序
+synchronized(lockA) { // 两个线程都先锁 A
+    synchronized(lockB) { /* ... */ }
+}
+
+// 解决方案 2：tryLock 带超时
+if (lockA.tryLock(1, TimeUnit.SECONDS)) {
+    try {
+        if (lockB.tryLock(1, TimeUnit.SECONDS)) {
+            try { /* ... */ } finally { lockB.unlock(); }
+        }
+    } finally { lockA.unlock(); }
+}
+
+// 伪共享解决方案
+public class PaddedCounter {
+    @sun.misc.Contended // JDK 8+ 自动填充缓存行
+    volatile long value;
+    // 或手动填充：long p1,p2,p3,p4,p5,p6,p7; // 64 字节
+}</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">synchronized 锁升级的过程是怎样的？为什么需要锁升级？</div>
+          <div class="a">
+            <strong>参考：</strong>synchronized 锁升级过程为：无锁 → 偏向锁 → 轻量级锁 → 重量级锁。<br>
+            1）<strong>偏向锁：</strong>对象头 Mark Word 记录首次获取锁的线程 ID，下次同一线程进入时无需 CAS，直接判断线程 ID 即可。适合单线程反复获取锁的场景。<br>
+            2）<strong>轻量级锁：</strong>当第二个线程竞争时，偏向锁撤销，升级为轻量级锁。线程在栈帧中创建 Lock Record，通过 CAS 尝试将 Mark Word 指向 Lock Record。适合锁持有时间短、竞争不激烈的场景。<br>
+            3）<strong>重量级锁：</strong>CAS 自旋超过阈值（默认 10 次，JDK 6+ 自适应自旋），升级为重量级锁。通过 OS 的 Mutex Lock 实现，未获取锁的线程阻塞挂起。<br>
+            <strong>为什么需要锁升级：</strong>不同场景下锁竞争程度不同，锁升级机制让 JVM 根据竞争强度自动选择最优的锁实现，在无竞争时几乎零开销，高竞争时保证正确性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">volatile 能保证原子性吗？为什么 DCL 单例要加 volatile？</div>
+          <div class="a">
+            <strong>参考：</strong>volatile 不能保证原子性。volatile 保证可见性和禁止指令重排，但 i++ 这种复合操作（读-改-写）不是原子的。要保证原子性需要 synchronized、Lock 或 AtomicInteger。<br>
+            DCL 单例加 volatile 的原因：<code>instance = new Singleton()</code> 不是原子操作，分为三步：1）分配内存；2）初始化对象；3）引用指向内存。JVM 可能将 2 和 3 重排，导致其他线程在第一次 null 检查时读到非 null 但未初始化完成的对象。volatile 通过内存屏障禁止这种重排。<br>
+            <strong>追问：除了 DCL，还有什么方式实现单例？</strong> 静态内部类（Holder 模式，类加载保证线程安全）、枚举单例（JVM 保证唯一，防反射和序列化攻击）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">线程池的核心参数有哪些？如何合理配置？</div>
+          <div class="a">
+            <strong>参考：</strong>7 大参数：corePoolSize（核心线程数）、maximumPoolSize（最大线程数）、keepAliveTime（非核心线程空闲存活时间）、unit（时间单位）、workQueue（工作队列）、threadFactory（线程工厂）、handler（拒绝策略）。<br>
+            配置原则：1）CPU 密集型任务：线程数 = N + 1（N 为 CPU 核心数）；2）IO 密集型任务：线程数 = N * 2 或 N * (1 + W/C)；3）队列用有界队列（ArrayBlockingQueue），防 OOM；4）拒绝策略根据业务选择（CallerRunsPolicy 保证不丢任务）；5）自定义 ThreadFactory 设置线程名（方便排查）。<br>
+            <strong>追问：为什么阿里规范禁止使用 Executors？</strong> newFixedThreadPool 使用无界 LinkedBlockingQueue，任务无限堆积可能 OOM；newCachedThreadPool 最大线程数 Integer.MAX_VALUE，可能创建大量线程导致 OOM。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>AQS 的原理是什么？ReentrantLock 是怎么基于 AQS 实现的？</div>
+          <div class="a">
+            <strong>参考：</strong>AQS（AbstractQueuedSynchronizer）是 JUC 并发工具的基础框架。核心是一个 volatile int state（表示锁状态）和一个 CLH 双向队列（存放等待获取锁的线程）。<br>
+            ReentrantLock 的实现：lock() 时尝试 CAS 修改 state（0→1），成功则获取锁并记录持有线程；失败则将当前线程封装为 Node 加入 CLH 队列，通过 LockSupport.park() 阻塞。unlock() 时将 state 减 1（可重入），为 0 时释放锁并唤醒队列中的下一个线程。<br>
+            公平锁和非公平锁的区别：非公平锁在 lock() 时直接尝试 CAS（可能插队），公平锁先检查队列中是否有等待线程（hasQueuedPredecessors），有则排队。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">CountDownLatch 和 CyclicBarrier 有什么区别？各自适用什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>CountDownLatch 是一次性计数器，countDown() 递减到 0 时唤醒所有 await() 的线程，不可复用。适合主线程等多个子任务完成的场景（如并行查询多个数据源后汇总）。<br>
+            CyclicBarrier 是可复用的屏障，所有线程到达屏障点后同时继续，自动重置。适合多个线程互相等待、同时开始的场景（如多线程分段计算后合并）。<br>
+            核心区别：1）CountDownLatch 计数递减到 0，CyclicBarrier 计数递增到 N；2）CountDownLatch 不可复用，CyclicBarrier 可复用；3）CountDownLatch 一个线程 countDown 多次，CyclicBarrier 每个线程 await 一次；4）CyclicBarrier 支持 barrierAction（最后一个到达的线程执行）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">CompletableFuture 的 thenApply 和 thenCompose 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>thenApply 类似 Stream 的 map，将结果 T 转换为 U，返回 CompletableFuture&lt;U&gt;。如果转换函数返回 CompletableFuture，结果会变成嵌套的 CompletableFuture&lt;CompletableFuture&lt;U&gt;&gt;。<br>
+            thenCompose 类似 Stream 的 flatMap，用于展平嵌套。如果函数返回 CompletableFuture&lt;U&gt;，thenCompose 会自动展平为 CompletableFuture&lt;U&gt;，避免嵌套。<br>
+            一句话总结：thenApply 用于同步转换，thenCompose 用于异步链式调用（当转换本身也是异步操作时）。<br>
+            <strong>追问：CompletableFuture 的异常怎么处理？</strong> exceptionally(ex -> default) 兜底；handle((result, ex) -> ...) 统一处理；whenComplete((result, ex) -> ...) 类似 handle 但不改变结果。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ThreadLocal 的原理是什么？为什么会导致内存泄漏？</div>
+          <div class="a">
+            <strong>参考：</strong>ThreadLocal 的实现依赖于 Thread 类中的 ThreadLocalMap。每个 Thread 持有一个 ThreadLocalMap，以 ThreadLocal 对象为 Key（弱引用），用户设置的值为 Value（强引用）。get() 时通过当前线程的 ThreadLocalMap 以 this（ThreadLocal 对象）为 Key 查找 Value。<br>
+            内存泄漏原因：ThreadLocal 对象被 GC 回收后，Key 变为 null（弱引用），但 Value 仍被 Entry 强引用，无法被 GC。如果线程是线程池中的核心线程长期存活，这些 Value 就永远不会被回收。<br>
+            解决方案：1）用完后必须在 finally 中调用 remove()；2）ThreadLocalMap 在 get/set 时会清理 Key 为 null 的 Entry（启发式清理），但不能完全依赖。<br>
+            <strong>追问：InheritableThreadLocal 有什么问题？</strong> 线程池中线程复用，父线程设置的值不会传递到新任务（因为线程已经创建了）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Java SPI 和 Dubbo SPI 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Java SPI（ServiceLoader）通过 META-INF/services/ 下的配置文件加载接口的所有实现类，全量加载，无法按名获取，遍历所有实现。典型应用：JDBC 驱动加载。<br>
+            Dubbo SPI 改进：1）配置文件改为 key=value 形式（META-INF/dubbo/），支持按名获取；2）支持 AOP（自动 Wrapper 装饰器链）；3）支持 IoC（setter 依赖注入）；4）@Adaptive 自适应扩展（根据 URL 参数动态选择实现）；5）支持自动激活扩展 @Activate（如 Filter 链）。<br>
+            <strong>追问：Dubbo 的 @Adaptive 怎么工作？</strong> 标注了 @Adaptive 的方法在运行时根据 URL 参数（如 protocol=dubbo）动态选择对应的 SPI 实现类，生成代理类实现动态路由。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>CAS 的原理是什么？ABA 问题怎么解决？LongAdder 为什么比 AtomicLong 快？</div>
+          <div class="a">
+            <strong>参考：</strong>CAS（Compare And Swap）是一种无锁并发原语，操作包含三个值：内存值 V、期望值 A、新值 B。当 V == A 时，将 V 更新为 B，否则不做操作。整个操作是 CPU 级别的原子指令（x86 的 CMPXCHG）。<br>
+            ABA 问题：值从 A 变为 B 再变回 A，CAS 检测不到变化。解决：AtomicStampedReference 加版本号（stamp），每次修改版本号递增；AtomicMarkableReference 加布尔标记。<br>
+            LongAdder 为什么快：AtomicLong 所有线程竞争同一个 value（热点集中），LongAdder 将 value 分散到 Cell[] 数组中，不同线程写不同 Cell（类似分段锁思想），sum() 时汇总。高并发下 LongAdder 的吞吐量远高于 AtomicLong。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Java 高级 · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RocketMQ - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
+  <div class="container">
+    <h1>🚀 RocketMQ</h1>
+    <p class="subtitle">顺序消息 · 延迟消息 · 事务消息 · 金融级 MQ</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#p1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#p1-1">整体架构</a></li>
+          <li class="sub"><a href="#p1-2">消息类型</a></li>
+          <li class="sub"><a href="#p1-3">顺序消息</a></li>
+          <li class="sub"><a href="#p1-4">延迟消息</a></li>
+          <li class="sub"><a href="#p1-5">事务消息</a></li>
+          <li class="sub"><a href="#p1-6">消费模式</a></li>
+          <li class="sub"><a href="#p1-7">死信队列</a></li>
+          <li class="sub"><a href="#p1-8">消息存储</a></li>
+          <li class="sub"><a href="#p1-9">高可用机制</a></li>
+          <li><a href="#p2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#p2-1">电商订单场景</a></li>
+          <li class="sub"><a href="#p2-2">金融交易场景</a></li>
+          <li class="sub"><a href="#p2-3">延迟任务调度</a></li>
+          <li class="sub"><a href="#p2-4">分布式事务</a></li>
+          <li class="sub"><a href="#p2-5">消息积压处理</a></li>
+          <li class="sub"><a href="#p2-6">与 Kafka 对比</a></li>
+          <li class="sub"><a href="#p2-7">运维调优</a></li>
+          <li><a href="#p3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ================= PART 1 ================= -->
+        <h2 id="p1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="p1-1">1. 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">RocketMQ 四组件架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>NameServer</strong>
+                <div class="arch-label">轻量级注册中心<br>无状态，节点间不通信<br>Topic 路由信息管理</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ Broker 启动时注册，Producer/Consumer 定期拉取路由</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Broker</strong>
+                <div class="arch-label">消息存储与转发<br>Master-Slave 架构<br>CommitLog + ConsumeQueue</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 发送 / 拉取消息</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Producer</strong>
+                <div class="arch-label">生产者组 ProducerGroup<br>同步/异步/单向发送<br>支持事务消息</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Consumer</strong>
+                <div class="arch-label">消费者组 ConsumerGroup<br>Push / Pull 模式<br>集群 / 广播消费</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>组件职责详解</h4>
+          <ul>
+            <li><strong>NameServer</strong>：几乎无状态的注册中心，各 NameServer 节点互不通信，Broker 向所有 NameServer 注册路由信息，Producer/Consumer 从任意 NameServer 拉取 Topic 路由。相比 ZooKeeper 更轻量，无单点瓶颈。</li>
+            <li><strong>Broker</strong>：消息存储的核心节点。每个 Broker 启动时向所有 NameServer 注册，定期发送心跳。Broker 分为 Master（可读写）和 Slave（只读、备份），通过 BrokerName + BrokerId 标识。</li>
+            <li><strong>Producer</strong>：消息生产者，通过 NameServer 获取 Topic 的 Broker 列表，选择 MessageQueue 发送消息。支持同步、异步、单向（Oneway）三种发送方式。</li>
+            <li><strong>Consumer</strong>：消息消费者，支持集群模式（一条消息只被组内一个消费者消费）和广播模式（所有消费者都收到）。默认 Pull 模式，封装为 Push 模式（长轮询）。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Topic 与 MessageQueue</h4>
+          <p>一个 Topic 对应多个 MessageQueue（类似 Kafka 的 Partition），分布在不同的 Broker 上。MessageQueue 是消息路由和负载均衡的最小单位。Producer 通过轮询或哈希选择 Queue 发送，Consumer 以 Queue 为单位分配消费。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">Topic: OrderTopic</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Broker-A: Queue0 Queue1</div>
+            <div class="flow-box flow-purple">Broker-B: Queue2 Queue3</div>
+          </div>
+        </div>
+
+        <h3 id="p1-2">2. 消息类型</h3>
+        <div class="diagram">
+          <div class="diagram-title">RocketMQ 六种消息类型</div>
+          <div class="layer-stack">
+            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>普通消息</strong> — 同步/异步/单向发送，不保证顺序，最基础的消息类型</div>
+            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>顺序消息</strong> — 全局有序或分区有序，通过 MessageQueueSelector 实现</div>
+            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>延迟消息</strong> — 指定延迟投递，4.x 有 18 个固定级别，5.0 支持任意时间</div>
+            <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>事务消息</strong> — Half Message + 本地事务 + 事务回查，实现最终一致性</div>
+            <div class="layer" style="border-color:var(--accent5);background:rgba(244,114,182,0.08)"><strong>批量消息</strong> — 将多条消息合并发送，提高吞吐量，要求同一 Topic、同一 WaitStoreMsgOK</div>
+            <div class="layer" style="border-color:var(--danger);background:rgba(239,68,68,0.08)"><strong>广播消息</strong> — 所有消费者都收到同一消息，用于配置广播、缓存刷新等</div>
+          </div>
+        </div>
+
+        <h3 id="p1-3">3. 顺序消息</h3>
+        <div class="diagram">
+          <div class="diagram-title">顺序消息：全局有序 vs 分区有序</div>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">全局有序</h4>
+              <ul>
+                <li>只使用 1 个 MessageQueue</li>
+                <li>所有消息串行发送和消费</li>
+                <li>吞吐量低，适合严格顺序场景</li>
+                <li>如：数据库 Binlog 同步</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">分区有序（推荐）</h4>
+              <ul>
+                <li>同一业务 Key 的消息发到同一 Queue</li>
+                <li>同一 Queue 内有序</li>
+                <li>不同 Queue 可并行，吞吐量高</li>
+                <li>如：同一订单的消息有序</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>实现原理</h4>
+          <p><strong>发送端</strong>：使用 <code>MessageQueueSelector</code>，根据业务 Key（如订单 ID）选择固定的 MessageQueue。例如对订单 ID 取模，保证同一订单的消息始终发送到同一个 Queue。</p>
+          <p><strong>消费端</strong>：使用 <code>MessageListenerOrderly</code>（而非 <code>MessageListenerConcurrently</code>），它会对每个 Queue 加锁，保证单 Queue 内串行消费。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">订单ID=1001</div>
+            <div class="flow-arrow">→ hash % QueueNum</div>
+            <div class="flow-box flow-green">Queue-2</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Consumer 串行消费 Queue-2</div>
+          </div>
+          <p class="warn">顺序消息的代价：消费端单 Queue 串行，消费并行度降低。如果某条消息消费失败会一直重试，阻塞后续消息。需要做好超时和死信兜底。</p>
+        </div>
+
+        <h3 id="p1-4">4. 延迟消息</h3>
+        <div class="card">
+          <h4>4.x 版本：18 个固定延迟级别</h4>
+          <p>RocketMQ 4.x 不支持任意时间延迟，只支持 18 个固定级别，通过 <code>messageDelayLevel</code> 配置：</p>
+          <table>
+            <thead><tr><th>级别</th><th>延迟时间</th><th>级别</th><th>延迟时间</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>1s</td><td>10</td><td>6min</td></tr>
+              <tr><td>2</td><td>5s</td><td>11</td><td>7min</td></tr>
+              <tr><td>3</td><td>10s</td><td>12</td><td>8min</td></tr>
+              <tr><td>4</td><td>30s</td><td>13</td><td>9min</td></tr>
+              <tr><td>5</td><td>1min</td><td>14</td><td>10min</td></tr>
+              <tr><td>6</td><td>2min</td><td>15</td><td>20min</td></tr>
+              <tr><td>7</td><td>3min</td><td>16</td><td>30min</td></tr>
+              <tr><td>8</td><td>4min</td><td>17</td><td>1h</td></tr>
+              <tr><td>9</td><td>5min</td><td>18</td><td>2h</td></tr>
+            </tbody>
+          </table>
+          <p>发送时设置 <code>message.setDelayTimeLevel(3)</code> 即表示延迟 10 秒投递。</p>
+        </div>
+        <div class="card">
+          <h4>实现原理（4.x）</h4>
+          <p>延迟消息不是在 Broker 端定时扫描，而是<strong>改 Topic 投递</strong>：</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">Producer 发送延迟消息</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Broker 改写 Topic 为 SCHEDULE_TOPIC_XXXX</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">TimerTask 到期后投递到原 Topic</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Consumer 正常消费</div>
+          </div>
+          <p>延迟消息被投递到内部 Topic <code>SCHEDULE_TOPIC_XXXX</code> 的 18 个 Queue（对应 18 个级别），每个 Queue 有自己的定时任务，到期后投递回原 Topic 的 ConsumeQueue。</p>
+        </div>
+        <div class="card">
+          <h4>5.0 版本：任意时间延迟</h4>
+          <p>RocketMQ 5.0 引入<strong>任意时间延迟</strong>，支持秒级精度的任意延迟时间。使用 <code>message.setDeliveryTimestamp(timestamp)</code> 设置投递时间戳。底层基于时间轮（TimingWheel）实现，精度更高、资源消耗更少。</p>
+          <p class="tip">时间轮算法是延迟消息的核心数据结构。相比优先级队列，时间轮在大量延迟任务场景下插入和删除都是 O(1)。</p>
+        </div>
+
+        <h3 id="p1-5">5. 事务消息</h3>
+        <div class="diagram">
+          <div class="diagram-title">事务消息三阶段流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">1. 发送 Half Message<br><span style="font-size:0.7rem">对 Consumer 不可见</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">2. 执行本地事务<br><span style="font-size:0.7rem">DB 操作</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">3. Commit / Rollback<br><span style="font-size:0.7rem">提交或回滚</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>详细流程</h4>
+          <ul>
+            <li><strong>Step 1</strong>：Producer 发送 Half Message 到 Broker，消息写入 <code>RMQ_SYS_TRANS_HALF_TOPIC</code>，Consumer 看不到。</li>
+            <li><strong>Step 2</strong>：Broker 返回 Half Message 发送成功，Producer 执行本地事务。</li>
+            <li><strong>Step 3</strong>：根据本地事务结果，Producer 发送 Commit（消息投递到目标 Topic）或 Rollback（消息标记为删除）。</li>
+            <li><strong>Step 4（回查）</strong>：如果 Broker 长时间没收到 Commit/Rollback（Producer 宕机、网络异常），Broker 会定时回查 Producer 的本地事务状态（最多 15 次，可配置）。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>事务回查机制</h4>
+          <p>Broker 在 <code>transactionTimeout</code>（默认 6s）后未收到二次确认，会发起回查。回查间隔由 <code>transactionCheckInterval</code>（默认 60s）控制，最多回查 15 次（<code>transactionCheckMax</code>）。Producer 需实现 <code>TransactionListener.checkLocalTransaction()</code> 来处理回查。</p>
+          <p class="warn">事务消息只保证最终一致性，不保证实时性。Half Message 在 Commit 前对 Consumer 不可见，Rollback 的消息只做标记不物理删除。</p>
+        </div>
+
+        <h3 id="p1-6">6. 消费模式</h3>
+        <div class="diagram">
+          <div class="diagram-title">Push vs Pull、集群 vs 广播</div>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">Push 模式（推荐）</h4>
+              <ul>
+                <li>底层是长轮询 Long Polling</li>
+                <li>Broker 有消息立即通知 Consumer</li>
+                <li>使用 <code>MessageListenerConcurrently</code></li>
+                <li>开发简单，实时性好</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">Pull 模式</h4>
+              <ul>
+                <li>Consumer 主动调用 <code>pull()</code></li>
+                <li>可自定义拉取频率和批量大小</li>
+                <li>适合批处理、流控场景</li>
+                <li>需要自行管理 offset</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>集群消费 vs 广播消费</h4>
+          <table>
+            <thead><tr><th>模式</th><th>特点</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>CLUSTERING</strong>（默认）</td><td>一条消息只被组内一个消费者消费</td><td>大多数业务场景</td></tr>
+              <tr><td><strong>BROADCASTING</strong></td><td>所有消费者都收到同一条消息</td><td>配置广播、本地缓存刷新</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Long Polling 长轮询</h4>
+          <p>Push 模式的底层实现是长轮询：Consumer 发起 Pull 请求，如果 Broker 没有新消息，不会立即返回空，而是hold 住请求（默认 5s），期间有新消息到达立即返回。这样既避免了短轮询的无效请求，又保证了实时性。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">Consumer Pull 请求</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Broker hold 5s</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">有消息立即返回</div>
+            <div class="flow-box flow-purple">无消息超时返回空</div>
+          </div>
+        </div>
+
+        <h3 id="p1-7">7. 死信队列（DLQ）</h3>
+        <div class="card">
+          <h4>重试与死信流程</h4>
+          <p>消息消费失败后会进入重试队列，按梯度时间重试（默认 16 次：10s, 30s, 1min, 2min, ... 2h）。重试次数耗尽后，消息进入死信队列 <code>%DLQ%ConsumerGroup</code>。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">消费失败</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">重试队列（最多 16 次）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">死信队列 DLQ</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>死信队列特点</h4>
+          <ul>
+            <li>每个 ConsumerGroup 有独立的死信 Topic：<code>%DLQ%ConsumerGroupA</code></li>
+            <li>死信消息不会再被消费者自动消费</li>
+            <li>需要专门的消费者订阅死信 Topic 进行人工处理或告警</li>
+            <li>死信消息默认保留 72 小时（与普通消息一致）</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-8">8. 消息存储</h3>
+        <div class="diagram">
+          <div class="diagram-title">RocketMQ 存储结构：CommitLog + ConsumeQueue + IndexFile</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>CommitLog</strong>
+                <div class="arch-label">所有消息顺序写入<br>单个文件 1GB<br>所有 Topic 混合存储</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 异步构建（ReputMessageService）</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>ConsumeQueue</strong>
+                <div class="arch-label">逻辑队列，每个 Topic-Queue 一个<br>20 字节/条（offset + size + tag hash）<br>消费时的索引</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>IndexFile</strong>
+                <div class="arch-label">哈希索引，支持按 Key 查询<br>Key Hash + 时间范围<br>默认 2000W 条/文件</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>写入流程</h4>
+          <ul>
+            <li><strong>顺序写 CommitLog</strong>：所有消息追加写入 CommitLog（顺序写磁盘，性能极高）</li>
+            <li><strong>异步构建索引</strong>：后台线程 ReputMessageService 从 CommitLog 异步构建 ConsumeQueue 和 IndexFile</li>
+            <li><strong>消费查询</strong>：Consumer 先查 ConsumeQueue（很小，可全内存缓存）拿到 CommitLog 物理偏移量，再从 CommitLog 读取完整消息</li>
+            <li><strong>Key 查询</strong>：通过 IndexFile 的哈希索引定位消息</li>
+          </ul>
+          <p class="tip">这种设计类似于数据库的"堆表 + 二级索引"：CommitLog 是堆表（按写入顺序存储），ConsumeQueue 和 IndexFile 是二级索引（按查询需求构建）。</p>
+        </div>
+        <div class="card">
+          <h4>刷盘策略</h4>
+          <table>
+            <thead><tr><th>策略</th><th>配置</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>同步刷盘</strong></td><td><code>flushDiskType=SYNC_FLUSH</code></td><td>消息写入 Page Cache 后立即刷盘，可靠性高，性能较低</td></tr>
+              <tr><td><strong>异步刷盘</strong>（默认）</td><td><code>flushDiskType=ASYNC_FLUSH</code></td><td>后台线程定时刷盘，性能高，极端情况（掉电）可能丢少量消息</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="p1-9">9. 高可用机制</h3>
+        <div class="diagram">
+          <div class="diagram-title">Broker 主从复制模式</div>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">同步复制（SYNC_MASTER）</h4>
+              <ul>
+                <li>Master 写入后等待 Slave 同步完成才返回 ACK</li>
+                <li>数据可靠性高</li>
+                <li>写入延迟较高</li>
+                <li>适合金融场景</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">异步复制（ASYNC_MASTER，默认）</h4>
+              <ul>
+                <li>Master 写入成功即返回 ACK</li>
+                <li>Slave 异步拉取同步</li>
+                <li>性能高，Master 宕机可能丢少量消息</li>
+                <li>适合大多数业务场景</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>DLedger 多副本模式（4.5+）</h4>
+          <p>基于 Raft 协议的多副本方案，替代传统 Master-Slave。至少 3 个节点组成 Raft Group，Leader 选举和数据复制由 DLedger 自动管理。</p>
+          <ul>
+            <li>自动选主：Master 宕机后自动从 Follower 中选举新 Leader，无需人工干预</li>
+            <li>多数派写入：消息写入多数节点后才返回 ACK，数据不丢失</li>
+            <li>原 Master-Slave 模式下 Master 宕机需要人工切换，DLedger 解决了这个痛点</li>
+          </ul>
+          <p class="tip">推荐生产配置：同步刷盘 + 同步复制（<code>SYNC_FLUSH + SYNC_MASTER</code>），配合 <code>BrokerRole.SLAVE</code>，做到"绝对不丢消息"。</p>
+        </div>
+
+        <!-- ================= PART 2 ================= -->
+        <h2 id="p2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="p2-1">2.1 电商订单场景</h3>
+        <div class="diagram">
+          <div class="diagram-title">订单状态流转保证顺序</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">创建订单</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">支付完成</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">发货</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">签收</div>
+          </div>
+        </div>
+        <div class="card">
+          <p>使用<strong>分区顺序消息</strong>，同一订单 ID 的所有状态变更消息发到同一个 MessageQueue，保证消费端按顺序处理。不同订单之间并行消费，兼顾顺序和吞吐。</p>
+          <p>Producer 端使用 <code>MessageQueueSelector</code> 按订单 ID 选择 Queue；Consumer 端使用 <code>MessageListenerOrderly</code> 保证 Queue 内串行消费。</p>
+        </div>
+
+        <h3 id="p2-2">2.2 金融交易场景</h3>
+        <div class="card">
+          <h4>金融级消息可靠性保障</h4>
+          <ul>
+            <li><strong>同步刷盘 + 同步复制</strong>：保证消息写入磁盘且 Slave 同步完成后才返回 ACK</li>
+            <li><strong>事务消息</strong>：交易记录入库和消息发送的原子性保证</li>
+            <li><strong>顺序消息</strong>：同一账户的交易记录按序处理，保证余额计算正确</li>
+            <li><strong>消息轨迹</strong>：RocketMQ 内置消息轨迹功能，追踪消息从发送到消费的全链路</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-3">2.3 延迟任务调度</h3>
+        <div class="card">
+          <h4>典型场景</h4>
+          <ul>
+            <li><strong>订单超时取消</strong>：下单后发送 30 分钟延迟消息，到期未支付自动取消</li>
+            <li><strong>定时提醒</strong>：会议开始前 15 分钟发送提醒消息</li>
+            <li><strong>重试退避</strong>：任务失败后发送延迟消息，按指数退避重试</li>
+          </ul>
+          <div class="flow">
+            <div class="flow-box flow-blue">下单</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">发送 30min 延迟消息</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">30min 后投递</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">检查支付状态</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">未支付则取消</div>
+          </div>
+          <p class="tip">如果使用 4.x，18 个级别可能不够精确，可配合数据库轮询补偿。5.0 任意延迟时间则完全满足需求。</p>
+        </div>
+
+        <h3 id="p2-4">2.4 分布式事务</h3>
+        <div class="card">
+          <h4>事务消息实现分布式事务</h4>
+          <p>以"下单扣库存"为例：</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">发送 Half Message</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">本地事务：扣减库存</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Commit: 消息可见</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">下游：创建订单</div>
+          </div>
+          <ul>
+            <li>如果本地事务失败，发送 Rollback，消息不投递</li>
+            <li>如果本地事务后 Producer 宕机，Broker 回查事务状态</li>
+            <li>下游消费消息创建订单，如果失败可以重试</li>
+            <li>最终一致性：允许短暂不一致，但最终所有节点状态一致</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-5">2.5 消息积压处理</h3>
+        <div class="card">
+          <h4>排查与处理流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-red">发现积压</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">排查原因</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">扩容消费</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">优化消费逻辑</div>
+          </div>
+          <ul>
+            <li><strong>紧急处理</strong>：增加消费者实例数（需 ≤ MessageQueue 数量）；临时增加 Queue 数量</li>
+            <li><strong>消费端优化</strong>：批量消费、异步处理、数据库批量写入</li>
+            <li><strong>根本解决</strong>：优化消费逻辑耗时、调整并发线程数 <code>consumeThreadMin/Max</code></li>
+            <li><strong>监控告警</strong>：使用 RocketMQ Dashboard 监控消费进度（Consumer Lag）</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-6">2.6 与 Kafka 对比</h3>
+        <div class="diagram">
+          <div class="diagram-title">RocketMQ vs Kafka 对比</div>
+          <table>
+            <thead><tr><th>维度</th><th>RocketMQ</th><th>Kafka</th></tr></thead>
+            <tbody>
+              <tr><td><strong>开发语言</strong></td><td>Java</td><td>Scala / Java</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>业务消息、金融级、事务消息</td><td>大数据、日志、流处理</td></tr>
+              <tr><td><strong>延迟消息</strong></td><td>原生支持（18 级 / 任意时间）</td><td>不原生支持，需自行实现</td></tr>
+              <tr><td><strong>事务消息</strong></td><td>原生支持（Half Message + 回查）</td><td>2.0+ 事务（跨 Partition 原子写入）</td></tr>
+              <tr><td><strong>顺序消息</strong></td><td>原生支持（全局 / 分区有序）</td><td>Partition 内有序</td></tr>
+              <tr><td><strong>消息回溯</strong></td><td>按时间回溯</td><td>按 offset 回溯</td></tr>
+              <tr><td><strong>消息轨迹</strong></td><td>原生支持</td><td>需要外部工具</td></tr>
+              <tr><td><strong>吞吐量</strong></td><td>十万级 / s</td><td>百万级 / s</td></tr>
+              <tr><td><strong>社区生态</strong></td><td>Apache 顶级项目，国内使用广泛</td><td>Apache 顶级项目，全球使用广泛</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>选型建议</h4>
+          <ul>
+            <li><strong>选 RocketMQ</strong>：业务消息（订单、交易）、需要事务消息、延迟消息、消息轨迹、金融级可靠性</li>
+            <li><strong>选 Kafka</strong>：大数据日志采集、流处理（Flink/Spark）、极高吞吐、与大数据生态集成</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-7">2.7 运维调优</h3>
+        <div class="card">
+          <h4>关键配置</h4>
+          <table>
+            <thead><tr><th>参数</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr><td><code>namesrvAddr</code></td><td>多个 NameServer 地址用分号分隔</td></tr>
+              <tr><td><code>flushDiskType</code></td><td>SYNC_FLUSH（高可靠）/ ASYNC_FLUSH（高吞吐）</td></tr>
+              <tr><td><code>brokerRole</code></td><td>SYNC_MASTER（高可靠）/ ASYNC_MASTER（高吞吐）</td></tr>
+              <tr><td><code>sendMessageThreadPoolNums</code></td><td>发送线程数，根据 CPU 核数调整</td></tr>
+              <tr><td><code>consumeThreadMin/Max</code></td><td>消费线程数，根据消费逻辑调整</td></tr>
+              <tr><td><code>maxMessageSize</code></td><td>最大消息体大小，默认 4MB</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ================= PART 3 ================= -->
+        <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa"><div class="q">RocketMQ 的整体架构是什么？</div><div class="a">四组件架构——<strong>NameServer</strong>（无状态注册中心，管理 Topic 路由信息，节点间不通信）；<strong>Broker</strong>（消息存储与转发，Master-Slave 架构，CommitLog 存储）；<strong>Producer</strong>（消息生产者，支持同步/异步/单向发送）；<strong>Consumer</strong>（消息消费者，Push/Pull 模式）。NameServer 比 ZooKeeper 更轻量，无单点瓶颈。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 如何保证消息顺序？</div><div class="a">两种方案——① <strong>全局有序</strong>：只使用 1 个 MessageQueue，吞吐量低，适合 Binlog 同步；② <strong>分区有序（推荐）</strong>：同一业务 Key（如订单 ID）通过 MessageQueueSelector 发到同一 Queue。消费端用 MessageListenerOrderly 对每个 Queue 加锁串行消费。代价是单 Queue 并行度降低，需配合死信队列兜底。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 事务消息的原理？</div><div class="a">三阶段——① 发送 Half Message（写入 HALF_TOPIC，Consumer 不可见）；② 执行本地事务；③ 根据结果发送 Commit（投递到目标 Topic）或 Rollback（标记删除）。如果 Broker 长时间未收到确认（Producer 宕机），会定时回查 Producer 的本地事务状态（最多 15 次）。只保证最终一致性，不保证实时性。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 延迟消息的实现原理？</div><div class="a">4.x 版本有 18 个固定延迟级别（1s~2h），发送时设置 DelayTimeLevel。原理：延迟消息被改写 Topic 为 SCHEDULE_TOPIC_XXXX，存入对应级别的 Queue，由定时任务到期后投递回原 Topic。5.0 版本支持任意时间延迟，使用 DeliveryTimestamp + 时间轮算法。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 的消息存储结构？</div><div class="a">三层结构——① <strong>CommitLog</strong>：所有消息顺序追加写入（单文件 1GB），所有 Topic 混合存储；② <strong>ConsumeQueue</strong>：逻辑队列索引（每条 20 字节：offset + size + tag hash），每个 Topic-Queue 一个文件；③ <strong>IndexFile</strong>：哈希索引，支持按 Key 查询。消费流程：先查 ConsumeQueue 拿偏移量，再从 CommitLog 读完整消息。类似于"堆表 + 二级索引"。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 和 Kafka 怎么选？</div><div class="a"><strong>RocketMQ</strong>：业务消息首选，原生支持事务消息、延迟消息、消息轨迹、消息回溯，金融级可靠性，国内阿里系广泛使用。<strong>Kafka</strong>：大数据首选，吞吐量更高（百万级/s），与 Flink/Spark/Hadoop 生态深度集成。简单原则：业务消息选 RocketMQ，大数据管道选 Kafka。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 的死信队列机制？</div><div class="a">消息消费失败后进入重试队列，默认重试 16 次（梯度时间：10s, 30s, 1min, ... 2h）。重试耗尽后消息进入死信队列 <code>%DLQ%ConsumerGroup</code>。死信消息不会被自动消费，需要专门消费者订阅 DLQ Topic 进行人工处理或告警。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 的高可用方案？</div><div class="a">两种——① <strong>Master-Slave</strong>：同步复制（SYNC_MASTER，数据不丢但延迟高）或异步复制（ASYNC_MASTER，性能高但可能丢少量数据），Master 宕机需人工切换；② <strong>DLedger（4.5+）</strong>：基于 Raft 协议的多副本，至少 3 节点，自动选主、多数派写入，解决手动切换痛点。金融场景推荐同步刷盘 + 同步复制。</div></div>
+
+        <div class="qa"><div class="q">Push 模式和 Pull 模式的区别？</div><div class="a"><strong>Push</strong>（底层是长轮询 Long Polling）：Broker 有消息立即返回，开发简单、实时性好。<strong>Pull</strong>：Consumer 主动拉取，可自定义频率和批量大小，适合批处理和流控。长轮询原理：Consumer 发 Pull 请求，Broker 没消息时 hold 住请求（默认 5s），期间有新消息立即返回，兼顾实时性和效率。</div></div>
+
+        <div class="qa"><div class="q">RocketMQ 的刷盘策略？</div><div class="a">两种——① <strong>同步刷盘（SYNC_FLUSH）</strong>：消息写入 Page Cache 后立即刷盘，可靠性高，性能较低；② <strong>异步刷盘（ASYNC_FLUSH，默认）</strong>：后台线程定时刷盘，性能高，极端情况（掉电）可能丢少量消息。金融场景建议同步刷盘 + 同步复制，做到"绝对不丢"。</div></div>
+
+        <div class="qa"><div class="q">如何处理 RocketMQ 消息积压？</div><div class="a">紧急：增加消费者实例数（≤ Queue 数）、临时增加 Queue 数量。消费端：批量消费、异步处理、数据库批量写入、调整 consumeThreadMin/Max。根本：优化消费逻辑耗时、异步化非关键操作。预防：Dashboard 监控 Consumer Lag，设告警阈值。</div></div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          RocketMQ · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u,{passive:true});u()})();
+  </script>
+</body>
+</html>

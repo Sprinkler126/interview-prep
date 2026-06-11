@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统设计 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🏗️ 系统设计</h1>
+    <p class="subtitle">高并发 · 高可用 · 经典设计题 · 面试必备</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">系统设计面试框架</a></li>
+          <li class="sub"><a href="#s1-2">高并发方案</a></li>
+          <li class="sub"><a href="#s1-3">高可用方案</a></li>
+          <li class="sub"><a href="#s1-4">CAP/BASE 理论应用</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">短链系统设计</a></li>
+          <li class="sub"><a href="#s2-2">秒杀系统设计</a></li>
+          <li class="sub"><a href="#s2-3">Feed 流系统设计</a></li>
+          <li class="sub"><a href="#s2-4">分布式文件存储设计</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 系统设计面试框架 -->
+        <h3 id="s1-1">系统设计面试框架</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">系统设计面试五步法</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Step 1<br>需求澄清<br><small>功能/非功能/约束</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Step 2<br>容量估算<br><small>QPS/存储/带宽</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Step 3<br>概要设计<br><small>API/数据模型/架构图</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Step 4<br>详细设计<br><small>核心组件深入</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Step 5<br>扩展优化<br><small>瓶颈识别/扩展方案</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Step 1：需求澄清</h4>
+          <ul>
+            <li><strong>功能需求：</strong>明确系统的核心功能和边界，先做 MVP 再扩展</li>
+            <li><strong>非功能需求：</strong>可用性（几个 9）、一致性（强一致/最终一致）、延迟（P99 响应时间）、吞吐量（QPS/TPS）</li>
+            <li><strong>约束条件：</strong>用户规模、数据量级、读写比、地域分布</li>
+            <li><strong>技巧：</strong>先问清楚再动手设计，展示你的沟通能力和系统思维</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Step 2：容量估算（Back-of-the-Envelope）</h4>
+          <table>
+            <thead>
+              <tr><th>估算项</th><th>公式</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>QPS</td><td>DAU × 每用户日均请求 / 86400</td><td>1亿DAU × 10次 / 86400 ≈ 11,500 QPS</td></tr>
+              <tr><td>峰值 QPS</td><td>平均 QPS × 峰值系数(2~5)</td><td>11,500 × 3 ≈ 34,500 QPS</td></tr>
+              <tr><td>存储</td><td>每日新增 × 单条大小 × 保留天数</td><td>1000万 × 1KB × 365 ≈ 3.65TB/年</td></tr>
+              <tr><td>带宽</td><td>QPS × 响应大小</td><td>10,000 × 10KB = 100MB/s ≈ 800Mbps</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">面试中的容量估算不需要精确，关键是展示你的推导过程和数量级感。记住常用换算：1天=86400秒，1亿≈10^8。</div>
+        </div>
+
+        <div class="card">
+          <h4>Step 3-5：概要设计、详细设计与扩展</h4>
+          <ul>
+            <li><strong>概要设计：</strong>定义 API 接口、设计数据模型（ER 图）、画出系统架构图（客户端→网关→服务→存储）</li>
+            <li><strong>详细设计：</strong>深入核心组件，如缓存策略、数据库分片方案、消息队列使用等</li>
+            <li><strong>扩展优化：</strong>识别单点瓶颈，讨论水平扩展、多级缓存、异步化、数据分片等方案</li>
+            <li><strong>Trade-off：</strong>始终讨论方案的取舍，展示工程判断力</li>
+          </ul>
+        </div>
+
+        <!-- 1-2 高并发方案 -->
+        <h3 id="s1-2">高并发方案</h3>
+
+        <div class="card">
+          <h4>高并发方案全景图</h4>
+          <div class="diagram">
+            <div class="diagram-title">高并发架构分层优化</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide">客户端层：CDN 加速、资源压缩、本地缓存</div>
+              </div>
+              <div class="arch-connector">↓</div>
+              <div class="arch-row">
+                <div class="arch-box-wide">接入层：负载均衡（Nginx/LVS/F5）、限流（令牌桶/漏桶）</div>
+              </div>
+              <div class="arch-connector">↓</div>
+              <div class="arch-row">
+                <div class="arch-box">应用层：无状态设计<br>水平扩展</div>
+                <div class="arch-box" style="margin-left:1rem">缓存层：本地缓存 +<br>分布式缓存(Redis)</div>
+                <div class="arch-box" style="margin-left:1rem">异步层：消息队列<br>(Kafka/RabbitMQ)</div>
+              </div>
+              <div class="arch-connector">↓</div>
+              <div class="arch-row">
+                <div class="arch-box">数据层：读写分离<br><small>主写从读</small></div>
+                <div class="arch-box" style="margin-left:1rem">数据层：分库分表<br><small>水平拆分</small></div>
+                <div class="arch-box" style="margin-left:1rem">数据层：NoSQL<br><small>Elasticsearch</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>读优化策略</h4>
+            <ul>
+              <li><strong>多级缓存：</strong>浏览器缓存 → CDN → 本地缓存(Caffeine) → 分布式缓存(Redis) → 数据库</li>
+              <li><strong>读写分离：</strong>主库写、从库读，通过 binlog 同步</li>
+              <li><strong>搜索引擎：</strong>将复杂查询下沉到 ES，减轻数据库压力</li>
+              <li><strong>预计算：</strong>热门数据提前计算好，直接查结果</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>写优化策略</h4>
+            <ul>
+              <li><strong>异步写入：</strong>写请求先进消息队列，消费者异步处理</li>
+              <li><strong>批量写入：</strong>攒批后批量 insert/update，减少 DB 交互</li>
+              <li><strong>分库分表：</strong>数据水平拆分，分散写压力</li>
+              <li><strong>写合并：</strong>将多次小写合并为一次大写（如计数器合并）</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>缓存常见问题与解决方案</h4>
+          <table>
+            <thead>
+              <tr><th>问题</th><th>描述</th><th>解决方案</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>缓存穿透</td><td>查询不存在的数据，请求直达 DB</td><td>布隆过滤器 / 缓存空值（短 TTL）</td></tr>
+              <tr><td>缓存击穿</td><td>热点 key 过期，大量请求打到 DB</td><td>互斥锁重建 / 永不过期+异步更新</td></tr>
+              <tr><td>缓存雪崩</td><td>大量 key 同时过期 / Redis 宕机</td><td>随机 TTL / 多级缓存 / 熔断降级</td></tr>
+              <tr><td>缓存一致性</td><td>DB 与缓存数据不一致</td><td>Cache Aside / 延迟双删 / Canal 订阅 binlog</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-3 高可用方案 -->
+        <h3 id="s1-3">高可用方案</h3>
+
+        <div class="card">
+          <h4>高可用设计原则</h4>
+          <p>可用性通常用"几个 9"来衡量：</p>
+          <table>
+            <thead>
+              <tr><th>可用性</th><th>年停机时间</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>99%（两个 9）</td><td>~3.65 天</td><td>内部系统</td></tr>
+              <tr><td>99.9%（三个 9）</td><td>~8.76 小时</td><td>一般互联网应用</td></tr>
+              <tr><td>99.99%（四个 9）</td><td>~52.6 分钟</td><td>电商/支付</td></tr>
+              <tr><td>99.999%（五个 9）</td><td>~5.26 分钟</td><td>金融/电信核心系统</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>高可用核心手段</h4>
+          <table>
+            <thead>
+              <tr><th>手段</th><th>说明</th><th>实现方式</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>冗余部署</td><td>多副本、多机房、多地域</td><td>主从复制 / 集群 / 异地多活</td></tr>
+              <tr><td>负载均衡</td><td>将流量分散到多个节点</td><td>Nginx / LVS / DNS 轮询</td></tr>
+              <tr><td>限流</td><td>控制请求速率，保护系统</td><td>令牌桶 / 漏桶 / 滑动窗口</td></tr>
+              <tr><td>熔断</td><td>下游故障时快速失败，防止级联</td><td>Hystrix / Sentinel / Resilience4j</td></tr>
+              <tr><td>降级</td><td>返回兜底数据或关闭非核心功能</td><td>缓存降级 / 静态页面降级</td></tr>
+              <tr><td>超时重试</td><td>避免长时间等待，快速失败重试</td><td>指数退避 / 幂等重试</td></tr>
+              <tr><td>灰度发布</td><td>小流量验证，降低发布风险</td><td>金丝雀发布 / 蓝绿部署 / A/B 测试</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>限流算法对比</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>特点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>固定窗口</td><td>简单，有临界突发问题</td><td>简单限流</td></tr>
+              <tr><td>滑动窗口</td><td>解决临界问题，精度更高</td><td>API 网关限流</td></tr>
+              <tr><td>漏桶</td><td>恒定速率输出，平滑流量</td><td>流量整形</td></tr>
+              <tr><td>令牌桶</td><td>允许一定程度的突发流量</td><td>接口限流（最常用）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-4 CAP/BASE 理论应用 -->
+        <h3 id="s1-4">CAP/BASE 理论在实际系统中的应用</h3>
+
+        <div class="card">
+          <h4>CAP 定理</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>三个特性</h4>
+              <ul>
+                <li><strong>C（Consistency）一致性：</strong>所有节点同一时刻看到相同数据</li>
+                <li><strong>A（Availability）可用性：</strong>每个请求都能在合理时间内得到响应</li>
+                <li><strong>P（Partition Tolerance）分区容错：</strong>网络分区时系统仍能运行</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>三种组合</h4>
+              <ul>
+                <li><strong>CP 系统：</strong>放弃可用性，保证一致。如 ZooKeeper、HBase、etcd</li>
+                <li><strong>AP 系统：</strong>放弃一致性，保证可用。如 Eureka、Cassandra、DynamoDB</li>
+                <li><strong>CA 系统：</strong>不存在分区时的理论情况。如传统单机 RDBMS</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip">分布式系统中网络分区是不可避免的，所以 P 是必选项。实际选择是在 C 和 A 之间权衡。</div>
+        </div>
+
+        <div class="card">
+          <h4>BASE 理论</h4>
+          <ul>
+            <li><strong>BA（Basically Available）基本可用：</strong>系统出现故障时，允许损失部分功能（如响应时间变长、降级返回非精确数据）</li>
+            <li><strong>S（Soft State）软状态：</strong>允许系统存在中间状态，不影响整体可用性</li>
+            <li><strong>E（Eventually Consistent）最终一致性：</strong>经过一段时间后，所有节点数据达到一致</li>
+          </ul>
+          <p>BASE 是 CAP 中 AP 的延伸，是大多数互联网系统的设计哲学：牺牲强一致性，换取高可用和高性能。</p>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 短链系统设计 -->
+        <h3 id="s2-1">短链系统设计</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">短链系统架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">用户浏览器 / App</div>
+            </div>
+            <div class="arch-connector">↓ 短链 URL ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">短链服务（生成短码）<br><small>POST /api/shorten</small></div>
+              <div class="arch-box" style="margin-left:1rem">重定向服务（解析短码）<br><small>GET /s/{shortCode}</small></div>
+            </div>
+            <div class="arch-connector">↓ 存储层 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Redis 缓存<br><small>短码→长URL</small></div>
+              <div class="arch-box" style="margin-left:1rem">MySQL 持久化<br><small>短码映射表</small></div>
+              <div class="arch-box" style="margin-left:1rem">ID 生成器<br><small>Snowflake/发号器</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>短码生成策略</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>哈希方案（MD5/SHA-256）</h4>
+              <ul>
+                <li>对长 URL 做哈希，取前 N 位 Base62 编码</li>
+                <li>冲突时追加随机字符重试</li>
+                <li>优点：相同 URL 生成相同短码（可去重）</li>
+                <li>缺点：需处理冲突，哈希计算有开销</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>自增 ID + Base62</h4>
+              <ul>
+                <li>用分布式 ID 生成器获取唯一自增 ID</li>
+                <li>将 ID 转为 Base62 编码（a-z, A-Z, 0-9）</li>
+                <li>优点：无冲突，性能好</li>
+                <li>缺点：相同 URL 每次生成不同短码</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// Base62 编码示例
+// 字符集：0-9a-zA-Z（共62个字符）
+// ID=1000000 → Base62(1000000) → "4c92"
+// 7位 Base62 可表示 62^7 ≈ 3.5万亿种组合
+
+String charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+public String encode(long id) {
+    StringBuilder sb = new StringBuilder();
+    while (id > 0) {
+        sb.append(charset.charAt((int)(id % 62)));
+        id /= 62;
+    }
+    return sb.reverse().toString();
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>重定向方案选择</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>状态码</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>301 Moved Permanently</td><td>301</td><td>永久重定向，浏览器缓存</td><td>SEO 友好，减少服务端压力</td></tr>
+              <tr><td>302 Found</td><td>302</td><td>临时重定向，不缓存</td><td>需要统计点击量（推荐）</td></tr>
+              <tr><td>307 Temporary Redirect</td><td>307</td><td>保持请求方法不变</td><td>POST 请求场景</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">短链系统推荐使用 302 重定向，因为每次请求都会经过服务端，便于统计点击次数、分析用户行为。</div>
+        </div>
+
+        <!-- 2-2 秒杀系统设计 -->
+        <h3 id="s2-2">秒杀系统设计</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">秒杀系统架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">用户请求（万级 QPS）</div>
+            </div>
+            <div class="arch-connector">↓ CDN + 前端静态化 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Nginx 限流<br><small>前端过滤</small></div>
+              <div class="arch-box" style="margin-left:1rem">验证码/答题<br><small>削峰填谷</small></div>
+              <div class="arch-box" style="margin-left:1rem">用户去重<br><small>一人一单</small></div>
+            </div>
+            <div class="arch-connector">↓ 后端服务 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Redis 预扣库存<br><small>DECR 原子操作</small></div>
+              <div class="arch-box" style="margin-left:1rem">MQ 异步下单<br><small>削峰</small></div>
+              <div class="arch-box" style="margin-left:1rem">DB 最终扣减<br><small>乐观锁</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>秒杀核心流程</h4>
+          <ol>
+            <li><strong>前端防刷：</strong>按钮置灰、验证码、请求签名，防止脚本刷单</li>
+            <li><strong>Nginx 层限流：</strong>限制单 IP 请求频率，静态资源走 CDN</li>
+            <li><strong>Redis 预扣库存：</strong>将库存提前加载到 Redis，用 <code>DECR</code> 原子操作预扣减，库存不足直接返回</li>
+            <li><strong>令牌桶限流：</strong>控制进入后端的请求速率，超出直接拒绝</li>
+            <li><strong>异步下单：</strong>预扣成功后发送消息到 MQ，消费者异步创建订单、扣减数据库库存</li>
+            <li><strong>数据库兜底：</strong>使用乐观锁 <code>UPDATE SET stock=stock-1 WHERE id=? AND stock&gt;0</code> 保证最终一致性</li>
+          </ol>
+          <div class="warn">秒杀系统的本质是将高并发读写转化为可控的异步处理。核心思想：前端做拦截，缓存做预扣，MQ 做削峰，数据库做兜底。</div>
+        </div>
+
+        <!-- 2-3 Feed 流系统设计 -->
+        <h3 id="s2-3">Feed 流系统设计</h3>
+
+        <div class="card">
+          <h4>三种 Feed 流模式</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>推模式（Push / Fan-out）</h4>
+              <ul>
+                <li>发布者发帖时，将内容推送到所有粉丝的收件箱</li>
+                <li>读取时直接查自己的收件箱，读取速度快</li>
+                <li>缺点：大 V 发帖写扩散严重（百万粉丝 = 百万次写入）</li>
+                <li>适合：普通用户、粉丝量少的场景</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>拉模式（Pull / Fan-out on Read）</h4>
+              <ul>
+                <li>发布者发帖时只写自己的发件箱</li>
+                <li>读取时拉取所有关注者的发件箱并聚合排序</li>
+                <li>缺点：读取慢，需实时聚合大量数据</li>
+                <li>适合：粉丝量大但关注者少的场景</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>推拉结合模式（推荐方案）</h4>
+          <p>根据用户粉丝量动态选择策略：</p>
+          <table>
+            <thead>
+              <tr><th>用户类型</th><th>粉丝量</th><th>策略</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>普通用户</td><td>粉丝 &lt; 5000</td><td>推模式：发帖时推送到粉丝收件箱</td></tr>
+              <tr><td>大 V</td><td>粉丝 ≥ 5000</td><td>拉模式：读取时实时拉取大 V 的内容</td></tr>
+            </tbody>
+          </table>
+          <p><strong>读取流程：</strong>收件箱（推模式内容）+ 关注的大 V 最新内容（拉模式）→ 合并排序 → 展示</p>
+          <div class="tip">微博、Twitter 等主流社交媒体都采用推拉结合模式。关键是找到粉丝量的阈值，平衡读写压力。</div>
+        </div>
+
+        <div class="card">
+          <h4>Feed 流存储设计</h4>
+          <ul>
+            <li><strong>发件箱（Outbox）：</strong>用户发布的所有内容，按时间倒序存储。可用 Redis Sorted Set（score=时间戳）</li>
+            <li><strong>收件箱（Inbox）：</strong>用户关注的人的内容聚合，推模式下预计算好。Redis List 或 Sorted Set</li>
+            <li><strong>内容表：</strong>帖子/微博正文、图片等，存在 MySQL 或 MongoDB</li>
+            <li><strong>社交关系：</strong>关注/粉丝关系图，可用 Redis Set 或图数据库（Neo4j）</li>
+          </ul>
+        </div>
+
+        <!-- 2-4 分布式文件存储设计 -->
+        <h3 id="s2-4">分布式文件存储设计</h3>
+
+        <div class="card">
+          <h4>核心架构（参考 GFS / HDFS）</h4>
+          <div class="diagram">
+            <div class="diagram-title">分布式文件存储架构</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide">客户端 Client</div>
+              </div>
+              <div class="arch-connector">↓ 元数据操作 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box">Master 节点<br><small>元数据管理</small><br><small>文件→Chunk映射</small></div>
+                <div class="arch-box" style="margin-left:1rem">Chunk Server 集群<br><small>数据存储</small><br><small>默认3副本</small></div>
+              </div>
+              <div class="arch-connector">↓ 数据流 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box">Chunk 1<br><small>64MB 分片</small></div>
+                <div class="arch-box" style="margin-left:1rem">Chunk 2<br><small>副本1/副本2/副本3</small></div>
+                <div class="arch-box" style="margin-left:1rem">Chunk 3<br><small>一致性哈希分布</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>关键设计点</h4>
+          <ul>
+            <li><strong>文件分片（Chunk）：</strong>大文件切分为固定大小的块（如 64MB），分散存储在不同节点</li>
+            <li><strong>多副本策略：</strong>每个 Chunk 默认 3 副本，分布在不同机架，保证容错</li>
+            <li><strong>一致性哈希：</strong>通过一致性哈希决定 Chunk 存储位置，节点增减时只迁移少量数据</li>
+            <li><strong>元数据管理：</strong>Master 存储文件名→Chunk 列表的映射，单 Master 或多 Master（Raft 选主）</li>
+            <li><strong>数据校验：</strong>每个 Chunk 有 Checksum，读取时校验数据完整性</li>
+            <li><strong>副本一致性：</strong>写入时采用链式复制或并行复制，保证副本数据一致</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请设计一个短链系统，如何生成短码？如何处理高并发跳转？</div>
+          <div class="a">
+            <strong>参考：</strong>短码生成有两种主流方案：1）哈希方案：对长 URL 做 MD5/SHA-256，取前 N 位 Base62 编码，冲突时追加重试；2）自增 ID + Base62：通过分布式 ID 生成器获取唯一 ID，转为 Base62 编码，无冲突且性能好。高并发跳转：使用 Redis 缓存短码→长 URL 映射，命中缓存直接 302 重定向；缓存未命中查 MySQL 并回写缓存。Redis 使用集群模式保证高可用。推荐 302 重定向而非 301，便于统计点击量。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何设计一个秒杀系统？如何保证不超卖？</div>
+          <div class="a">
+            <strong>参考：</strong>秒杀系统的核心是削峰+异步。1）前端拦截：验证码、按钮置灰防重复提交；2）Nginx 限流：限制单 IP 频率；3）Redis 预扣库存：用 <code>DECR</code> 原子操作扣减，库存不足直接返回；4）MQ 异步下单：扣减成功后发消息，消费者异步创建订单；5）DB 兜底：乐观锁 <code>UPDATE SET stock=stock-1 WHERE stock&gt;0</code>。防超卖的关键是 Redis 原子操作+数据库乐观锁双重保障。一人一单可通过 Redis Set 记录已购买用户。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Feed 流系统中推模式和拉模式有什么区别？大 V 问题如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>推模式：发帖时将内容推送到所有粉丝收件箱，读取快但写扩散严重（大 V 百万粉丝 = 百万次写入）。拉模式：发帖只写自己发件箱，读取时实时聚合关注者内容，写入快但读取慢。大 V 问题解决方案：推拉结合模式。普通用户（粉丝少）用推模式，大 V（粉丝多，如 > 5000）用拉模式。读取时合并收件箱（推模式数据）和关注的大 V 最新内容（拉模式数据），按时间排序展示。Twitter 和微博都采用这种方案。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 CAP 定理？实际系统中如何选择？</div>
+          <div class="a">
+            <strong>参考：</strong>CAP 定理指出分布式系统中一致性（C）、可用性（A）、分区容错（P）三者最多同时满足两个。由于网络分区不可避免，P 是必选项，实际是在 C 和 A 之间选择。CP 系统（如 ZooKeeper、etcd）保证强一致性但可能在分区时不可用；AP 系统（如 Eureka、Cassandra）保证可用性但数据可能短暂不一致。实际中多数互联网系统选择 AP + 最终一致性（BASE 理论），金融系统则倾向 CP。Nacos 的创新在于同时支持 AP（临时实例用 Distro）和 CP（持久化实例用 Raft）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何设计一个分布式文件存储系统？</div>
+          <div class="a">
+            <strong>参考：</strong>参考 GFS/HDFS 架构：1）文件分片：大文件切为固定大小 Chunk（如 64MB），分散存储；2）多副本：每个 Chunk 3 副本，分布在不同机架保证容错；3）元数据管理：Master 节点维护文件→Chunk 映射，可使用 Raft 保证高可用；4）一致性哈希：决定 Chunk 分布位置，节点增减只迁移少量数据；5）数据校验：Checksum 保证完整性；6）写入流程：客户端先查 Master 获取 Chunk 位置，直接写入 Chunk Server，采用链式复制保证副本一致。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何进行容量估算？请估算一个日活 1 亿的短链系统的存储和 QPS。</div>
+          <div class="a">
+            <strong>参考：</strong>假设每个用户每天创建 0.1 个短链，访问 10 次。QPS 估算：1亿 × 10 / 86400 ≈ 11,500 QPS（读），峰值约 35,000 QPS。写 QPS：1亿 × 0.1 / 86400 ≈ 115 QPS。存储估算：每天新增 1000 万短链，每条记录约 500 字节（短码+长URL+时间戳），每天约 5GB，一年约 1.8TB。带宽：35,000 QPS × 500 字节 ≈ 17.5MB/s ≈ 140Mbps。这些数量级决定了我们需要 Redis 集群做缓存、MySQL 分库分表做持久化。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是限流？常见限流算法有哪些？令牌桶和漏桶有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>限流是控制请求速率以保护系统的手段。常见算法：1）固定窗口：简单但有临界突发问题；2）滑动窗口：解决临界问题，精度更高；3）漏桶：以恒定速率处理请求，平滑流量但不允许突发；4）令牌桶：以恒定速率生成令牌，请求需消耗令牌，允许一定程度的突发。核心区别：漏桶的输出速率恒定（流量整形），令牌桶允许桶内积累的令牌被一次性消费（允许突发）。实际中令牌桶更常用（如 Guava RateLimiter、Sentinel）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">熔断和降级有什么区别？在微服务架构中如何使用？</div>
+          <div class="a">
+            <strong>参考：</strong>熔断：当下游服务错误率超过阈值时，自动切断请求（快速失败），经过冷却时间后进入半开状态试探恢复。类似于电路的保险丝。降级：在系统压力过大时，主动关闭非核心功能或返回兜底数据，保证核心链路可用。区别：熔断是被动触发（下游故障），降级是主动执行（预设策略）。在微服务中：Sentinel/Hystrix 实现熔断，根据慢调用比例/异常比例触发；降级则通过配置中心控制功能开关，如商品详情页降级时隐藏推荐模块。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          系统设计 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

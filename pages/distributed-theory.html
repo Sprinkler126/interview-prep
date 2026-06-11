@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分布式理论 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>📐 分布式理论</h1>
+    <p class="subtitle">CAP · BASE · 一致性哈希 · 幂等 · 分布式 ID</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">CAP 定理</a></li>
+          <li class="sub"><a href="#s1-2">BASE 理论</a></li>
+          <li class="sub"><a href="#s1-3">一致性哈希</a></li>
+          <li class="sub"><a href="#s1-4">分布式 ID 方案</a></li>
+          <li class="sub"><a href="#s1-5">幂等性设计</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">分布式事务理论</a></li>
+          <li class="sub"><a href="#s2-2">Raft 协议简述</a></li>
+          <li class="sub"><a href="#s2-3">数据分片策略</a></li>
+          <li class="sub"><a href="#s2-4">分布式系统常见问题</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 CAP 定理 -->
+        <h3 id="s1-1">CAP 定理</h3>
+
+        <div class="card">
+          <h4>CAP 三大特性</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>C - Consistency（一致性）</h4>
+              <p>所有节点在同一时刻看到的数据是相同的。即写操作完成后，后续的读操作都能读到最新值。</p>
+            </div>
+            <div class="compare-box">
+              <h4>A - Availability（可用性）</h4>
+              <p>每个请求都能在合理时间内得到响应（不保证是最新数据）。即系统不能返回错误或超时。</p>
+            </div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>P - Partition Tolerance（分区容错）</h4>
+              <p>网络分区（节点间通信中断）时，系统仍能继续运行。分布式系统中网络分区是不可避免的。</p>
+            </div>
+            <div class="compare-box">
+              <h4>核心结论</h4>
+              <p>P 是必选项，所以实际选择是 <strong>CP 或 AP</strong>。CA 在分布式环境中不存在（无分区时退化为单机）。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>CP vs AP 系统对照</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>代表系统</th><th>特点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">CP 系统</span></td><td>ZooKeeper、etcd、HBase、Consul</td><td>强一致性，分区时可能拒绝服务</td><td>配置中心、分布式锁、选主</td></tr>
+              <tr><td><span class="badge badge-green">AP 系统</span></td><td>Eureka、Cassandra、DynamoDB、CouchDB</td><td>高可用，数据可能短暂不一致</td><td>服务发现、社交信息流</td></tr>
+              <tr><td><span class="badge badge-purple">混合系统</span></td><td>Nacos（AP+CP）</td><td>不同场景使用不同策略</td><td>注册中心+配置中心</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>CAP 定理的证明（简述）</h4>
+          <p>假设两个节点 N1、N2，数据初始为 V0：</p>
+          <ol>
+            <li>客户端向 N1 写入新值 V1</li>
+            <li>N1 需要将 V1 同步给 N2（但此时发生网络分区，N1 和 N2 通信中断）</li>
+            <li><strong>选择 C（一致性）：</strong>N2 拒绝读请求（因为无法确认数据是最新的），牺牲了 A</li>
+            <li><strong>选择 A（可用性）：</strong>N2 返回旧值 V0，牺牲了 C</li>
+          </ol>
+          <div class="tip">CAP 定理的更精确表述：在网络分区发生时，系统只能在 C 和 A 之间二选一。没有分区时，可以同时满足 CA。</div>
+        </div>
+
+        <!-- 1-2 BASE 理论 -->
+        <h3 id="s1-2">BASE 理论</h3>
+
+        <div class="card">
+          <h4>BASE 三要素</h4>
+          <table>
+            <thead>
+              <tr><th>要素</th><th>全称</th><th>含义</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>BA</strong></td><td>Basically Available（基本可用）</td><td>系统出现故障时，允许损失部分功能或响应时间变长，但保证核心功能可用</td></tr>
+              <tr><td><strong>S</strong></td><td>Soft State（软状态）</td><td>允许系统存在中间状态，该状态不影响系统的整体可用性。如数据同步中的"同步中"状态</td></tr>
+              <tr><td><strong>E</strong></td><td>Eventually Consistent（最终一致性）</td><td>经过一段时间的同步后，系统最终能达到数据一致的状态</td></tr>
+            </tbody>
+          </table>
+          <p>BASE 理论是 CAP 中 AP 方案的延伸，核心思想是：<strong>牺牲强一致性，换取系统的高可用和高性能</strong>。这是大多数互联网系统的设计哲学。</p>
+        </div>
+
+        <div class="card">
+          <h4>最终一致性的几种变体</h4>
+          <ul>
+            <li><strong>因果一致性（Causal Consistency）：</strong>有因果关系的操作保证顺序一致，无因果关系的操作不做保证</li>
+            <li><strong>读己之所写（Read Your Writes）：</strong>用户总能读到自己最新写入的数据</li>
+            <li><strong>会话一致性（Session Consistency）：</strong>在同一个会话内保证读己之所写</li>
+            <li><strong>单调读一致性（Monotonic Read）：</strong>用户不会读到比之前更旧的数据</li>
+          </ul>
+        </div>
+
+        <!-- 1-3 一致性哈希 -->
+        <h3 id="s1-3">一致性哈希</h3>
+
+        <div class="card">
+          <h4>传统哈希的问题</h4>
+          <p>传统取模哈希 <code>hash(key) % N</code> 在节点数 N 变化时，几乎所有 key 的映射都会改变，导致大规模数据迁移。</p>
+          <pre><code>// 传统哈希：节点数变化影响全部数据
+// 3个节点时：key="user1" → hash("user1") % 3 = 1
+// 4个节点时：key="user1" → hash("user1") % 4 = 3  （映射变了！）
+// 变化率 ≈ (N-1)/N，几乎全量迁移</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>一致性哈希原理</h4>
+          <p>将哈希值空间组织成一个环（0 ~ 2^32-1），节点和数据都映射到环上。数据沿顺时针方向找到第一个节点存储。</p>
+          <pre><code>// 一致性哈希：节点增减只影响相邻区间
+// 环空间：0 ──────────────── 2^32-1
+//         |   Node A   |   Node B   |   Node C   |
+//
+// 新增 Node D：只影响 Node D 到其前一个节点之间的数据
+// 变化率 ≈ 1/N（只迁移 1/N 的数据）</code></pre>
+          <div class="warn">一致性哈希的<strong>数据倾斜问题</strong>：当节点较少时，数据分布可能极不均匀（某个节点承担大部分数据）。</div>
+        </div>
+
+        <div class="card">
+          <h4>虚拟节点解决数据倾斜</h4>
+          <p>每个物理节点对应多个虚拟节点（如 100~200 个），虚拟节点均匀分布在哈希环上，使数据分布更加均匀。</p>
+          <pre><code>// 虚拟节点示例
+// 物理节点 Node A → 虚拟节点 A#0, A#1, A#2, ..., A#99
+// 物理节点 Node B → 虚拟节点 B#0, B#1, B#2, ..., B#99
+//
+// 数据映射到虚拟节点后，再映射到物理节点
+// 虚拟节点越多，数据分布越均匀</code></pre>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>节点增减时迁移比例</th><th>数据分布</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>传统取模</td><td>(N-1)/N（几乎全量）</td><td>均匀</td><td>节点数固定</td></tr>
+              <tr><td>一致性哈希（无虚拟节点）</td><td>1/N</td><td>可能倾斜</td><td>节点数多且均匀</td></tr>
+              <tr><td>一致性哈希（有虚拟节点）</td><td>1/N</td><td>均匀</td><td>通用推荐</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-4 分布式 ID 方案 -->
+        <h3 id="s1-4">分布式 ID 方案</h3>
+
+        <div class="card">
+          <h4>分布式 ID 方案对比</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>实现方式</th><th>优点</th><th>缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>UUID</td><td>128位随机数</td><td>简单、无网络开销</td><td>无序、存储大、不适合做主键</td></tr>
+              <tr><td>数据库自增</td><td>单库 AUTO_INCREMENT</td><td>简单有序</td><td>单点瓶颈、扩展性差</td></tr>
+              <tr><td>号段模式</td><td>批量获取 ID 段（如 Leaf）</td><td>高性能、减少 DB 交互</td><td>需要额外服务</td></tr>
+              <tr><td>Snowflake</td><td>时间戳+机器ID+序列号</td><td>趋势递增、高性能</td><td>依赖时钟、机器ID需管理</td></tr>
+              <tr><td>ULID</td><td>时间戳+随机数</td><td>有序、兼容 UUID</td><td>极端并发可能冲突</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Snowflake 算法详解</h4>
+          <pre><code>// Snowflake ID 结构（64位）
+// ┌─────────┬───────────┬───────────┬──────────────┐
+// │ 符号(1) │ 时间戳(41) │ 机器ID(10) │ 序列号(12)  │
+// └─────────┴───────────┴───────────┴──────────────┘
+//
+// 符号位：0（正数）
+// 时间戳：41位，毫秒级，可用约69年
+// 机器ID：10位，支持1024个节点（5位数据中心+5位机器）
+// 序列号：12位，同一毫秒内支持4096个ID
+
+public class SnowflakeIdGenerator {
+    private long epoch = 1609459200000L; // 2021-01-01
+    private long datacenterId;  // 5位
+    private long workerId;      // 5位
+    private long sequence = 0;  // 12位
+    private long lastTimestamp = -1;
+
+    public synchronized long nextId() {
+        long timestamp = System.currentTimeMillis() - epoch;
+        if (timestamp == lastTimestamp) {
+            sequence = (sequence + 1) & 0xFFF; // 4096
+            if (sequence == 0) timestamp = waitNextMillis();
+        } else {
+            sequence = 0;
+        }
+        lastTimestamp = timestamp;
+        return (timestamp << 22) | (datacenterId << 17) |
+               (workerId << 12) | sequence;
+    }
+}</code></pre>
+          <div class="tip">Snowflake 的核心优势：趋势递增（按时间排序）、高性能（纯内存计算、无网络开销）、全局唯一。缺点是依赖机器时钟，时钟回拨可能导致 ID 重复。</div>
+        </div>
+
+        <div class="card">
+          <h4>号段模式（Leaf / 美团）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">应用请求 ID</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Leaf 服务<br>检查本地号段</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">号段用完?<br>从 DB 批量获取新号段</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">返回递增 ID</div>
+          </div>
+          <ul>
+            <li>每次从数据库批量获取一段 ID（如 1~1000），缓存在内存中分发</li>
+            <li>号段快用完时异步预加载下一段，避免阻塞</li>
+            <li>双 Buffer 机制：一个 buffer 在使用时提前加载另一个</li>
+            <li>数据库只需记录当前最大值，压力极小</li>
+          </ul>
+        </div>
+
+        <!-- 1-5 幂等性设计 -->
+        <h3 id="s1-5">幂等性设计</h3>
+
+        <div class="card">
+          <h4>什么是幂等性</h4>
+          <p>幂等性是指同一个操作执行一次和执行多次的效果完全相同。在分布式系统中，由于网络超时、重试机制等原因，同一请求可能被多次发送，幂等性设计可以保证数据不会重复处理。</p>
+          <p><strong>天然幂等的操作：</strong>SELECT、DELETE（删除同一个记录）、SET key=value</p>
+          <p><strong>非幂等的操作：</strong>INSERT（可能插入多条）、UPDATE balance = balance + 100</p>
+        </div>
+
+        <div class="card">
+          <h4>幂等性实现方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>实现原理</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Token 机制</td><td>请求前获取唯一 Token，服务端消费 Token 后删除，重复请求因 Token 已消费而拒绝</td><td>表单防重复提交</td></tr>
+              <tr><td>唯一索引</td><td>在数据库中对业务字段建唯一索引，重复插入会报唯一键冲突</td><td>创建订单等写入操作</td></tr>
+              <tr><td>乐观锁</td><td>使用版本号 <code>UPDATE SET ... WHERE version=old_version</code></td><td>更新操作</td></tr>
+              <tr><td>状态机</td><td>限制状态流转方向，如"已支付"不能再次支付</td><td>订单状态流转</td></tr>
+              <tr><td>去重表</td><td>将请求的唯一标识存入去重表，处理前先查询</td><td>消息消费去重</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// Token 机制示例
+// 1. 客户端请求获取 Token
+GET /api/token → 返回 token-abc123
+
+// 2. 提交请求时携带 Token
+POST /api/order { orderId: 123, token: "token-abc123" }
+
+// 3. 服务端用 Lua 脚本原子性检查并删除 Token
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 分布式事务理论 -->
+        <h3 id="s2-1">分布式事务理论</h3>
+
+        <div class="card">
+          <h4>分布式事务方案全景</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>一致性</th><th>性能</th><th>复杂度</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>2PC（两阶段提交）</td><td>强一致</td><td>低（阻塞）</td><td>中</td><td>数据库层面分布式事务</td></tr>
+              <tr><td>3PC（三阶段提交）</td><td>强一致</td><td>中</td><td>高</td><td>理论模型，实际少用</td></tr>
+              <tr><td>TCC</td><td>最终一致</td><td>高</td><td>高</td><td>资金、库存等核心业务</td></tr>
+              <tr><td>Saga</td><td>最终一致</td><td>高</td><td>中</td><td>长事务、跨多服务</td></tr>
+              <tr><td>本地消息表</td><td>最终一致</td><td>高</td><td>中</td><td>异步场景</td></tr>
+              <tr><td>最大努力通知</td><td>最终一致</td><td>高</td><td>低</td><td>跨平台通知</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>2PC（两阶段提交）原理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">阶段1: Prepare<br><small>协调者询问所有参与者<br>是否可以提交</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">参与者响应<br><small>YES/NO</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">阶段2: Commit/Abort<br><small>全部YES→提交<br>任一NO→回滚</small></div>
+          </div>
+          <p><strong>问题：</strong>1）同步阻塞：参与者在 Prepare 后需等待 Commit/Abort，期间资源被锁定；2）单点故障：协调者宕机，参与者会一直阻塞；3）数据不一致：Commit 消息丢失导致部分提交、部分未提交。</p>
+        </div>
+
+        <div class="card">
+          <h4>TCC 模式详解</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>三个阶段</h4>
+              <ul>
+                <li><strong>Try：</strong>资源检查与预留（如冻结库存、冻结余额）</li>
+                <li><strong>Confirm：</strong>确认执行，使用预留资源（如扣减冻结的库存）</li>
+                <li><strong>Cancel：</strong>取消执行，释放预留资源（如解冻库存）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>三大难题</h4>
+              <ul>
+                <li><strong>空回滚：</strong>Try 未执行就收到 Cancel，需要识别并跳过</li>
+                <li><strong>幂等：</strong>Confirm/Cancel 可能被重试，需要保证幂等</li>
+                <li><strong>悬挂：</strong>Cancel 先于 Try 到达，需防止后续 Try 执行</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Saga 模式</h4>
+          <p>Saga 将长事务拆分为一系列本地事务，每个本地事务有对应的补偿操作：</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">T1: 创建订单</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">T2: 扣减库存</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">T3: 扣减余额</div>
+          </div>
+          <p>如果 T3 失败，执行补偿：C2（恢复库存）→ C1（取消订单）</p>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>编排式（Orchestration）</h4>
+              <p>中央协调器控制执行流程，类似指挥者模式。适合复杂流程，易于监控。</p>
+            </div>
+            <div class="compare-box">
+              <h4>协调式（Choreography）</h4>
+              <p>各服务通过事件驱动自行协调，无中央控制器。适合简单流程，松耦合。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-2 Raft 协议简述 -->
+        <h3 id="s2-2">Raft 协议简述</h3>
+
+        <div class="card">
+          <h4>Raft 三大子问题</h4>
+          <table>
+            <thead>
+              <tr><th>子问题</th><th>说明</th><th>关键机制</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Leader 选举</td><td>集群中选出唯一 Leader</td><td>随机选举超时、多数派投票</td></tr>
+              <tr><td>日志复制</td><td>Leader 将日志复制到 Follower</td><td>AppendEntries RPC、多数派确认</td></tr>
+              <tr><td>安全性</td><td>保证所有节点最终一致</td><td>选举限制、提交规则</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Leader 选举流程</h4>
+          <ol>
+            <li>所有节点初始为 <strong>Follower</strong> 状态</li>
+            <li>Follower 在选举超时（150~300ms 随机）内未收到 Leader 心跳，转变为 <strong>Candidate</strong></li>
+            <li>Candidate 自增任期号（Term），向所有节点发起 <code>RequestVote</code> 请求</li>
+            <li>获得<strong>多数派（N/2+1）</strong>投票的 Candidate 成为 <strong>Leader</strong></li>
+            <li>Leader 周期性向所有节点发送心跳（AppendEntries）维持权威</li>
+            <li>如果多个 Candidate 同时竞选导致票数分裂，等待随机超时后重新选举</li>
+          </ol>
+          <div class="tip">随机选举超时是 Raft 避免活锁的关键设计。通过随机化，大概率只有一个 Candidate 先超时发起选举。</div>
+        </div>
+
+        <div class="card">
+          <h4>日志复制流程</h4>
+          <ol>
+            <li>客户端向 Leader 发送写请求</li>
+            <li>Leader 将请求作为日志条目追加到本地日志</li>
+            <li>Leader 通过 <code>AppendEntries</code> RPC 将日志复制到所有 Follower</li>
+            <li>当<strong>多数节点</strong>确认收到日志后，Leader 将该条目标记为已提交（committed）</li>
+            <li>Leader 通知所有 Follower 提交该条目，各节点应用到状态机</li>
+            <li>Leader 返回客户端写入成功</li>
+          </ol>
+        </div>
+
+        <!-- 2-3 数据分片策略 -->
+        <h3 id="s2-3">数据分片策略</h3>
+
+        <div class="card">
+          <h4>三种分片策略对比</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>原理</th><th>优点</th><th>缺点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Range 分片</td><td>按数据范围划分（如 ID 1-100 万在分片 1）</td><td>范围查询高效、易于扩展</td><td>可能热点集中</td><td>时间序列数据、日志</td></tr>
+              <tr><td>Hash 分片</td><td>hash(key) % N 确定分片</td><td>数据分布均匀</td><td>扩容需全量迁移</td><td>通用场景</td></tr>
+              <tr><td>一致性哈希</td><td>哈希环 + 虚拟节点</td><td>扩容只迁移 1/N</td><td>实现复杂</td><td>缓存分片、分布式存储</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>分库分表实战</h4>
+          <pre><code>// 分库分表示例：订单表按 user_id 水平拆分
+// 分片规则：hash(userId) % 4 确定库，hash(userId) % 8 确定表
+//
+// db_0: order_0, order_1
+// db_1: order_2, order_3
+// db_2: order_4, order_5
+// db_3: order_6, order_7
+//
+// ShardingSphere 配置示例
+spring:
+  shardingsphere:
+    sharding:
+      tables:
+        order:
+          actual-data-nodes: ds_$->{0..3}.order_$->{0..7}
+          database-strategy:
+            standard:
+              sharding-column: user_id
+              sharding-algorithm-name: db-hash
+          table-strategy:
+            standard:
+              sharding-column: user_id
+              sharding-algorithm-name: table-hash</code></pre>
+          <div class="warn">分库分表后，跨分片查询（如按 order_id 查询）需要额外维护映射关系或使用搜索引擎（ES）做二级索引。</div>
+        </div>
+
+        <!-- 2-4 分布式系统常见问题 -->
+        <h3 id="s2-4">分布式系统常见问题</h3>
+
+        <div class="card">
+          <h4>脑裂（Split Brain）</h4>
+          <p>网络分区导致集群出现多个 Leader，各自接受写入，造成数据不一致。</p>
+          <ul>
+            <li><strong>解决方案：</strong>多数派机制（Quorum），只有获得 N/2+1 节点投票才能成为 Leader</li>
+            <li><strong>Fencing 机制：</strong>旧 Leader 的写入通过 epoch/term 号被拒绝</li>
+            <li><strong>实践中：</strong>Raft/ZAB 通过任期号（Term）+ 选举限制天然防脑裂</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>拜占庭问题（Byzantine Failure）</h4>
+          <p>节点可能发送任意错误消息（包括恶意行为），不仅仅是宕机或超时。</p>
+          <ul>
+            <li><strong>非拜占庭故障（CFT）：</strong>节点只会宕机或超时，Raft/Paxos 可处理</li>
+            <li><strong>拜占庭故障（BFT）：</strong>节点可能发送错误信息，需要 PBFT 等算法处理</li>
+            <li><strong>实际场景：</strong>大多数内部系统只需 CFT；区块链等开放环境需要 BFT</li>
+            <li><strong>容错数：</strong>CFT 需要 N/2+1 正常节点；BFT 需要 2N/3+1 正常节点</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>网络分区（Network Partition）</h4>
+          <p>网络分区是指集群中部分节点之间无法通信，形成多个孤立的子网络。</p>
+          <ul>
+            <li><strong>影响：</strong>可能导致数据不一致、服务不可用</li>
+            <li><strong>检测：</strong>通过心跳超时检测节点是否可达</li>
+            <li><strong>处理：</strong>CAP 权衡——选择 CP 则少数派分区不可用，选择 AP 则少数派分区可能数据不一致</li>
+            <li><strong>恢复：</strong>分区恢复后，通过日志复制或数据同步恢复一致性</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是 CAP 定理？为什么不能同时满足 CA？</div>
+          <div class="a">
+            <strong>参考：</strong>CAP 定理指出分布式系统中一致性（C）、可用性（A）、分区容错（P）最多同时满足两个。分布式系统中网络分区是不可避免的（P 是必选），所以在分区发生时，只能选择 C（拒绝服务保证一致性）或 A（返回旧数据保证可用性）。不存在分区时可以同时满足 CA，但那本质上是单机系统。实际系统多选择 AP + 最终一致性（BASE）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">一致性哈希是什么？为什么需要虚拟节点？</div>
+          <div class="a">
+            <strong>参考：</strong>一致性哈希将哈希空间组织成环，节点和数据都映射到环上，数据沿顺时针找到最近节点存储。当节点增减时，只影响相邻区间的数据，迁移比例为 1/N。虚拟节点是为了解决数据倾斜问题：当物理节点较少时，数据分布可能极不均匀。通过为每个物理节点创建多个虚拟节点（如 100 个），使其均匀分布在环上，从而实现数据的均匀分布。Redis Cluster 使用哈希槽（16384 个）而非一致性哈希，本质思路类似。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">分布式 ID 有哪些方案？Snowflake 算法的原理是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>常见方案：UUID（简单但无序）、数据库自增（简单但单点）、号段模式（Leaf，批量获取减少 DB 压力）、Snowflake（趋势递增、高性能）、ULID（有序兼容 UUID）。Snowflake 将 64 位 ID 分为：1 位符号 + 41 位毫秒时间戳（约 69 年）+ 10 位机器 ID（1024 节点）+ 12 位序列号（每毫秒 4096 个 ID）。核心优势是趋势递增（利于 B+Tree 索引）和纯内存生成（高性能）。缺点是依赖时钟，时钟回拨可能重复。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是幂等性？如何保证接口幂等？</div>
+          <div class="a">
+            <strong>参考：</strong>幂等性是指同一操作执行多次效果与执行一次相同。在分布式系统中，网络超时重试可能导致请求重复发送。保证幂等的方案：1）Token 机制：请求前获取唯一 Token，服务端消费后删除；2）唯一索引：数据库对业务字段建唯一索引，重复插入报冲突；3）乐观锁：使用版本号控制更新；4）状态机：限制状态流转方向（如"已支付"不能再次支付）；5）去重表：记录已处理的请求标识。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">2PC 和 TCC 有什么区别？各适用于什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>2PC 是数据库层面的分布式事务：Prepare 阶段参与者锁定资源，Commit 阶段统一提交。问题是同步阻塞、单点故障、数据不一致风险。TCC 是业务层面：Try 阶段预留资源（如冻结库存），Confirm 阶段确认扣减，Cancel 阶段释放。区别：2PC 在数据库层实现，对业务侵入小但性能差；TCC 在业务层实现，侵入大但性能好。2PC 适合对一致性要求极高的数据库操作；TCC 适合资金、库存等核心业务场景。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Raft 协议是如何选举 Leader 的？如何防止脑裂？</div>
+          <div class="a">
+            <strong>参考：</strong>Raft 选举流程：1）Follower 在随机选举超时（150-300ms）内未收到心跳，转变为 Candidate；2）自增 Term，向所有节点发 RequestVote；3）获得多数派投票成为 Leader；4）Leader 定期发心跳维持权威。防脑裂：1）多数派机制——只有获得 N/2+1 投票才能成为 Leader；2）Term 机制——旧 Leader 的 Term 小于新 Leader，Follower 会拒绝旧 Leader 的请求；3）选举限制——Candidate 的日志必须足够新（至少和多数节点一样新）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">分布式系统中的数据分片有哪些策略？如何选择？</div>
+          <div class="a">
+            <strong>参考：</strong>三种策略：1）Range 分片：按数据范围划分（如 ID 1-100万在分片1），范围查询高效但可能热点集中，适合时间序列数据；2）Hash 分片：hash(key) % N 确定分片，分布均匀但扩容需全量迁移；3）一致性哈希：哈希环 + 虚拟节点，扩容只迁移 1/N 数据，适合缓存分片。选择依据：需要范围查询用 Range，通用场景用 Hash，需要弹性扩缩容用一致性哈希。分库分表通常结合使用：按 user_id Hash 分库，按时间 Range 分表。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 Saga 模式？编排式和协调式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Saga 将长事务拆为一系列本地事务，每个有对应补偿操作。正向流程 T1→T2→T3，若 T3 失败则执行 C2→C1 补偿回滚。编排式（Orchestration）：由中央协调器控制流程，类似指挥者模式，适合复杂流程，易于监控和调试。协调式（Choreography）：各服务通过事件驱动自行协调，无中央控制器，松耦合但流程难以追踪。实际中编排式更常用（如 Seata Saga），因为业务流程更直观，便于管理补偿逻辑。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          分布式理论 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

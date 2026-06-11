@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Netty - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔗 Netty</h1>
+    <p class="subtitle">EventLoop · Pipeline · 零拷贝 · 编解码 · 粘包拆包</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">线程模型</a></li>
+          <li class="sub"><a href="#s1-2">EventLoopGroup 与 EventLoop</a></li>
+          <li class="sub"><a href="#s1-3">Channel 与 Pipeline</a></li>
+          <li class="sub"><a href="#s1-4">零拷贝</a></li>
+          <li class="sub"><a href="#s1-5">ByteBuf</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">编解码器</a></li>
+          <li class="sub"><a href="#s2-2">粘包拆包</a></li>
+          <li class="sub"><a href="#s2-3">心跳机制</a></li>
+          <li class="sub"><a href="#s2-4">Netty vs Mina vs NIO</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 线程模型 -->
+        <h3 id="s1-1">线程模型</h3>
+
+        <div class="card">
+          <h4>三种 Reactor 线程模型</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>单线程 Reactor</h4>
+              <ul>
+                <li>一个线程处理所有 IO</li>
+                <li>Accept + Read + Write + 业务</li>
+                <li>简单但性能差</li>
+                <li>不适合高并发</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>多线程 Reactor</h4>
+              <ul>
+                <li>一个 Acceptor 线程</li>
+                <li>多个 Worker 线程处理 IO</li>
+                <li>Reactor + Worker 线程池</li>
+                <li>大多数场景适用</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="diagram">
+          <div class="diagram-title">Netty 主从 Reactor 模型（默认）</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#c8e6c9">Boss EventLoopGroup（主线程组）<br><small>1 个线程，负责 Accept 新连接</small></div>
+            </div>
+            <div class="arch-connector">↓ 新连接 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#bbdefb">Worker EventLoopGroup（工作线程组）<br><small>默认 CPU*2 个线程，负责 IO 读写和业务处理</small></div>
+            </div>
+            <div class="arch-connector">↓ 每个 Worker ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="background:#fff3e0">EventLoop<br><small>1 个线程<br>绑定多个 Channel</small></div>
+              <div class="arch-box" style="margin-left:1rem;background:#fff3e0">EventLoop<br><small>1 个线程<br>绑定多个 Channel</small></div>
+              <div class="arch-box" style="margin-left:1rem;background:#fff3e0">EventLoop<br><small>1 个线程<br>绑定多个 Channel</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Netty 服务端启动模板</h4>
+          <pre><code>EventLoopGroup bossGroup = new NioEventLoopGroup(1);      // Accept 线程
+EventLoopGroup workerGroup = new NioEventLoopGroup();    // Worker 线程（默认 CPU*2）
+try {
+    ServerBootstrap bootstrap = new ServerBootstrap();
+    bootstrap.group(bossGroup, workerGroup)
+        .channel(NioServerSocketChannel.class)           // 通道类型
+        .option(ChannelOption.SO_BACKLOG, 128)           // 连接队列大小
+        .childOption(ChannelOption.SO_KEEPALIVE, true)   // TCP 保活
+        .childOption(ChannelOption.TCP_NODELAY, true)    // 禁用 Nagle 算法
+        .childHandler(new ChannelInitializer&lt;SocketChannel&gt;() {
+            @Override
+            protected void initChannel(SocketChannel ch) {
+                ChannelPipeline pipeline = ch.pipeline();
+                pipeline.addLast(new IdleStateHandler(60, 0, 0));  // 心跳检测
+                pipeline.addLast(new LengthFieldBasedFrameDecoder(1024, 0, 4));
+                pipeline.addLast(new MessageDecoder());
+                pipeline.addLast(new MessageEncoder());
+                pipeline.addLast(new BusinessHandler());
+            }
+        });
+    ChannelFuture future = bootstrap.bind(8080).sync();
+    future.channel().closeFuture().sync();
+} finally {
+    bossGroup.shutdownGracefully();
+    workerGroup.shutdownGracefully();
+}</code></pre>
+        </div>
+
+        <!-- 1-2 EventLoopGroup 与 EventLoop -->
+        <h3 id="s1-2">EventLoopGroup 与 EventLoop</h3>
+
+        <div class="card">
+          <h4>核心概念</h4>
+          <table>
+            <thead>
+              <tr><th>概念</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>EventLoop</strong></td><td>一个线程 + 一个 Selector + 一个任务队列，处理 IO 事件和普通任务</td></tr>
+              <tr><td><strong>EventLoopGroup</strong></td><td>EventLoop 的集合，负责分配 EventLoop 给新 Channel</td></tr>
+              <tr><td><strong>NioEventLoop</strong></td><td>NIO 实现的 EventLoop，基于 Selector 多路复用</td></tr>
+              <tr><td><strong>任务队列</strong></td><td>每个 EventLoop 有三个任务队列：普通任务、定时任务、尾部任务</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>NioEventLoop 执行流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">select()<br><small>轮询 IO 事件（有超时时间）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">processSelectedKeys()<br><small>处理就绪的 IO 事件</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">runAllTasks()<br><small>处理任务队列中的任务</small></div>
+          </div>
+          <ul>
+            <li>每个 NioEventLoop 绑定一个线程，<strong>一个 Channel 只会被一个 EventLoop 处理</strong>（线程安全保证）</li>
+            <li>IO 事件处理和任务队列处理在同一个线程，避免线程切换</li>
+            <li>默认不执行用户自定义的定时任务（需要设置 <code>-Dio.netty.eventLoop.executePendingTasks=true</code>）</li>
+          </ul>
+          <div class="tip">Channel 与 EventLoop 的绑定是永久的（在 Channel 生命周期内不变），确保了 Channel 上的所有 IO 操作都是线程安全的，无需额外加锁。</div>
+        </div>
+
+        <!-- 1-3 Channel 与 Pipeline -->
+        <h3 id="s1-3">Channel 与 Pipeline</h3>
+
+        <div class="card">
+          <h4>核心组件关系</h4>
+          <div class="diagram">
+            <div class="diagram-title">Channel、Pipeline、Handler 关系</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:#e3f2fd">Channel<br><small>网络连接的抽象（读/写/连接/绑定）</small></div>
+              </div>
+              <div class="arch-connector">↓ 包含 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:#e8f5e9">ChannelPipeline<br><small>Handler 链（双向链表）</small></div>
+              </div>
+              <div class="arch-connector">↓ 包含 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box" style="background:#c8e6c9">Head<br><small>HeadContext</small></div>
+                <div class="arch-box" style="margin-left:0.5rem;background:#bbdefb">Handler1<br><small>Decoder</small></div>
+                <div class="arch-box" style="margin-left:0.5rem;background:#bbdefb">Handler2<br><small>Business</small></div>
+                <div class="arch-box" style="margin-left:0.5rem;background:#bbdefb">Handler3<br><small>Encoder</small></div>
+                <div class="arch-box" style="margin-left:0.5rem;background:#ffccbc">Tail<br><small>TailContext</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Inbound vs Outbound Handler</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>Inbound Handler（入站）</h4>
+              <ul>
+                <li>处理入站数据（从网络读取）</li>
+                <li>从 Head → Tail 方向执行</li>
+                <li>channelRead() / channelActive()</li>
+                <li>典型：Decoder、业务 Handler</li>
+                <li>继承 ChannelInboundHandlerAdapter</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>Outbound Handler（出站）</h4>
+              <ul>
+                <li>处理出站数据（写出到网络）</li>
+                <li>从 Tail → Head 方向执行</li>
+                <li>write() / flush() / connect()</li>
+                <li>典型：Encoder、压缩 Handler</li>
+                <li>继承 ChannelOutboundHandlerAdapter</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>责任链模式</h4>
+          <p>Pipeline 本质是一个双向链表，每个节点是一个 ChannelHandlerContext（包装了 Handler）。数据在 Pipeline 中按方向逐个经过 Handler 处理：</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">入站数据<br><small>Socket → Head → Decoder → Business → Tail</small></div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0"></div>
+          <div class="flow">
+            <div class="flow-box flow-purple">出站数据<br><small>Tail → Encoder → Head → Socket</small></div>
+          </div>
+          <div class="tip">HeadContext 既是 Inbound 又是 Outbound Handler，负责实际的 Socket 读写。TailContext 负责处理未被消费的事件和资源释放。</div>
+        </div>
+
+        <!-- 1-4 零拷贝 -->
+        <h3 id="s1-4">零拷贝</h3>
+
+        <div class="card">
+          <h4>Netty 零拷贝实现方式</h4>
+          <table>
+            <thead>
+              <tr><th>方式</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>FileRegion</strong></td><td>底层使用 transferTo()，数据直接从文件缓冲区到 Socket 缓冲区</td><td>文件传输</td></tr>
+              <tr><td><strong>CompositeByteBuf</strong></td><td>组合多个 ByteBuf，逻辑上合并但不复制数据</td><td>协议头+消息体组合</td></tr>
+              <tr><td><strong>slice()</strong></td><td>切片 ByteBuf，共享底层内存但有独立的读写索引</td><td>拆分数据包</td></tr>
+              <tr><td><strong>wrap()</strong></td><td>包装已有 byte[]，不复制数据</td><td>包装已有数据</td></tr>
+              <tr><td><strong>堆外内存</strong></td><td>使用 DirectBuffer，减少堆内到堆外的拷贝</td><td>IO 读写</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>传统 IO vs 零拷贝</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>传统 IO（4 次拷贝）</h4>
+              <ul>
+                <li>磁盘 → 内核缓冲区（DMA 拷贝）</li>
+                <li>内核缓冲区 → 用户缓冲区（CPU 拷贝）</li>
+                <li>用户缓冲区 → Socket 缓冲区（CPU 拷贝）</li>
+                <li>Socket 缓冲区 → 网卡（DMA 拷贝）</li>
+                <li>4 次上下文切换</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>零拷贝（2 次拷贝）</h4>
+              <ul>
+                <li>磁盘 → 内核缓冲区（DMA 拷贝）</li>
+                <li>内核缓冲区 → 网卡（DMA 拷贝）</li>
+                <li>数据不经过用户空间</li>
+                <li>2 次上下文切换</li>
+                <li>Linux: sendfile() / transferTo()</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-5 ByteBuf -->
+        <h3 id="s1-5">ByteBuf</h3>
+
+        <div class="card">
+          <h4>ByteBuf 分类</h4>
+          <table>
+            <thead>
+              <tr><th>维度</th><th>类型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td rowspan="2"><strong>内存位置</strong></td><td>堆内（HeapByteBuf）</td><td>分配在 JVM 堆上，受 GC 管理，读写需拷贝到堆外</td></tr>
+              <tr><td>堆外（DirectByteBuf）</td><td>分配在堆外，不受 GC 管理，IO 读写性能好（推荐）</td></tr>
+              <tr><td rowspan="2"><strong>内存管理</strong></td><td>池化（PooledByteBuf）</td><td>内存复用，减少分配/释放开销（推荐）</td></tr>
+              <tr><td>非池化（UnpooledByteBuf）</td><td>每次分配新内存，用完释放</td></tr>
+            </tbody>
+          </table>
+          <p>Netty 默认使用 <strong>PooledDirectByteBuf</strong>（池化堆外内存）。</p>
+        </div>
+
+        <div class="card">
+          <h4>ByteBuf 核心特性</h4>
+          <ul>
+            <li><strong>读写分离：</strong>readerIndex（读指针）和 writerIndex（写指针）独立维护，0 ≤ readerIndex ≤ writerIndex ≤ capacity</li>
+            <li><strong>自动扩容：</strong>写入时如果空间不足，ByteBuf 自动扩容（最大 Integer.MAX_VALUE）</li>
+            <li><strong>引用计数：</strong>通过 retain()/release() 管理生命周期，计数归零时释放内存</li>
+            <li><strong>三种指针区域：</strong>discardable bytes（已读）、readable bytes（可读）、writable bytes（可写）</li>
+          </ul>
+          <pre><code>// ByteBuf 使用示例
+ByteBuf buf = Unpooled.buffer(256);  // 堆内缓冲区
+ByteBuf buf2 = Unpooled.directBuffer(256);  // 堆外缓冲区
+
+// 写入数据
+buf.writeInt(1);
+buf.writeLong(100L);
+buf.writeBytes("hello".getBytes());
+
+// 读取数据
+int a = buf.readInt();
+long b = buf.readLong();
+
+// 引用计数（必须在 finally 中释放）
+buf.retain();  // 引用计数 +1
+buf.release(); // 引用计数 -1，归零时释放
+
+// 切片（零拷贝，共享底层内存）
+ByteBuf slice = buf.slice(0, 4);  // 包含前 4 个字节
+
+// 组合 ByteBuf（零拷贝）
+CompositeByteBuf composite = Unpooled.compositeBuffer();
+composite.addComponents(true, header, body);  // true 自动调整 writerIndex</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 编解码器 -->
+        <h3 id="s2-1">编解码器</h3>
+
+        <div class="card">
+          <h4>编解码器体系</h4>
+          <div class="diagram">
+            <div class="diagram-title">Netty 编解码器层次</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box" style="background:#c8e6c9">ByteToMessageDecoder<br><small>字节 → 对象</small></div>
+                <div class="arch-box" style="margin-left:1rem;background:#bbdefb">MessageToByteEncoder<br><small>对象 → 字节</small></div>
+              </div>
+              <div class="arch-connector">↓ 继承 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box" style="background:#e8f5e9">MessageToMessageDecoder<br><small>对象 → 对象</small></div>
+                <div class="arch-box" style="margin-left:1rem;background:#e3f2fd">MessageToMessageEncoder<br><small>对象 → 对象</small></div>
+              </div>
+              <div class="arch-connector">↓ 组合 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:#fff3e0">Codec（编解码器）<br><small>ByteToMessageCodec / MessageToMessageCodec</small></div>
+              </div>
+            </div>
+          </div>
+          <pre><code>// 自定义编码器
+public class MessageEncoder extends MessageToByteEncoder&lt;Message&gt; {
+    @Override
+    protected void encode(ChannelHandlerContext ctx, Message msg, ByteBuf out) {
+        out.writeInt(msg.getLength());       // 4 字节长度头
+        out.writeShort(msg.getType());       // 2 字节消息类型
+        out.writeBytes(msg.getBody());       // 消息体
+    }
+}
+
+// 自定义解码器
+public class MessageDecoder extends ByteToMessageDecoder {
+    @Override
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List&lt;Object&gt; out) {
+        if (in.readableBytes() < 4) return;  // 不够读长度字段
+        in.markReaderIndex();                 // 标记读位置
+        int length = in.readInt();
+        if (in.readableBytes() < length) {
+            in.resetReaderIndex();            // 重置，等待更多数据
+            return;
+        }
+        short type = in.readShort();
+        byte[] body = new byte[length - 2];
+        in.readBytes(body);
+        out.add(new Message(type, body));
+    }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>常用内置编解码器</h4>
+          <table>
+            <thead>
+              <tr><th>编解码器</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>StringEncoder/StringDecoder</strong></td><td>字符串编解码</td><td>文本协议</td></tr>
+              <tr><td><strong>ObjectEncoder/ObjectDecoder</strong></td><td>Java 序列化</td><td>Java 内部通信</td></tr>
+              <tr><td><strong>ProtobufEncoder/ProtobufDecoder</strong></td><td>Protocol Buffers</td><td>高性能序列化</td></tr>
+              <tr><td><strong>JsonEncoder/JsonDecoder</strong></td><td>JSON 序列化</td><td>Web API 通信</td></tr>
+              <tr><td><strong>HttpRequestEncoder/Decoder</strong></td><td>HTTP 协议</td><td>HTTP 服务器</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-2 粘包拆包 -->
+        <h3 id="s2-2">粘包拆包</h3>
+
+        <div class="card">
+          <h4>粘包拆包产生原因</h4>
+          <p>TCP 是面向字节流的协议，没有消息边界的概念。发送方多次 write 的数据可能被合并成一次发送（粘包），也可能被拆分成多次发送（拆包）。</p>
+          <table>
+            <thead>
+              <tr><th>原因</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>发送端合并</strong></td><td>Nagle 算法将小包合并发送</td></tr>
+              <tr><td><strong>接收端缓冲区</strong></td><td>TCP 接收缓冲区积累数据，一次 read 读到多条消息</td></tr>
+              <tr><td><strong>MSS/MTU 分片</strong></td><td>数据包超过 MSS 被拆分成多个 TCP 段</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>四种解决方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>解码器</th><th>原理</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>固定长度</strong></td><td>FixedLengthFrameDecoder</td><td>每条消息固定长度，不足补零</td><td>消息长度固定</td></tr>
+              <tr><td><strong>分隔符</strong></td><td>DelimiterBasedFrameDecoder</td><td>用特殊分隔符标记消息边界</td><td>文本协议（如 HTTP）</td></tr>
+              <tr><td><strong>长度字段</strong></td><td>LengthFieldBasedFrameDecoder</td><td>消息头包含消息体长度</td><td>二进制协议（最常用）</td></tr>
+              <tr><td><strong>行分隔</strong></td><td>LineBasedFrameDecoder</td><td>以 \n 或 \r\n 分隔</td><td>行文本协议</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// LengthFieldBasedFrameDecoder 参数详解
+// maxFrameLength: 最大帧长度
+// lengthFieldOffset: 长度字段偏移量
+// lengthFieldLength: 长度字段大小（字节数）
+// lengthAdjustment: 长度调整值（长度字段值 + adjustment = 内容长度）
+// initialBytesToStrip: 跳过的字节数（去掉消息头）
+
+// 示例：协议格式 [消息长度(4字节)][消息类型(2字节)][消息体]
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    1024 * 1024,  // maxFrameLength: 1MB
+    0,            // lengthFieldOffset: 0
+    4,            // lengthFieldLength: 4 字节
+    -2,           // lengthAdjustment: 减去消息类型 2 字节
+    0             // initialBytesToStrip: 不跳过
+));
+
+// 示例：直接去掉长度头
+pipeline.addLast(new LengthFieldBasedFrameDecoder(
+    1024 * 1024, 0, 4, 0, 4  // 跳过 4 字节长度头
+));</code></pre>
+        </div>
+
+        <!-- 2-3 心跳机制 -->
+        <h3 id="s2-3">心跳机制</h3>
+
+        <div class="card">
+          <h4>IdleStateHandler 心跳检测</h4>
+          <pre><code>// IdleStateHandler 参数
+// readerIdleTime: 读空闲超时（多久没收到数据触发）
+// writerIdleTime: 写空闲超时（多久没发送数据触发）
+// allIdleTime: 读写空闲超时
+// unit: 时间单位
+
+pipeline.addLast(new IdleStateHandler(60, 30, 0, TimeUnit.SECONDS));
+
+// 心跳处理 Handler
+public class HeartbeatHandler extends ChannelInboundHandlerAdapter {
+    private int lossCount = 0;
+    private static final int MAX_LOSS = 3;  // 最大丢失次数
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+        if (evt instanceof IdleStateEvent) {
+            IdleStateEvent event = (IdleStateEvent) evt;
+            switch (event.state()) {
+                case READER_IDLE:
+                    lossCount++;
+                    if (lossCount >= MAX_LOSS) {
+                        ctx.close();  // 超过最大丢失次数，关闭连接
+                    }
+                    break;
+                case WRITER_IDLE:
+                    ctx.writeAndFlush(heartbeatPacket());  // 发送心跳包
+                    break;
+            }
+        } else {
+            super.userEventTriggered(ctx, evt);
+        }
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        lossCount = 0;  // 收到数据，重置丢失计数
+        super.channelRead(ctx, msg);
+    }
+}</code></pre>
+          <div class="tip">心跳机制的作用：1）检测连接是否存活（读空闲超时 → 关闭连接）；2）保持连接不被中间设备（如 NAT、防火墙）断开（定期发送心跳包）；3）服务端及时释放不活跃的连接资源。</div>
+        </div>
+
+        <!-- 2-4 Netty vs Mina vs NIO -->
+        <h3 id="s2-4">Netty vs Mina vs 原生 NIO</h3>
+
+        <div class="card">
+          <h4>三者对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Netty</th><th>Mina</th><th>原生 NIO</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>API 易用性</strong></td><td>高（Channel/Pipeline/Handler）</td><td>中等</td><td>低（Selector/Buffer/Channel）</td></tr>
+              <tr><td><strong>线程模型</strong></td><td>主从 Reactor</td><td>Reactor</td><td>需手动实现</td></tr>
+              <tr><td><strong>内存管理</strong></td><td>ByteBuf 池化 + 零拷贝</td><td>ByteBuffer</td><td>ByteBuffer（无池化）</td></tr>
+              <tr><td><strong>协议支持</strong></td><td>丰富（HTTP/WebSocket/Protobuf）</td><td>较多</td><td>需手动实现</td></tr>
+              <tr><td><strong>社区活跃度</strong></td><td>高（GitHub star 多）</td><td>低</td><td>JDK 内置</td></tr>
+              <tr><td><strong>使用者</strong></td><td>Dubbo/gRPC/Elasticsearch</td><td>较少</td><td>学习用途</td></tr>
+              <tr><td><strong>特点</strong></td><td>功能全面，生态丰富</td><td>较早的 NIO 框架</td><td>灵活但开发成本高</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Netty 是目前 Java 网络编程的事实标准。Dubbo、gRPC、Elasticsearch、RocketMQ 等知名项目底层都使用 Netty。原生 NIO 存在 epoll bug、ByteBuffer 难用、需手动处理粘包拆包等问题，Netty 都做了封装和优化。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Netty 的线程模型是怎样的？什么是主从 Reactor？</div>
+          <div class="a">
+            <strong>参考：</strong>Netty 默认使用主从 Reactor 多线程模型。Boss EventLoopGroup（通常 1 个线程）负责 Accept 新连接，Worker EventLoopGroup（默认 CPU 核心数 * 2 个线程）负责 IO 读写和业务处理。每个 EventLoop 是一个线程 + 一个 Selector + 一个任务队列，一个 Channel 绑定到一个 EventLoop（保证线程安全）。Boss 线程接收新连接后，将 Channel 注册到 Worker 的某个 EventLoop 上，后续该 Channel 的所有 IO 操作都由这个 EventLoop 处理。这种模型避免了多线程竞争，同时通过多 Worker 线程实现高并发。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>什么是 Netty 的零拷贝？有哪些实现方式？</div>
+          <div class="a">
+            <strong>参考：</strong>Netty 的零拷贝是指减少数据在内存中的拷贝次数，提高 IO 效率。实现方式：1）FileRegion：底层使用 Linux 的 sendfile() 系统调用，数据直接从文件缓冲区传输到 Socket 缓冲区，不经过用户空间；2）CompositeByteBuf：逻辑上组合多个 ByteBuf，不拷贝底层数据；3）slice()：将 ByteBuf 切分成多个逻辑视图，共享底层内存；4）wrap()：包装已有 byte[]，不复制数据；5）堆外内存（DirectBuffer）：减少堆内到堆外的数据拷贝。传统 IO 需要 4 次拷贝（磁盘→内核→用户空间→Socket→网卡）和 4 次上下文切换，零拷贝只需 2 次拷贝和 2 次上下文切换。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Netty 中 Pipeline 的工作原理是什么？Inbound 和 Outbound Handler 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Pipeline 是一个双向链表，每个节点是一个 ChannelHandlerContext，包装了 ChannelHandler。数据在 Pipeline 中按方向流动：入站数据从 Head → Tail 方向经过 Inbound Handler（如解码器、业务 Handler），出站数据从 Tail → Head 方向经过 Outbound Handler（如编码器）。Inbound Handler 处理接收到的数据（channelRead），Outbound Handler 处理要发送的数据（write）。HeadContext 是实际进行 Socket 读写的 Handler，TailContext 处理未被消费的事件。一个 Handler 可以同时是 Inbound 和 Outbound（实现两个接口）。Pipeline 支持动态添加和删除 Handler。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是粘包拆包？Netty 提供了哪些解决方案？</div>
+          <div class="a">
+            <strong>参考：</strong>TCP 是面向字节流的协议，没有消息边界。多次发送的数据可能被合并接收（粘包），一次发送的数据也可能被分多次接收（拆包）。Netty 提供四种解决方案：1）FixedLengthFrameDecoder：固定长度帧，不足补零；2）DelimiterBasedFrameDecoder：分隔符（如 \n、\r\n 或自定义分隔符）；3）LengthFieldBasedFrameDecoder：消息头包含长度字段（最常用），需要配置 lengthFieldOffset、lengthFieldLength、lengthAdjustment、initialBytesToStrip 四个参数；4）LineBasedFrameDecoder：行分隔符。生产环境推荐使用 LengthFieldBasedFrameDecoder，设计自定义协议时在消息头中包含长度字段。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Netty 的 ByteBuf 和 Java NIO 的 ByteBuffer 有什么区别？为什么 Netty 要重新设计？</div>
+          <div class="a">
+            <strong>参考：</strong>区别：1）读写指针：ByteBuffer 用 position 和 limit，切换读写模式需要 flip()，容易出错；ByteBuf 有独立的 readerIndex 和 writerIndex，无需切换；2）扩容：ByteBuffer 固定大小，写满需要手动扩容；ByteBuf 支持自动扩容；3）池化：ByteBuffer 无池化机制；ByteBuf 支持对象池化复用；4）引用计数：ByteBuf 有引用计数机制，计数归零自动释放；5）API：ByteBuf 提供丰富的 readXxx/writeXxx 方法和零拷贝操作（slice、composite）。Netty 重新设计的原因是 ByteBuffer 的 API 太底层且难用，容易出错（flip/compact），且不支持池化和零拷贝等高级特性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Netty 中如何实现心跳检测和断线重连？</div>
+          <div class="a">
+            <strong>参考：</strong>心跳检测：使用 IdleStateHandler 监测读/写/全部空闲。配置 readerIdleTime（读空闲超时）、writerIdleTime（写空闲超时），当超时触发时会调用 userEventTriggered() 方法。在自定义 Handler 中处理 IdleStateEvent：读空闲超过阈值 → 关闭连接；写空闲 → 发送心跳包。断线重连：在客户端的 ChannelHandler 的 channelInactive() 方法中触发重连逻辑，使用定时任务延迟执行重连（避免频繁重连），重连成功后重新初始化 Channel Pipeline。注意使用指数退避策略（如 1s、2s、4s、8s...），避免服务端压力过大。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Netty 中有哪些常见的性能优化手段？</div>
+          <div class="a">
+            <strong>参考：</strong>1）使用池化的 DirectBuffer：减少 GC 和内存拷贝（默认已开启）；2）合理设置线程数：Boss 线程 1 个即可，Worker 线程默认 CPU*2；3）减少对象分配：使用 ByteBuf 池化、对象池化、ThreadLocal 缓存；4）避免在 EventLoop 中执行阻塞操作：使用 DefaultEventExecutorGroup 处理耗时业务；5）TCP 参数优化：SO_BACKLOG、SO_SNDBUF、SO_RCVBUF、TCP_NODELAY；6）使用 CompositeByteBuf 和 slice 实现零拷贝；7）减少系统调用：批量写（gather write）；8）使用 Protobuf 等高效序列化替代 JSON。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Netty 的 EventLoop 一个线程绑定一个 Channel 的设计有什么好处？</div>
+          <div class="a">
+            <strong>参考：</strong>好处：1）线程安全：一个 Channel 的所有 IO 操作都在同一个 EventLoop 线程中执行，无需加锁，避免了多线程竞争；2）减少线程切换：同一个连接的读写和业务处理在同一线程完成；3）简化编程模型：开发者无需关心 Channel 上的并发问题。实现原理：Channel 注册到 EventLoop 时建立绑定关系，后续该 Channel 的所有事件（读/写/连接/断开）都由绑定的 EventLoop 线程处理。如果在非 EventLoop 线程中调用 Channel 的方法（如 write），Netty 会将操作封装成任务提交到对应的 EventLoop 任务队列中。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Netty · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XXL-Job - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🕐 XXL-Job</h1>
+    <p class="subtitle">分布式任务调度 · 分片 · 失败重试 · 调度中心</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">调度方式</a></li>
+          <li class="sub"><a href="#s1-3">路由策略</a></li>
+          <li class="sub"><a href="#s1-4">分片广播</a></li>
+          <li class="sub"><a href="#s1-5">阻塞策略</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">失败处理</a></li>
+          <li class="sub"><a href="#s2-2">任务日志与回调</a></li>
+          <li class="sub"><a href="#s2-3">与 Elastic-Job / Quartz 对比</a></li>
+          <li class="sub"><a href="#s2-4">跨语言支持</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">XXL-Job 架构总览</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">调度中心（Admin）<br><small>管理任务 · 调度触发 · 日志管理 · 任务编排</small></div>
+            </div>
+            <div class="arch-connector">↓ HTTP 调用 / 回调 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">执行器 A<br><small>Appname: order-job</small></div>
+              <div class="arch-box" style="margin-left:1rem">执行器 B<br><small>Appname: user-job</small></div>
+              <div class="arch-box" style="margin-left:1rem">执行器 C<br><small>Appname: data-job</small></div>
+            </div>
+            <div class="arch-connector">执行器内可有多个实例 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">实例 1<br><small>192.168.1.100:9999</small></div>
+              <div class="arch-box" style="margin-left:1rem">实例 2<br><small>192.168.1.101:9999</small></div>
+              <div class="arch-box" style="margin-left:1rem">实例 3<br><small>192.168.1.102:9999</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心组件</h4>
+          <table>
+            <thead>
+              <tr><th>组件</th><th>职责</th><th>部署</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>调度中心</strong></td><td>管理任务配置、触发调度、管理日志、任务编排</td><td>独立部署（支持集群）</td></tr>
+              <tr><td><strong>执行器</strong></td><td>接收调度请求、执行任务逻辑、回调结果</td><td>嵌入业务应用</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li>调度中心是独立的 Web 应用（Spring Boot），自带管理界面</li>
+            <li>执行器通过自动注册或手动注册到调度中心</li>
+            <li>调度中心通过 HTTP 调用执行器触发任务</li>
+            <li>执行器执行完成后通过 HTTP 回调结果给调度中心</li>
+            <li>调度中心集群部署时，通过数据库锁保证同一任务只被一个节点调度</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>执行器注册机制</h4>
+          <pre><code>// 执行器配置
+xxl:
+  job:
+    admin:
+      addresses: http://localhost:8080/xxl-job-admin  # 调度中心地址
+    executor:
+      appname: order-job           # 执行器 AppName
+      port: 9999                   # 执行器端口（回调端口）
+      logpath: /data/applogs/xxl-job/jobhandler
+      logretentiondays: 30
+    accessToken: default_token     # 通信令牌
+
+// 自动注册流程：
+// 1. 执行器启动时，向调度中心注册（HTTP POST）
+//    → /api/registry
+//    → 参数：AppName, IP, Port
+// 2. 执行器每 30 秒心跳续约
+//    → /api/registry
+// 3. 执行器关闭时注销
+//    → /api/registryRemove
+// 4. 调度中心维护执行器地址列表
+//    → 超过 90 秒未心跳则剔除</code></pre>
+        </div>
+
+        <!-- 1-2 调度方式 -->
+        <h3 id="s1-2">调度方式</h3>
+
+        <div class="card">
+          <h4>三种调度方式</h4>
+          <table>
+            <thead>
+              <tr><th>方式</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Cron 表达式</strong></td><td>标准 Cron 格式，支持秒级</td><td><code>0 0/5 * * * ?</code> 每 5 分钟</td></tr>
+              <tr><td><strong>固定频率</strong></td><td>按固定间隔重复执行</td><td>每隔 60 秒执行一次</td></tr>
+              <tr><td><strong>API 触发</strong></td><td>通过 API 手动触发执行</td><td>业务事件触发</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// API 触发方式
+// 方式一：HTTP API
+POST /jobinfo/trigger
+{
+  "jobId": 1,
+  "executorParam": "参数",
+  "addressList": "192.168.1.100:9999"  // 可选，指定执行器地址
+}
+
+// 方式二：Java API
+XxlJobHelper.trigger(1, "参数");
+
+// 方式三：代码中直接触发
+@Autowired
+private AdminBiz adminBiz;
+adminBiz.trigger(TriggerParam);</code></pre>
+        </div>
+
+        <!-- 1-3 路由策略 -->
+        <h3 id="s1-3">路由策略</h3>
+
+        <div class="card">
+          <h4>路由策略详解</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">FIRST</span></td><td>固定选择第一个执行器</td><td>单点执行，固定节点</td></tr>
+              <tr><td><span class="badge badge-green">LAST</span></td><td>固定选择最后一个执行器</td><td>单点执行，固定节点</td></tr>
+              <tr><td><span class="badge badge-purple">ROUND</span></td><td>轮询</td><td>均匀分配负载</td></tr>
+              <tr><td><span class="badge badge-orange">RANDOM</span></td><td>随机</td><td>简单随机分配</td></tr>
+              <tr><td><span class="badge badge-blue">CONSISTENT_HASH</span></td><td>一致性 Hash</td><td>有状态任务</td></tr>
+              <tr><td><span class="badge badge-green">LEAST_FREQUENTLY_USED</span></td><td>最不经常使用</td><td>均衡调度频次</td></tr>
+              <tr><td><span class="badge badge-purple">LEAST_RECENTLY_USED</span></td><td>最近最久未使用</td><td>均衡调度时间</td></tr>
+              <tr><td><span class="badge badge-orange">FAILOVER</span></td><td>故障转移</td><td>高可用场景</td></tr>
+              <tr><td><span class="badge badge-pink">BUSYOVER</span></td><td>忙碌转移</td><td>避免阻塞</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 路由策略配置（在调度中心管理界面配置）
+// FAILOVER 故障转移流程：
+// 1. 选择第一个执行器发起调用
+// 2. 如果调用失败（超时/异常），自动切换到下一个
+// 3. 直到找到一个可用的执行器
+// 4. 所有都失败则任务失败
+
+// BUSYOVER 忙碌转移流程：
+// 1. 选择第一个执行器发起调用
+// 2. 如果返回"忙碌"状态，自动切换到下一个
+// 3. 避免任务阻塞在繁忙的执行器上</code></pre>
+          <div class="tip">面试重点：FAILOVER 和 BUSYOVER 的区别。FAILOVER 在调用失败时转移，BUSYOVER 在执行器忙碌时转移。两者都提升了任务执行的可靠性。</div>
+        </div>
+
+        <!-- 1-4 分片广播 -->
+        <h3 id="s1-4">分片广播</h3>
+
+        <div class="card">
+          <h4>分片广播原理</h4>
+          <pre><code>// 分片广播任务执行流程：
+// 1. 调度中心向执行器的所有实例广播触发
+// 2. 每个实例收到分片参数：shardIndex（当前分片序号）、shardTotal（总分片数）
+// 3. 任务代码根据分片参数处理对应的数据子集
+
+// 示例：处理 100 万条数据
+@XxlJob("shardingJobHandler")
+public void execute() {
+    int shardIndex = XxlJobHelper.getShardIndex();  // 当前分片（0,1,2,...）
+    int shardTotal = XxlJobHelper.getShardTotal();  // 总分片数
+
+    // 分片查询：只处理 shardIndex 对应的数据
+    // SELECT * FROM orders WHERE id % shardTotal = shardIndex
+    List&lt;Order&gt; orders = orderMapper.selectByShard(shardTotal, shardIndex);
+
+    for (Order order : orders) {
+        processOrder(order);
+    }
+}
+
+// 优势：
+// - 3 个实例分片并行处理，速度提升 3 倍
+// - 每个实例只处理 1/3 的数据
+// - 天然支持水平扩展</code></pre>
+        </div>
+
+        <!-- 1-5 阻塞策略 -->
+        <h3 id="s1-5">阻塞策略</h3>
+
+        <div class="card">
+          <h4>阻塞处理策略</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>行为</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">SERIAL_EXECUTION</span></td><td>串行执行，上一次完成后再执行下一次</td><td>顺序敏感任务</td></tr>
+              <tr><td><span class="badge badge-green">DISCARD_LATER</span></td><td>丢弃本次调度，等待下一次</td><td>非关键周期任务</td></tr>
+              <tr><td><span class="badge badge-purple">COVER_EARLY</span></td><td>覆盖之前未完成的调度，立即执行</td><td>实时性要求高</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 场景：任务每 10 秒触发一次，但执行需要 30 秒
+
+// SERIAL_EXECUTION（串行）：
+// 第 1 次调度 → 执行（0-30s）
+// 第 2 次调度 → 等待 → 第 1 次完成后执行（30-60s）
+// 第 3 次调度 → 等待 → 第 2 次完成后执行（60-90s）
+// 结果：任务堆积，延迟越来越大
+
+// DISCARD_LATER（丢弃）：
+// 第 1 次调度 → 执行（0-30s）
+// 第 2 次调度 → 丢弃（因为上一次还没完成）
+// 第 3 次调度 → 丢弃
+// 第 4 次调度 → 执行（第 1 次已完成）
+// 结果：不堆积，但可能丢失执行
+
+// COVER_EARLY（覆盖）：
+// 第 1 次调度 → 执行（0-30s）
+// 第 2 次调度 → 中断第 1 次，立即执行
+// 结果：实时性最好，但可能中断正在执行的任务</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 失败处理 -->
+        <h3 id="s2-1">失败处理</h3>
+
+        <div class="card">
+          <h4>失败重试与告警</h4>
+          <pre><code>// 失败重试配置
+// 任务配置中设置"失败重试次数"（默认 0，最大 10）
+// 调度中心在任务失败后自动重新触发
+
+// 失败重试流程：
+// 1. 任务执行失败（执行器回调 FAIL）
+// 2. 调度中心检查重试次数 > 0
+// 3. 等待一定间隔后重新触发
+// 4. 根据路由策略选择执行器（可选择不同实例）
+// 5. 重试次数耗尽仍失败 → 触发告警
+
+// 失败告警方式：
+// 1. 邮件告警（配置邮件服务器）
+// 2. 钉钉/企业微信 webhook
+// 3. 自定义告警（实现 JobAlarm 接口）
+
+// 告警配置
+xxl:
+  job:
+    alarm:
+      email:
+        host: smtp.163.com
+        port: 25
+        user: alarm@163.com
+        password: xxx</code></pre>
+        </div>
+
+        <!-- 2-2 任务日志与回调 -->
+        <h3 id="s2-2">任务日志与回调</h3>
+
+        <div class="card">
+          <h4>任务日志机制</h4>
+          <pre><code>// 任务执行中写日志
+@XxlJob("demoJobHandler")
+public void execute() {
+    XxlJobHelper.log("任务开始执行");
+
+    // 业务逻辑
+    List&lt;Order&gt; orders = orderMapper.selectPending();
+    XxlJobHelper.log("查询到 {} 条待处理订单", orders.size());
+
+    for (Order order : orders) {
+        processOrder(order);
+        XxlJobHelper.log("处理订单 {} 完成", order.getId());
+    }
+
+    XxlJobHelper.log("任务执行完成");
+    // 日志会通过回调发送给调度中心
+}
+
+// 日志回调流程：
+// 1. 执行器将日志写入本地文件（logpath 目录）
+// 2. 任务完成后，执行器向调度中心回调结果
+// 3. 调度中心记录任务执行日志（成功/失败/耗时）
+// 4. 管理界面可查看实时日志（通过 HTTP 实时读取执行器日志文件）</code></pre>
+        </div>
+
+        <!-- 2-3 对比 -->
+        <h3 id="s2-3">与 Elastic-Job / Quartz 对比</h3>
+
+        <div class="card">
+          <h4>分布式任务调度框架对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>XXL-Job</th><th>Elastic-Job</th><th>Quartz</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>架构</td><td>中心化（调度中心）</td><td>去中心化（ZK 协调）</td><td>独立（DB 锁）</td></tr>
+              <tr><td>依赖</td><td>MySQL</td><td>Zookeeper</td><td>数据库</td></tr>
+              <tr><td>任务分片</td><td>✅ 分片广播</td><td>✅ 分片 + 个性化</td><td>❌ 需自行实现</td></tr>
+              <tr><td>失败重试</td><td>✅ 内置</td><td>❌ 需自行实现</td><td>❌</td></tr>
+              <tr><td>路由策略</td><td>✅ 9 种</td><td>基于分片</td><td>❌</td></tr>
+              <tr><td>管理界面</td><td>✅ 功能丰富</td><td>❌ 无</td><td>❌ 无</td></tr>
+              <tr><td>任务编排</td><td>✅ DAG 工作流</td><td>❌</td><td>❌</td></tr>
+              <tr><td>日志管理</td><td>✅ 实时日志</td><td>❌</td><td>❌</td></tr>
+              <tr><td>接入复杂度</td><td>低</td><td>中</td><td>中</td></tr>
+              <tr><td>社区活跃度</td><td>⭐⭐⭐⭐⭐</td><td>⭐⭐⭐</td><td>⭐⭐</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">XXL-Job 是目前国内使用最广泛的分布式任务调度框架。核心优势是轻量级、开箱即用、自带管理界面、社区活跃。Elastic-Job 适合需要精细分片的场景，Quartz 适合单机或简单集群。</div>
+        </div>
+
+        <!-- 2-4 跨语言支持 -->
+        <h3 id="s2-4">跨语言支持</h3>
+
+        <div class="card">
+          <h4>任务类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>语言</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>BEAN</strong></td><td>Java Bean 模式，通过 @XxlJob 注解定义</td><td>Java</td></tr>
+              <tr><td><strong>GLUE(Java)</strong></td><td>在线编辑 Java 代码，动态编译执行</td><td>Java</td></tr>
+              <tr><td><strong>GLUE(Shell)</strong></td><td>在线编辑 Shell 脚本</td><td>Shell</td></tr>
+              <tr><td><strong>GLUE(Python)</strong></td><td>在线编辑 Python 脚本</td><td>Python</td></tr>
+              <tr><td><strong>GLUE(NodeJS)</strong></td><td>在线编辑 Node.js 脚本</td><td>Node.js</td></tr>
+              <tr><td><strong>GLUE(PHP)</strong></td><td>在线编辑 PHP 脚本</td><td>PHP</td></tr>
+              <tr><td><strong>GLUE(PowerShell)</strong></td><td>在线编辑 PowerShell 脚本</td><td>PowerShell</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// BEAN 模式（最常用）
+@XxlJob("orderSyncHandler")
+public void execute() {
+    // Java 业务逻辑
+}
+
+// GLUE(Java) 模式
+// 在调度中心 Web 界面在线编辑 Java 代码
+// 系统动态编译并执行
+// 优势：修改任务逻辑无需重新部署
+public class DemoGlueJobHandler extends IJobHandler {
+    @Override
+    public void execute() throws Exception {
+        XxlJobHelper.log("GLUE Java 任务执行");
+    }
+}
+
+// GLUE(Shell) 模式
+// 在调度中心 Web 界面编写 Shell 脚本
+#!/bin/bash
+echo "开始执行数据备份..."
+mysqldump -u root mydb > /backup/mydb_$(date +%Y%m%d).sql
+echo "备份完成"</code></pre>
+          <div class="tip">GLUE 模式是 XXL-Job 的特色功能，支持在线编辑和发布任务代码，无需重新部署应用。版本管理功能可追溯每次代码变更。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请介绍 XXL-Job 的架构，调度中心和执行器是如何交互的？</div>
+          <div class="a">
+            <strong>参考：</strong>XXL-Job 由调度中心和执行器两部分组成。调度中心是独立部署的 Web 应用，负责管理任务配置、触发调度、管理日志。执行器嵌入业务应用，负责执行任务逻辑。交互流程：1）执行器启动时向调度中心注册地址，每 30 秒心跳续约；2）调度中心根据 Cron 表达式到时间后，通过 HTTP 调用执行器触发任务；3）执行器收到调度请求后异步执行任务；4）执行完成后通过 HTTP 回调结果给调度中心。调度中心集群部署时，通过数据库行锁保证同一任务只被一个节点调度。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 的路由策略有哪些？FAILOVER 和 BUSYOVER 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>XXL-Job 提供 9 种路由策略：FIRST、LAST、ROUND（轮询）、RANDOM（随机）、CONSISTENT_HASH（一致性 Hash）、LEAST_FREQUENTLY_USED（最不经常使用）、LEAST_RECENTLY_USED（最近最久未使用）、FAILOVER（故障转移）、BUSYOVER（忙碌转移）。FAILOVER 和 BUSYOVER 的区别：FAILOVER 在调用执行器失败时（超时、网络异常等）自动切换到下一个执行器重试；BUSYOVER 在执行器返回"忙碌"状态时自动切换到下一个。两者都提升了任务执行的可靠性，但 FAILOVER 关注的是"失败"，BUSYOVER 关注的是"阻塞"。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 的分片广播是什么原理？适合什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>分片广播是 XXL-Job 的并行任务处理机制。当任务配置为分片广播模式时，调度中心会向执行器的所有实例广播触发，每个实例收到两个分片参数：shardIndex（当前分片序号，从 0 开始）和 shardTotal（总分片数）。任务代码根据分片参数处理对应的数据子集，例如 SELECT * FROM table WHERE id % shardTotal = shardIndex。适合场景：1）大批量数据处理（如百万条数据导出）；2）定时数据同步（按 ID 取模分片并行同步）；3）报表生成（按时间维度分片计算）。优势是天然支持水平扩展，增加执行器实例即可提升并行度。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 的阻塞策略是什么？三种策略分别适用于什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>当任务的上一次调度还未完成时，新的调度触发就会被"阻塞"。三种策略：1）SERIAL_EXECUTION（串行执行）——新调度等待上一次完成后才执行，适合顺序敏感的任务，但可能导致任务堆积延迟；2）DISCARD_LATER（丢弃调度）——新调度被丢弃，等待下一次正常调度，适合非关键的周期任务，不会堆积但可能丢执行；3）COVER_EARLY（覆盖之前）——中断之前未完成的调度，立即执行新调度，适合实时性要求高的任务，但可能中断正在执行的业务逻辑。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 和 Elastic-Job 如何选型？</div>
+          <div class="a">
+            <strong>参考：</strong>选型建议：1）XXL-Job 适合大多数场景 — 轻量级、开箱即用、自带管理界面、支持失败重试和告警、社区活跃；2）Elastic-Job 适合需要精细分片的场景 — 基于 Zookeeper 的去中心化架构，支持分片个性化（每个分片可以有不同逻辑）；3）Quartz 适合简单场景 — 单机或简单集群，不需要分片和复杂路由。综合来看，XXL-Job 是首选：功能最全面（分片、路由、重试、告警、日志、任务编排 DAG），接入最简单（引入 starter 即可），管理最方便（Web 界面）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 的 GLUE 模式是什么？有什么优势和风险？</div>
+          <div class="a">
+            <strong>参考：</strong>GLUE 模式允许在调度中心 Web 界面在线编辑任务代码（Java/Shell/Python 等），系统动态编译并执行。优势：1）修改任务逻辑无需重新部署应用，实现热更新；2）支持版本管理，每次修改都有历史记录，可回滚；3）支持多种语言，灵活性高。风险：1）安全风险 — 在线执行代码需要严格的权限控制，防止恶意代码注入；2）调试困难 — GLUE 代码在远程执行器上运行，本地无法调试；3）依赖限制 — GLUE(Java) 只能使用执行器已有的依赖。建议：简单任务用 GLUE 模式，复杂任务用 BEAN 模式在代码中实现。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">XXL-Job 调度中心集群部署时，如何保证同一任务不被重复调度？</div>
+          <div class="a">
+            <strong>参考：</strong>XXL-Job 调度中心集群通过数据库行锁保证不重复调度。流程：1）所有调度中心节点共享同一个 MySQL 数据库；2）调度中心使用 xxl_job_lock 表的 FOR UPDATE 行锁进行调度竞争；3）一个调度周期开始时，所有节点竞争获取锁；4）获取锁成功的节点执行本次调度，其他节点跳过；5）调度完成后释放锁。这是典型的分布式锁方案，基于数据库的悲观锁实现。锁粒度是 schedule_type 级别（秒/分/时），不会出现同一任务被多个节点同时触发的情况。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          XXL-Job · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>可观测性对比 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* ===== Comparison specific styles ===== */
+    .vs-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 1.5rem 0;
+      box-shadow: var(--shadow);
+    }
+    .vs-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .vs-header .vs-side {
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+    .vs-header .vs-vs {
+      background: var(--surface2);
+      padding: 0.3rem 0.8rem;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+    .vs-header .vs-left { text-align: right; }
+    .vs-header .vs-right { text-align: left; }
+
+    .vs-body { padding: 1.5rem; }
+    .vs-row {
+      display: grid;
+      grid-template-columns: 1fr 120px 1fr;
+      gap: 0.8rem;
+      align-items: center;
+      padding: 0.7rem 0;
+      border-bottom: 1px solid rgba(71,85,105,0.3);
+    }
+    .vs-row:last-child { border-bottom: none; }
+    .vs-row .dim-label {
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-dim);
+    }
+    .vs-row .dim-val {
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .vs-row .dim-val.left { text-align: right; }
+    .vs-row .dim-val.right { text-align: left; }
+    .highlight { color: var(--accent3); font-weight: 600; }
+    .dim { color: var(--text-dim); }
+
+    .pos-badge {
+      display: inline-block;
+      padding: 0.2rem 0.7rem;
+      border-radius: 99px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-left: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .when-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .when-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem;
+    }
+    .when-card .wc-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .when-card .wc-scene {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .summary-table th {
+      background: var(--surface2);
+      padding: 0.7rem 0.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-align: center;
+      position: sticky;
+      top: 55px;
+      z-index: 10;
+    }
+    .summary-table td {
+      padding: 0.65rem 0.8rem;
+      border-bottom: 1px solid rgba(71,85,105,0.3);
+      text-align: center;
+      vertical-align: top;
+    }
+    .summary-table tr:hover { background: rgba(56,189,248,0.03); }
+    .summary-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent);
+      position: sticky;
+      left: 0;
+      background: var(--bg);
+      z-index: 5;
+    }
+    .summary-table tr:hover td:first-child { background: var(--bg); }
+
+    .score { font-weight: 700; }
+    .s-high { color: var(--accent3); }
+    .s-mid { color: var(--accent4); }
+    .s-low { color: var(--danger); }
+
+    @media (max-width: 768px) {
+      .vs-row { grid-template-columns: 1fr; gap: 0.3rem; }
+      .vs-row .dim-val.left, .vs-row .dim-val.right { text-align: left; }
+      .vs-row .dim-label { text-align: left; font-size: 0.75rem; }
+      .vs-header { grid-template-columns: 1fr; gap: 0.5rem; text-align: center !important; }
+      .vs-header .vs-left, .vs-header .vs-right { text-align: center !important; }
+      .summary-table { font-size: 0.75rem; }
+      .summary-table td, .summary-table th { padding: 0.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>📊 可观测性对比</h1>
+    <p class="subtitle">Prometheus vs Zabbix · SkyWalking vs Zipkin vs Jaeger · ELK vs Loki — 三大支柱，各有所长</p>
+
+    <!-- TOC -->
+    <div class="toc">
+      <div class="toc-title">📑 目录</div>
+      <ul>
+        <li><a href="#overview">全景定位：可观测性三大支柱</a></li>
+        <li><a href="#vs1">Prometheus vs Zabbix vs Datadog — 监控系统选型</a></li>
+        <li><a href="#vs2">SkyWalking vs Zipkin vs Jaeger vs OpenTelemetry — 链路追踪选型</a></li>
+        <li><a href="#vs3">ELK vs Loki vs ClickHouse 日志 — 日志系统选型</a></li>
+        <li><a href="#scenario">场景选型指南：什么场景该选什么？</a></li>
+        <li><a href="#interview">面试高频对比题</a></li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Overview -->
+    <!-- ============================================================ -->
+    <h2 id="overview"><span class="icon">🗺️</span>全景定位</h2>
+
+    <div class="diagram">
+      <div class="diagram-title">可观测性三大支柱</div>
+      <table>
+        <thead>
+          <tr>
+            <th>支柱</th>
+            <th>定义</th>
+            <th>核心工具</th>
+            <th>典型场景</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color:#38bdf8;">📈 Metrics（指标）</strong></td>
+            <td>可聚合的数值型时间序列数据</td>
+            <td>Prometheus · Zabbix · Datadog</td>
+            <td>CPU / 内存 / QPS / 延迟 / 错误率</td>
+          </tr>
+          <tr>
+            <td><strong style="color:#fb923c;">🔭 Tracing（链路追踪）</strong></td>
+            <td>单个请求在分布式系统中的完整路径</td>
+            <td>SkyWalking · Zipkin · Jaeger</td>
+            <td>跨服务调用链、慢请求定位、依赖分析</td>
+          </tr>
+          <tr>
+            <td><strong style="color:#a78bfa;">📝 Logging（日志）</strong></td>
+            <td>离散的事件记录，包含详细上下文</td>
+            <td>ELK · Loki · ClickHouse</td>
+            <td>错误排查、审计记录、业务分析</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>三者关系</h4>
+      <ul>
+        <li><strong>Metrics</strong> 回答"什么出了问题"（What）—— 通过指标异常发现系统问题</li>
+        <li><strong>Tracing</strong> 回答"问题在哪里"（Where）—— 通过链路追踪定位具体服务和方法</li>
+        <li><strong>Logging</strong> 回答"为什么出问题"（Why）—— 通过日志详情分析根因</li>
+        <li>三者相互关联：Metrics 告警触发 → 通过 TraceId 关联链路 → 通过 TraceId 关联日志</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 1: 监控系统 -->
+    <!-- ============================================================ -->
+    <h2 id="vs1"><span class="icon">⚔️</span>Prometheus vs Zabbix vs Datadog — 监控系统选型</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#38bdf8;">📈 Prometheus</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fb923c;">📊 Zabbix</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">云原生标准</span></div>
+          <div class="dim-label">定位</div>
+          <div class="dim-val right"><span class="highlight">传统运维监控</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">Pull 模型（主动拉取 /metrics）</div>
+          <div class="dim-label">采集方式</div>
+          <div class="dim-val right">Push + Pull（Agent 上报 + 主动探测）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">时序数据（Counter/Gauge/Histogram）</div>
+          <div class="dim-label">数据模型</div>
+          <div class="dim-val right">结构化监控项（数值/日志/事件）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">PromQL（强大灵活）</span></div>
+          <div class="dim-label">查询语言</div>
+          <div class="dim-val right">内置表达式（较简单）</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">K8s / Consul / DNS 自动发现</div>
+          <div class="dim-label">服务发现</div>
+          <div class="dim-val right"><span class="highlight">Agent 自动注册 + 网络扫描</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">内置（Alertmanager）</div>
+          <div class="dim-label">告警</div>
+          <div class="dim-val right"><span class="highlight">内置（功能更丰富）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">TSDB / Thanos / VictoriaMetrics</div>
+          <div class="dim-label">长期存储</div>
+          <div class="dim-val right">MySQL / PostgreSQL / TimescaleDB</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">容器和微服务首选</span></div>
+          <div class="dim-label">适用场景</div>
+          <div class="dim-val right"><span class="highlight">传统基础设施、网络设备</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#38bdf8;">📈 Prometheus</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#22d3ee;">☁️ Datadog</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left">开源免费</div>
+          <div class="dim-label">成本</div>
+          <div class="dim-val right"><span class="highlight">SaaS 商业产品（按主机/指标收费）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">自托管，需运维</div>
+          <div class="dim-label">部署</div>
+          <div class="dim-val right"><span class="highlight">开箱即用，零运维</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">需要集成 Grafana</div>
+          <div class="min-label">可视化</div>
+          <div class="dim-val right"><span class="highlight">内置强大的 Dashboard</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">仅指标</div>
+          <div class="dim-label">功能范围</div>
+          <div class="dim-val right"><span class="highlight">指标 + 日志 + 链路 + APM 一体化</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">社区生态丰富</span></div>
+          <div class="dim-label">生态</div>
+          <div class="dim-val right">200+ 集成，开箱即用</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试话术</strong>：Prometheus 是云原生监控标准（CNCF 毕业项目），适合 K8s 和微服务场景，开源免费但需自运维。Zabbix 适合传统运维（服务器、网络设备），功能全面但对云原生支持较弱。Datadog 是 SaaS 一体化可观测平台，开箱即用但成本高。中小团队用 Prometheus + Grafana，预算充足用 Datadog，传统运维用 Zabbix。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 2: 链路追踪 -->
+    <!-- ============================================================ -->
+    <h2 id="vs2"><span class="icon">⚔️</span>SkyWalking vs Zipkin vs Jaeger vs OpenTelemetry — 链路追踪选型</h2>
+
+    <div class="diagram" style="overflow-x:auto;">
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>🔭 SkyWalking</th>
+            <th>🔍 Zipkin</th>
+            <th>🟡 Jaeger</th>
+            <th>🔭 OpenTelemetry</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>探针方式</td>
+            <td><span class="score s-high">字节码增强（零侵入）</span></td>
+            <td>埋点 SDK</td>
+            <td>埋点 SDK / Envoy</td>
+            <td>SDK + Agent</td>
+          </tr>
+          <tr>
+            <td>语言支持</td>
+            <td>Java/Go/Python/Node/.NET</td>
+            <td>多语言</td>
+            <td>多语言</td>
+            <td><span class="score s-high">11 种语言</span></td>
+          </tr>
+          <tr>
+            <td>APM 能力</td>
+            <td><span class="score s-high">全功能 APM</span></td>
+            <td>纯追踪</td>
+            <td>纯追踪</td>
+            <td>采集标准化</td>
+          </tr>
+          <tr>
+            <td>拓扑图</td>
+            <td><span class="score s-high">自动拓扑</span></td>
+            <td>依赖图</td>
+            <td>依赖图</td>
+            <td>需后端支持</td>
+          </tr>
+          <tr>
+            <td>告警</td>
+            <td><span class="score s-high">内置</span></td>
+            <td>无</td>
+            <td>无</td>
+            <td>需后端支持</td>
+          </tr>
+          <tr>
+            <td>存储</td>
+            <td>ES / MySQL / BanyanDB</td>
+            <td>ES / MySQL / Cassandra</td>
+            <td>ES / Cassandra / Kafka</td>
+            <td>取决于后端</td>
+          </tr>
+          <tr>
+            <td>社区</td>
+            <td>Apache 顶级项目</td>
+            <td>开源（Twitter）</td>
+            <td>CNCF 毕业项目</td>
+            <td><span class="score s-high">CNCF 孵化（标准）</span></td>
+          </tr>
+          <tr>
+            <td>定位</td>
+            <td>全功能 APM 平台</td>
+            <td>轻量追踪工具</td>
+            <td>分布式追踪系统</td>
+            <td><span class="score s-high">可观测性标准</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#38bdf8;">🔭 SkyWalking</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fb923c;">🔍 Zipkin</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">零侵入（Java Agent）</span></div>
+          <div class="dim-label">接入方式</div>
+          <div class="dim-val right">需要代码埋点</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">全功能 APM（拓扑+指标+告警）</span></div>
+          <div class="dim-label">功能</div>
+          <div class="dim-val right">纯链路追踪</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">OAP Server 流式分析</div>
+          <div class="dim-label">架构</div>
+          <div class="dim-val right">Collector + Storage + UI</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">70+ 内置插件</span></div>
+          <div class="dim-label">中间件支持</div>
+          <div class="dim-val right">社区贡献插件</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#fb923c;">🔍 Zipkin</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fbbf24;">🟡 Jaeger</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left">Twitter 开源</div>
+          <div class="dim-label">来源</div>
+          <div class="dim-val right">Uber 开源</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">Java（较重）</div>
+          <div class="dim-label">Collector</div>
+          <div class="dim-val right"><span class="highlight">Go（轻量高性能）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">HTTP 传输</div>
+          <div class="dim-label">传输协议</div>
+          <div class="dim-val right"><span class="highlight">gRPC + UDP 采样</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">社区成熟</div>
+          <div class="dim-label">生态</div>
+          <div class="dim-val right"><span class="highlight">CNCF 毕业，K8s 集成好</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warn">
+      <strong>OpenTelemetry 的重要性</strong>：OpenTelemetry（OTel）是 CNCF 孵化的可观测性标准项目，统一了 Metrics、Tracing、Logging 的采集协议。它不是后端存储/分析工具，而是<strong>采集标准</strong>。推荐做法：用 OTel SDK 采集数据，后端选择 SkyWalking / Jaeger / Tempo 等。未来趋势是 OTel 成为唯一的采集标准。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VS 3: 日志系统 -->
+    <!-- ============================================================ -->
+    <h2 id="vs3"><span class="icon">⚔️</span>ELK vs Loki vs ClickHouse 日志 — 日志系统选型</h2>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#fb923c;">📝 ELK Stack</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#34d399;">🟢 Loki</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">全文检索（倒排索引）</span></div>
+          <div class="dim-label">索引方式</div>
+          <div class="dim-val right"><span class="highlight">标签索引（仅索引标签）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">功能强大但复杂</div>
+          <div class="dim-label">查询语言</div>
+          <div class="dim-val right"><span class="highlight">LogQL（类 PromQL）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">资源消耗大（JVM）</div>
+          <div class="dim-label">资源占用</div>
+          <div class="dim-val right"><span class="highlight">轻量级（Go 语言）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">高（全文索引）</div>
+          <div class="dim-label">存储成本</div>
+          <div class="dim-val right"><span class="highlight">低（仅索引标签）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">复杂查询性能好</span></div>
+          <div class="dim-label">查询性能</div>
+          <div class="dim-val right">简单查询快，复杂查询慢</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">Kibana（功能丰富）</div>
+          <div class="min-label">可视化</div>
+          <div class="dim-val right"><span class="highlight">Grafana（与指标统一）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">功能最全的日志方案</div>
+          <div class="dim-label">定位</div>
+          <div class="dim-val right"><span class="highlight">Grafana 生态的日志方案</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#34d399;">🟢 Loki</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fbbf24;">📊 ClickHouse</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left">标签索引（不索引日志内容）</div>
+          <div class="dim-label">索引方式</div>
+          <div class="dim-val right"><span class="highlight">列式存储 + 跳数索引</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">存储成本最低</div>
+          <div class="dim-label">存储成本</div>
+          <div class="dim-val right"><span class="highlight">较低（列式压缩）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">标签过滤快，全文搜索慢</div>
+          <div class="dim-label">查询性能</div>
+          <div class="dim-val right"><span class="highlight">分析查询极快（列式计算）</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">Grafana 原生集成</div>
+          <div class="dim-label">生态</div>
+          <div class="dim-val right">Grafana / 自研工具</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">日志聚合（轻量）</span></div>
+          <div class="dim-label">适用场景</div>
+          <div class="dim-val right"><span class="highlight">日志分析（OLAP）</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>面试话术</strong>：ELK 是最成熟的日志方案，功能最全但资源消耗大。Loki 是 Grafana 出品的轻量级日志系统，只索引标签不索引日志内容，存储成本最低，与 Grafana 指标面板统一。ClickHouse 是列式数据库做日志分析，分析查询极快，适合日志量大且需要复杂分析的场景。中小团队用 Loki，需要全文检索用 ELK，日志分析用 ClickHouse。
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Scenario Guide -->
+    <!-- ============================================================ -->
+    <h2 id="scenario"><span class="icon">🎯</span>场景选型指南</h2>
+
+    <div class="when-grid">
+      <div class="when-card" style="border-color:#38bdf8;">
+        <div class="wc-title" style="color:#38bdf8;">📈 选 Prometheus</div>
+        <div class="wc-scene">
+          • K8s / 微服务环境的指标监控<br>
+          • 需要强大的 PromQL 查询<br>
+          • 预算有限，开源免费<br>
+          • 搭配 Grafana 做可视化
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">📊 选 Zabbix</div>
+        <div class="wc-scene">
+          • 传统运维（服务器、网络设备、数据库）<br>
+          • 需要自动发现和 Agent 管理<br>
+          • 需要完善的告警和升级机制<br>
+          • 团队有 Zabbix 运维经验
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#38bdf8;">
+        <div class="wc-title" style="color:#38bdf8;">🔭 选 SkyWalking</div>
+        <div class="wc-scene">
+          • Java 为主的微服务架构<br>
+          • 需要零侵入接入（字节码增强）<br>
+          • 需要全功能 APM（拓扑+指标+告警）<br>
+          • 不想修改业务代码
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fbbf24;">
+        <div class="wc-title" style="color:#fbbf24;">🟡 选 Jaeger</div>
+        <div class="wc-scene">
+          • K8s 原生环境<br>
+          • 多语言微服务（Go / Java / Python）<br>
+          • 需要 CNCF 生态集成<br>
+          • 搭配 OpenTelemetry 采集
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#fb923c;">
+        <div class="wc-title" style="color:#fb923c;">📝 选 ELK</div>
+        <div class="wc-scene">
+          • 需要全文检索和复杂日志分析<br>
+          • 日志量大，需要强大的索引能力<br>
+          • 需要 Kibana 的丰富可视化<br>
+          • 团队有 ELK 运维经验
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#34d399;">
+        <div class="wc-title" style="color:#34d399;">🟢 选 Loki</div>
+        <div class="wc-scene">
+          • 已使用 Grafana 做指标监控<br>
+          • 需要轻量级日志聚合<br>
+          • 预算有限，存储成本敏感<br>
+          • 日志查询以标签过滤为主
+        </div>
+      </div>
+      <div class="when-card" style="border-color:#818cf8;">
+        <div class="wc-title" style="color:#818cf8;">🔭 选 OpenTelemetry</div>
+        <div class="wc-scene">
+          • 需要统一的可观测性采集标准<br>
+          • 多语言、多后端场景<br>
+          • 避免厂商锁定<br>
+          • 未来趋势，推荐提前布局
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Interview Questions -->
+    <!-- ============================================================ -->
+    <h2 id="interview"><span class="icon">🎤</span>面试高频对比题</h2>
+
+    <div class="qa">
+      <div class="q">可观测性的三大支柱是什么？它们之间有什么关系？</div>
+      <div class="a">
+        <strong>参考答案</strong>：三大支柱是 Metrics（指标）、Tracing（链路追踪）、Logging（日志）。Metrics 回答"什么出了问题"（CPU 高、延迟大），Tracing 回答"问题在哪里"（哪个服务、哪个方法慢），Logging 回答"为什么出问题"（具体异常信息）。三者通过 TraceId 关联：Metrics 告警触发 → 查看相关 Trace → 通过 TraceId 关联日志。完整的可观测性需要三者配合。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">Prometheus 和 Zabbix 有什么区别？什么时候用哪个？</div>
+      <div class="a">
+        <strong>参考答案</strong>：Prometheus 是云原生监控标准，Pull 模型采集 /metrics，PromQL 查询强大，适合 K8s 和微服务。Zabbix 是传统运维监控，支持 Agent 上报和主动探测，内置告警和自动发现，适合服务器、网络设备、数据库。选择：容器和微服务用 Prometheus，传统基础设施用 Zabbix，两者可以共存。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">SkyWalking 和 Jaeger 有什么区别？Java 项目该选哪个？</div>
+      <div class="a">
+        <strong>参考答案</strong>：SkyWalking 是全功能 APM 平台，Java Agent 字节码增强零侵入，内置拓扑图、指标、告警。Jaeger 是纯链路追踪系统，需要 SDK 埋点，CNCF 毕业项目。Java 项目推荐 SkyWalking：零侵入（不改代码）、70+ 内置插件（Spring/Dubbo/MySQL/Redis）、APM 能力强。如果团队已有 OpenTelemetry 基础，Jaeger + OTel 也是好选择。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q">ELK 和 Loki 有什么区别？什么时候用 Loki？</div>
+      <div class="a">
+        <strong>参考答案</strong>：ELK 基于 Elasticsearch 的倒排索引，对日志内容全文索引，查询强大但资源消耗大。Loki 只索引标签（不索引日志内容），存储成本低，与 Grafana 集成好。选择：需要全文检索和复杂分析用 ELK，日志量不大且已用 Grafana 用 Loki。Loki 的 LogQL 类似 PromQL，学习成本低。Loki 适合中小团队，ELK 适合大厂。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q>什么是 OpenTelemetry？为什么它很重要？</div>
+      <div class="a">
+        <strong>参考答案</strong>：OpenTelemetry（OTel）是 CNCF 孵化的可观测性标准项目，统一了 Metrics、Tracing、Logging 的采集协议和 SDK。它不是后端存储工具，而是采集标准。重要性：1）统一标准：避免每种工具各自埋点；2）厂商无关：采集一次，可发送到多个后端（Jaeger、SkyWalking、Datadog）；3）多语言支持：11 种语言 SDK；4）未来趋势：所有可观测工具都在适配 OTel。推荐：用 OTel SDK 采集数据，后端自由选择。
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="q>如何设计一个完整的可观测性方案？</div>
+      <div class="a">
+        <strong>参考答案</strong>：分层设计——<strong>指标层</strong>：Prometheus + Grafana，监控系统指标（CPU/内存/QPS/延迟），配置告警规则。<strong>链路层</strong>：SkyWalking 或 Jaeger + OpenTelemetry，自动追踪跨服务调用链。<strong>日志层</strong>：Loki 或 ELK，收集应用日志和访问日志。<strong>关联</strong>：通过 TraceId 将三者关联。告警触发 → 查看指标趋势 → 定位 Trace → 查看日志详情。所有工具通过 Grafana 统一展示。
+      </div>
+    </div>
+
+    <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
+      <a href="../index.html" style="color:var(--accent); text-decoration:none;">← 返回知识库目录</a>
+      <br><br>
+      可观测性对比 · 面试知识复习库 · Last updated 2026-06-10
+    </div>
+
+  </div>
+
+</body>
+</html>

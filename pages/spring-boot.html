@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spring Boot - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🚀 Spring Boot</h1>
+    <p class="subtitle">自动配置 · Starter · Actuator · 条件注解 · 嵌入式容器</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">自动配置原理</a></li>
+          <li class="sub"><a href="#s1-2">条件注解</a></li>
+          <li class="sub"><a href="#s1-3">Starter 机制</a></li>
+          <li class="sub"><a href="#s1-4">嵌入式容器</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">Actuator 监控</a></li>
+          <li class="sub"><a href="#s2-2">配置加载顺序</a></li>
+          <li class="sub"><a href="#s2-3">Profile 机制</a></li>
+          <li class="sub"><a href="#s2-4">启动流程</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 自动配置原理 -->
+        <h3 id="s1-1">自动配置原理</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Spring Boot 自动配置流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">@SpringBootApplication<br><small>启动注解</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">@EnableAutoConfiguration<br><small>开启自动配置</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">AutoConfigurationImportSelector<br><small>加载候选配置类</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">条件过滤<br><small>@Conditional 注解</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">注册 Bean<br><small>符合条件的配置生效</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>@SpringBootApplication 注解拆解</h4>
+          <pre><code>@SpringBootApplication
+// 等价于以下三个注解
+@SpringBootConfiguration    // 标记为配置类（本质是 @Configuration）
+@EnableAutoConfiguration    // 开启自动配置
+@ComponentScan              // 包扫描（默认扫描主类所在包及子包）
+
+// @EnableAutoConfiguration 的核心
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@AutoConfigurationPackage   // 将主类所在包注册到 AutoConfigurationPackages
+@Import(AutoConfigurationImportSelector.class)  // 导入自动配置类
+public @interface EnableAutoConfiguration { }</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>自动配置加载机制</h4>
+          <table>
+            <thead>
+              <tr><th>Spring Boot 版本</th><th>配置文件位置</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>2.x</td><td><code>META-INF/spring.factories</code></td><td>Key: EnableAutoConfiguration</td></tr>
+              <tr><td>3.x</td><td><code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code></td><td>每行一个配置类全限定名</td></tr>
+            </tbody>
+          </table>
+          <pre><code># Spring Boot 2.x spring.factories
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration,\
+  org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
+  org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+# Spring Boot 3.x AutoConfiguration.imports
+org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration
+org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration</code></pre>
+          <div class="tip">Spring Boot 3.x 改用 imports 文件替代 spring.factories，解析效率更高，因为 spring.factories 是全量加载再过滤，而 imports 文件支持条件化按需加载。</div>
+        </div>
+
+        <div class="card">
+          <h4>自动配置类示例分析</h4>
+          <pre><code>@Configuration
+@ConditionalOnClass(DataSource.class)           // classpath 有 DataSource 类才生效
+@ConditionalOnMissingBean(DataSource.class)     // 容器中没有 DataSource Bean 才生效
+@EnableConfigurationProperties(DataSourceProperties.class)
+public class DataSourceAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DataSource dataSource(DataSourceProperties properties) {
+        // 根据配置自动创建 DataSource
+        return DataSourceBuilder.create()
+            .url(properties.getUrl())
+            .username(properties.getUsername())
+            .password(properties.getPassword())
+            .build();
+    }
+}</code></pre>
+          <p>自动配置的核心思想：<strong>约定优于配置</strong>。引入 Starter 依赖后，Spring Boot 自动检测 classpath 上的类和已有的 Bean，通过条件注解决定是否创建默认的 Bean。用户可以通过自定义 Bean 或修改配置属性来覆盖默认行为。</p>
+        </div>
+
+        <!-- 1-2 条件注解 -->
+        <h3 id="s1-2">条件注解</h3>
+
+        <div class="card">
+          <h4>@Conditional 系列注解</h4>
+          <table>
+            <thead>
+              <tr><th>注解</th><th>生效条件</th><th>典型用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>@ConditionalOnClass</code></td><td>classpath 中存在指定类</td><td>引入某依赖后自动配置</td></tr>
+              <tr><td><code>@ConditionalOnMissingClass</code></td><td>classpath 中不存在指定类</td><td>排除特定依赖时的配置</td></tr>
+              <tr><td><code>@ConditionalOnBean</code></td><td>容器中存在指定 Bean</td><td>依赖其他 Bean 的配置</td></tr>
+              <tr><td><code>@ConditionalOnMissingBean</code></td><td>容器中不存在指定 Bean</td><td>提供默认实现，允许用户覆盖</td></tr>
+              <tr><td><code>@ConditionalOnProperty</code></td><td>配置属性满足条件</td><td><code>@ConditionalOnProperty(prefix="app", name="cache", havingValue="redis")</code></td></tr>
+              <tr><td><code>@ConditionalOnResource</code></td><td>classpath 中存在指定资源</td><td>存在某个配置文件时生效</td></tr>
+              <tr><td><code>@ConditionalOnWebApplication</code></td><td>当前是 Web 应用</td><td>Web 相关自动配置</td></tr>
+              <tr><td><code>@ConditionalOnNotWebApplication</code></td><td>当前不是 Web 应用</td><td>非 Web 环境的配置</td></tr>
+              <tr><td><code>@ConditionalOnExpression</code></td><td>SpEL 表达式为 true</td><td>复杂条件判断</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">@ConditionalOnMissingBean 是自动配置"可被覆盖"的关键：Spring Boot 先提供默认 Bean，如果用户自己定义了同类型的 Bean，自动配置的 Bean 就不会生效。</div>
+        </div>
+
+        <!-- 1-3 Starter 机制 -->
+        <h3 id="s1-3">Starter 机制</h3>
+
+        <div class="card">
+          <h4>Starter 的组成</h4>
+          <div class="diagram">
+            <div class="diagram-title">Starter 模块结构</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box" style="background:#c8e6c9">xxx-spring-boot-starter<br><small>空模块，仅传递依赖</small></div>
+                <div class="arch-box" style="margin-left:1rem;background:#bbdefb">xxx-spring-boot-autoconfigure<br><small>自动配置逻辑</small></div>
+              </div>
+              <div class="arch-connector">↓ 包含 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box">自动配置类<br><small>@Configuration + @Conditional</small></div>
+                <div class="arch-box" style="margin-left:1rem">属性配置类<br><small>@ConfigurationProperties</small></div>
+                <div class="arch-box" style="margin-left:1rem">spring.factories<br><small>注册自动配置类</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>自定义 Starter 步骤</h4>
+          <pre><code>// 1. 创建属性配置类
+@ConfigurationProperties(prefix = "app.greeting")
+public class GreetingProperties {
+    private String prefix = "Hello";
+    private String suffix = "!";
+    // getter/setter
+}
+
+// 2. 创建自动配置类
+@Configuration
+@EnableConfigurationProperties(GreetingProperties.class)
+@ConditionalOnClass(GreetingService.class)
+public class GreetingAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean
+    public GreetingService greetingService(GreetingProperties properties) {
+        return new GreetingService(properties.getPrefix(), properties.getSuffix());
+    }
+}
+
+// 3. 创建业务类
+public class GreetingService {
+    private final String prefix;
+    private final String suffix;
+
+    public GreetingService(String prefix, String suffix) {
+        this.prefix = prefix;
+        this.suffix = suffix;
+    }
+
+    public String greet(String name) {
+        return prefix + " " + name + suffix;
+    }
+}
+
+// 4. 注册自动配置
+// resources/META-INF/spring.factories
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.example.starter.GreetingAutoConfiguration
+
+// 5. 使用（引入 starter 依赖后）
+// application.yml
+app:
+  greeting:
+    prefix: "Hi"
+    suffix: "!!"
+
+@Autowired
+private GreetingService greetingService;</code></pre>
+        </div>
+
+        <!-- 1-4 嵌入式容器 -->
+        <h3 id="s1-4">嵌入式容器</h3>
+
+        <div class="card">
+          <h4>三种嵌入式容器对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Tomcat</th><th>Undertow</th><th>Jetty</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>默认</td><td>✅ Spring Boot 默认</td><td>需手动切换</td><td>需手动切换</td></tr>
+              <tr><td>IO 模型</td><td>BIO + NIO</td><td>XNIO（NIO2）</td><td>NIO</td></tr>
+              <tr><td>性能</td><td>中等</td><td>高（并发性能好）</td><td>中等</td></tr>
+              <tr><td>内存占用</td><td>中等</td><td>低</td><td>低</td></tr>
+              <tr><td>WebSocket</td><td>支持</td><td>支持</td><td>支持好</td></tr>
+              <tr><td>适用场景</td><td>通用场景</td><td>高并发微服务</td><td>长连接场景</td></tr>
+            </tbody>
+          </table>
+          <pre><code># 切换为 Undertow
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+    &lt;exclusions&gt;
+        &lt;exclusion&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
+        &lt;/exclusion&gt;
+    &lt;/exclusions&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-undertow&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>嵌入式容器配置</h4>
+          <pre><code># application.yml
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    session:
+      timeout: 30m
+  tomcat:
+    max-threads: 200          # 最大工作线程数
+    min-spare-threads: 10     # 最小空闲线程数
+    accept-count: 100         # 等待队列长度
+    max-connections: 10000    # 最大连接数
+    connection-timeout: 5000  # 连接超时(ms)
+    uri-encoding: UTF-8</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 Actuator 监控 -->
+        <h3 id="s2-1">Actuator 监控</h3>
+
+        <div class="card">
+          <h4>常用 Actuator 端点</h4>
+          <table>
+            <thead>
+              <tr><th>端点</th><th>说明</th><th>默认暴露</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>/actuator/health</code></td><td>健康检查（UP/DOWN/UNKNOWN）</td><td>是</td></tr>
+              <tr><td><code>/actuator/info</code></td><td>应用信息</td><td>是</td></tr>
+              <tr><td><code>/actuator/metrics</code></td><td>指标数据（JVM/HTTP/自定义）</td><td>否</td></tr>
+              <tr><td><code>/actuator/env</code></td><td>环境变量和配置属性</td><td>否</td></tr>
+              <tr><td><code>/actuator/beans</code></td><td>容器中所有 Bean 信息</td><td>否</td></tr>
+              <tr><td><code>/actuator/configprops</code></td><td>@ConfigurationProperties 配置</td><td>否</td></tr>
+              <tr><td><code>/actuator/mappings</code></td><td>URL 映射（RequestMapping）</td><td>否</td></tr>
+              <tr><td><code>/actuator/loggers</code></td><td>日志级别查看/修改</td><td>否</td></tr>
+              <tr><td><code>/actuator/threaddump</code></td><td>线程 dump</td><td>否</td></tr>
+              <tr><td><code>/actuator/heapdump</code></td><td>堆 dump 文件下载</td><td>否</td></tr>
+              <tr><td><code>/actuator/prometheus</code></td><td>Prometheus 格式指标</td><td>否</td></tr>
+            </tbody>
+          </table>
+          <pre><code># Actuator 配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env  # 暴露的端点
+        exclude: shutdown                  # 排除的端点
+  endpoint:
+    health:
+      show-details: always  # 显示详细健康信息（磁盘/DB/Redis）
+    shutdown:
+      enabled: true         # 开启优雅停机端点</code></pre>
+          <div class="warn">生产环境不要暴露所有端点，特别是 /actuator/env（可能泄露密码）和 /actuator/heapdump（内存快照）。建议只暴露 health、info、metrics。</div>
+        </div>
+
+        <!-- 2-2 配置加载顺序 -->
+        <h3 id="s2-2">配置加载顺序</h3>
+
+        <div class="card">
+          <h4>Spring Boot 配置优先级（从高到低）</h4>
+          <div class="layer-stack">
+            <div class="layer" style="background:#c8e6c9">1. 命令行参数 <code>--server.port=9090</code></div>
+            <div class="layer" style="background:#bbdefb">2. Java 系统属性 <code>-Dserver.port=9090</code></div>
+            <div class="layer" style="background:#e8f5e9">3. 操作系统环境变量 <code>SERVER_PORT=9090</code></div>
+            <div class="layer" style="background:#fff3e0">4. <code>application-{profile}.yml</code>（profile 特定配置）</div>
+            <div class="layer" style="background:#fce4ec">5. <code>application.yml</code>（主配置文件）</div>
+            <div class="layer" style="background:#f3e5f5">6. <code>@PropertySource</code> 引入的配置</div>
+            <div class="layer" style="background:#e0f7fa">7. 默认属性 <code>SpringApplication.setDefaultProperties()</code></div>
+          </div>
+          <div class="tip">同级目录下，YAML 优先于 Properties。jar 包外的配置文件优先于 jar 包内的。配置查找路径：file:./config/ > file:./ > classpath:/config/ > classpath:/。</div>
+        </div>
+
+        <!-- 2-3 Profile 机制 -->
+        <h3 id="s2-3">Profile 机制</h3>
+
+        <div class="card">
+          <h4>多环境配置</h4>
+          <pre><code># application.yml（公共配置）
+spring:
+  profiles:
+    active: dev  # 激活的 Profile
+
+---
+# application-dev.yml（开发环境）
+spring:
+  config:
+    activate:
+      on-profile: dev
+server:
+  port: 8080
+logging:
+  level:
+    com.example: debug
+
+---
+# application-prod.yml（生产环境）
+spring:
+  config:
+    activate:
+      on-profile: prod
+server:
+  port: 80
+logging:
+  level:
+    com.example: info</code></pre>
+          <p><strong>激活方式（优先级从高到低）：</strong></p>
+          <ol>
+            <li>命令行：<code>--spring.profiles.active=prod</code></li>
+            <li>Java 系统属性：<code>-Dspring.profiles.active=prod</code></li>
+            <li>环境变量：<code>SPRING_PROFILES_ACTIVE=prod</code></li>
+            <li>配置文件：<code>spring.profiles.active=dev</code></li>
+            <li>代码方式：<code>SpringApplication.setAdditionalProfiles("prod")</code></li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h4>Profile 分组</h4>
+          <pre><code># 分组管理 Profile
+spring:
+  profiles:
+    group:
+      production: proddb,prodmq,prodmetrics  # production = proddb + prodmq + prodmetrics
+      test: testdb,testmq
+
+# 激活分组
+--spring.profiles.active=production</code></pre>
+        </div>
+
+        <!-- 2-4 启动流程 -->
+        <h3 id="s2-4">启动流程</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Spring Boot 启动流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">new SpringApplication<br><small>推断应用类型、加载 Initializers/Listeners</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">run() 方法<br><small>核心启动流程</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">创建 Environment<br><small>加载配置文件</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">创建 ApplicationContext<br><small>注解/Web 上下文</small></div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0">↓</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">prepareContext<br><small>BeanDefinition 加载</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">refreshContext<br><small>容器刷新（Bean 创建）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">afterRefresh<br><small>回调 ApplicationRunner</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">启动完成<br><small>发布 ApplicationReadyEvent</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>启动流程关键步骤</h4>
+          <pre><code>@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        // SpringApplication.run() 内部流程
+        SpringApplication app = new SpringApplication(Application.class);
+
+        // 1. 推断应用类型（SERVLET / REACTIVE / NONE）
+        // 2. 加载 META-INF/spring.factories 中的 ApplicationContextInitializer
+        // 3. 加载 META-INF/spring.factories 中的 ApplicationListener
+
+        app.run(args);
+        // 4. 创建并配置 Environment（加载配置文件）
+        // 5. 创建 ApplicationContext
+        // 6. 准备 Context（加载 BeanDefinition）
+        // 7. 刷新 Context（refresh()，核心：Bean 实例化、依赖注入、AOP）
+        // 8. 调用 ApplicationRunner 和 CommandLineRunner
+        // 9. 发布 ApplicationReadyEvent
+    }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>ApplicationRunner vs CommandLineRunner</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>CommandLineRunner</h4>
+              <ul>
+                <li>接收 String[] args 原始参数</li>
+                <li>可使用 @Order 排序</li>
+                <li>在容器启动完成后执行</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>ApplicationRunner</h4>
+              <ul>
+                <li>接收 ApplicationArguments 对象</li>
+                <li>支持解析 optional/non-optional 参数</li>
+                <li>可使用 @Order 排序</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Spring Boot 的自动配置原理是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>@SpringBootApplication 包含 @EnableAutoConfiguration，它通过 @Import(AutoConfigurationImportSelector.class) 加载 META-INF/spring.factories（Spring Boot 2.x）或 AutoConfiguration.imports（3.x）中定义的自动配置类。每个自动配置类通过 @Conditional 系列注解进行条件判断（如 @ConditionalOnClass、@ConditionalOnMissingBean），只有满足条件时才会生效。用户自定义的 Bean 优先级高于自动配置（@ConditionalOnMissingBean 保证）。核心思想是"约定优于配置"——引入 Starter 后自动提供合理默认值，用户可按需覆盖。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>如何自定义一个 Spring Boot Starter？</div>
+          <div class="a">
+            <strong>参考：</strong>自定义 Starter 需要两个模块：1）autoconfigure 模块：创建 @ConfigurationProperties 属性类、@Configuration 自动配置类（使用 @Conditional 注解控制条件）、@Bean 定义默认实现；2）starter 模块：空模块，仅引入 autoconfigure 和必要的第三方依赖。注册：在 autoconfigure 模块的 META-INF/spring.factories 中注册自动配置类。命名规范：官方 spring-boot-starter-xxx，第三方 xxx-spring-boot-starter。最佳实践：自动配置类使用 @ConditionalOnMissingBean 保证可被覆盖；属性类使用 @ConfigurationProperties 绑定配置；提供 spring-configuration-metadata.json 支持 IDE 提示。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring Boot 的配置文件加载优先级是怎样的？</div>
+          <div class="a">
+            <strong>参考：</strong>优先级从高到低：1）命令行参数（--key=value）；2）Java 系统属性（-Dkey=value）；3）操作系统环境变量（大写下划线格式）；4）application-{profile}.yml；5）application.yml；6）@PropertySource 注解引入的配置；7）默认属性。同级目录下 jar 包外的配置优先于 jar 包内。查找路径优先级：file:./config/ > file:./ > classpath:/config/ > classpath:/。配置属性支持松散绑定（server.port = SERVER_PORT = server_port 都可以绑定）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring Boot 中 @ConditionalOnMissingBean 的作用是什么？为什么自动配置中大量使用？</div>
+          <div class="a">
+            <strong>参考：</strong>@ConditionalOnMissingBean 表示"当容器中不存在指定类型的 Bean 时才生效"。自动配置中大量使用是因为 Spring Boot 的设计理念是"提供默认实现，允许用户覆盖"。如果用户没有自定义 Bean，自动配置提供默认实现；如果用户自己定义了同类型的 Bean，自动配置就不会生效。例如 DataSourceAutoConfiguration 使用 @ConditionalOnMissingBean(DataSource.class)，当用户自己配置了数据源时，Spring Boot 的默认数据源配置就会被跳过。这保证了 Starter 的开箱即用同时又足够灵活。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring Boot 内嵌 Tomcat 的工作原理是什么？如何自定义配置？</div>
+          <div class="a">
+            <strong>参考：</strong>Spring Boot 通过 ServletWebServerFactory 创建内嵌的 Tomcat 实例。TomcatServletWebServerFactory 在 refresh() 阶段创建 Tomcat 实例、配置 Connector（端口/线程池/协议）、部署 Web 应用（DispatcherServlet）。自定义配置方式：1）application.yml 中通过 server.tomcat.* 配置线程池、连接数等；2）实现 WebServerFactoryCustomizer&lt;TomcatServletWebServerFactory&gt; 编程式自定义；3）注册 TomcatConnectorCustomizer 自定义 Connector。切换容器：排除 spring-boot-starter-tomcat，引入 spring-boot-starter-undertow 或 jetty。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring Boot 的 Profile 机制是如何工作的？</div>
+          <div class="a">
+            <strong>参考：</strong>Profile 是 Spring 提供的多环境配置机制。Spring Boot 扩展了它：1）通过 spring.profiles.active 激活指定 Profile；2）加载对应的 application-{profile}.yml 配置文件；3）@Profile 注解控制 Bean 只在特定 Profile 下创建。激活方式：命令行参数（最高优先级）、环境变量、配置文件、代码方式。Spring Boot 2.4+ 支持 Profile 分组（spring.profiles.group）和多文档 YAML（---分隔）。Spring Profiles 与 @Conditional 不同：Profile 控制"环境"，@Conditional 控制"条件"。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring Boot Actuator 的 health 端点如何自定义健康检查？</div>
+          <div class="a">
+            <strong>参考：</strong>实现 HealthIndicator 接口或继承 AbstractHealthIndicator：重写 doHealthCheck() 方法，检查自定义资源（如数据库连接、Redis 连接、外部 API 可用性），返回 Builder.up() 或 down() 状态。复合健康检查使用 CompositeHealthContributor。可通过 management.endpoint.health.show-details=always 显示详细信息。禁用默认健康检查：management.health.defaults.enabled=false。自定义健康状态码映射：management.endpoint.health.status.http-mapping.down=503。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Spring Boot · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分布式事务 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>💰 分布式事务</h1>
+    <p class="subtitle">2PC · TCC · Saga · 最终一致性 · Seata</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">分布式事务问题背景</a></li>
+          <li class="sub"><a href="#s1-2">2PC（两阶段提交）</a></li>
+          <li class="sub"><a href="#s1-3">3PC（三阶段提交）</a></li>
+          <li class="sub"><a href="#s1-4">TCC 模式</a></li>
+          <li class="sub"><a href="#s1-5">Saga 模式</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">本地消息表</a></li>
+          <li class="sub"><a href="#s2-2">最大努力通知</a></li>
+          <li class="sub"><a href="#s2-3">各方案对比</a></li>
+          <li class="sub"><a href="#s2-4">Seata 框架详解</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 分布式事务问题背景 -->
+        <h3 id="s1-1">分布式事务问题背景</h3>
+
+        <div class="card">
+          <h4>为什么需要分布式事务</h4>
+          <p>在单体应用中，所有业务操作在同一个数据库中完成，通过本地事务（ACID）保证数据一致性。但在微服务架构下：</p>
+          <ul>
+            <li><strong>跨服务调用：</strong>一个业务操作涉及多个微服务（如下单→扣库存→扣余额）</li>
+            <li><strong>跨数据库：</strong>不同服务使用不同的数据库，无法使用同一个本地事务</li>
+            <li><strong>数据一致性：</strong>部分操作成功、部分失败时，如何保证数据的一致性？</li>
+          </ul>
+          <pre><code>// 典型的分布式事务场景：下单
+// 服务 A（订单服务）：创建订单 → 成功
+// 服务 B（库存服务）：扣减库存 → 成功
+// 服务 C（账户服务）：扣减余额 → 失败
+// 问题：订单已创建、库存已扣减，但余额不足，需要回滚前两步</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>分布式事务的分类</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>刚性事务（强一致性）</h4>
+              <ul>
+                <li>遵循 ACID 特性</li>
+                <li>代表：2PC、3PC</li>
+                <li>性能差，资源锁定时间长</li>
+                <li>适合对一致性要求极高的场景</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>柔性事务（最终一致性）</h4>
+              <ul>
+                <li>遵循 BASE 理论</li>
+                <li>代表：TCC、Saga、本地消息表</li>
+                <li>性能好，业务侵入性不同</li>
+                <li>适合大多数互联网业务场景</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-2 2PC -->
+        <h3 id="s1-2">2PC（两阶段提交）</h3>
+
+        <div class="card">
+          <h4>2PC 流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">阶段1: Prepare<br><small>协调者询问所有参与者<br>"是否可以提交？"</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">参与者响应<br><small>执行事务但不提交<br>返回 YES / NO</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">阶段2: Commit/Abort<br><small>全部 YES → 提交<br>任一 NO → 回滚</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>2PC 存在的问题</h4>
+          <table>
+            <thead>
+              <tr><th>问题</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>同步阻塞</strong></td><td>参与者在 Prepare 后需要等待 Commit/Abort，期间资源被锁定，吞吐量低</td></tr>
+              <tr><td><strong>单点故障</strong></td><td>协调者是单点，宕机后参与者一直阻塞（锁定资源不释放）</td></tr>
+              <tr><td><strong>数据不一致</strong></td><td>Commit 消息丢失时，部分参与者提交、部分未提交，数据不一致</td></tr>
+              <tr><td><strong>脑裂风险</strong></td><td>网络分区可能导致多个协调者，造成混乱</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">2PC 在数据库层面广泛使用（如 MySQL XA 事务），但由于性能和可靠性问题，在微服务架构中很少直接使用。</div>
+        </div>
+
+        <!-- 1-3 3PC -->
+        <h3 id="s1-3">3PC（三阶段提交）</h3>
+
+        <div class="card">
+          <h4>3PC 对 2PC 的改进</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">阶段1: CanCommit<br><small>协调者询问是否可以提交<br>（轻量检查，不锁资源）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">阶段2: PreCommit<br><small>参与者执行事务但不提交<br>（类似 2PC 的 Prepare）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">阶段3: DoCommit<br><small>正式提交<br>引入超时机制</small></div>
+          </div>
+          <ul>
+            <li><strong>CanCommit 阶段：</strong>轻量检查，不锁定资源，减少阻塞时间</li>
+            <li><strong>超时机制：</strong>参与者在 DoCommit 阶段如果超时未收到通知，默认提交（减少阻塞）</li>
+            <li><strong>改进点：</strong>减少了阻塞范围，降低了单点故障的影响</li>
+            <li><strong>仍然存在的问题：</strong>网络分区时仍可能数据不一致（超时默认提交可能造成不一致）</li>
+          </ul>
+          <div class="warn">3PC 在实际系统中很少使用，因为超时默认提交的设计在网络分区时可能造成更严重的不一致。实际中更多使用 TCC、Saga 等柔性事务方案。</div>
+        </div>
+
+        <!-- 1-4 TCC -->
+        <h3 id="s1-4">TCC 模式</h3>
+
+        <div class="card">
+          <h4>TCC 三个阶段</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>Try - 预留资源</h4>
+              <ul>
+                <li>不直接执行业务，而是检查和预留资源</li>
+                <li>如：冻结库存 100 件、冻结余额 500 元</li>
+                <li>此时库存总量不变，只是被标记为"冻结"</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>Confirm - 确认执行</h4>
+              <ul>
+                <li>所有 Try 成功后，执行真正的业务操作</li>
+                <li>如：扣减冻结的库存、扣减冻结的余额</li>
+                <li>必须保证幂等（可能被重试）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>Cancel - 取消释放</h4>
+              <ul>
+                <li>任一 Try 失败，释放所有预留资源</li>
+                <li>如：解冻库存、解冻余额</li>
+                <li>必须保证幂等（可能被重试）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>流程示意</h4>
+              <ul>
+                <li>所有 Try 成功 → 所有 Confirm</li>
+                <li>任一 Try 失败 → 所有 Cancel</li>
+                <li>Confirm 失败 → 重试直到成功</li>
+                <li>Cancel 失败 → 重试直到成功</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>TCC 三大难题</h4>
+          <table>
+            <thead>
+              <tr><th>难题</th><th>场景</th><th>解决方案</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>空回滚</strong></td><td>Try 未执行就收到 Cancel（如 Try 超时）</td><td>Cancel 方法中检查 Try 是否执行过，未执行则跳过</td></tr>
+              <tr><td><strong>幂等</strong></td><td>Confirm/Cancel 被多次调用（网络重试）</td><td>使用事务状态表或唯一事务 ID 保证幂等</td></tr>
+              <tr><td><strong>悬挂</strong></td><td>Cancel 先于 Try 到达，Try 后续才到达</td><td>Try 方法中检查是否已 Cancel，是则拒绝执行</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// TCC 解决三大难题的通用模式
+// 使用事务状态表记录每个事务的状态
+CREATE TABLE tcc_transaction (
+    xid VARCHAR(128) PRIMARY KEY,  -- 全局事务 ID
+    status VARCHAR(16),             -- INIT/CONFIRMED/CANCELLED
+    created_at DATETIME
+);
+
+// Try: 检查状态表，如果已 CANCELLED 则拒绝（防悬挂）
+// Confirm: 检查状态表，如果已 CONFIRMED 则跳过（幂等）
+// Cancel: 检查状态表，如果已 CANCELLED 则跳过（幂等）
+//          如果 Try 未执行（无记录），标记为 CANCELLED（空回滚）</code></pre>
+        </div>
+
+        <!-- 1-5 Saga -->
+        <h3 id="s1-5">Saga 模式</h3>
+
+        <div class="card">
+          <h4>Saga 核心思想</h4>
+          <p>Saga 将一个长事务拆分为一系列本地事务 T1, T2, ..., Tn，每个本地事务 Ti 有对应的补偿事务 C1, C2, ..., Cn。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">T1: 创建订单</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">T2: 扣减库存</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">T3: 扣减余额</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">T4: 确认订单</div>
+          </div>
+          <p><strong>正向流程：</strong>T1 → T2 → T3 → T4（全部成功）</p>
+          <p><strong>补偿流程：</strong>若 T3 失败 → C2（恢复库存）→ C1（取消订单）</p>
+        </div>
+
+        <div class="card">
+          <h4>编排式 vs 协调式</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>编排式（Orchestration）</h4>
+              <ul>
+                <li>中央协调器（Orchestrator）控制整个流程</li>
+                <li>协调器依次调用各服务，处理成功/失败</li>
+                <li>优点：流程清晰、易于监控和调试</li>
+                <li>缺点：协调器是单点，可能成为瓶颈</li>
+                <li>代表：Seata Saga、Camunda</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>协调式（Choreography）</h4>
+              <ul>
+                <li>各服务通过事件驱动自行协调</li>
+                <li>服务 A 完成后发布事件，服务 B 监听并执行</li>
+                <li>优点：松耦合、无单点</li>
+                <li>缺点：流程分散、难以追踪和调试</li>
+                <li>代表：基于 MQ 的事件驱动架构</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 本地消息表 -->
+        <h3 id="s2-1">本地消息表</h3>
+
+        <div class="card">
+          <h4>可靠消息最终一致性</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">本地事务<br><small>业务操作 + 写入消息表<br>在同一事务中完成</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">定时任务<br><small>扫描未发送的消息<br>发送到 MQ</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">消费者处理<br><small>消费消息执行业务<br>保证幂等</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">确认完成<br><small>标记消息为已处理</small></div>
+          </div>
+          <pre><code>-- 本地消息表设计
+CREATE TABLE local_message (
+    id BIGINT PRIMARY KEY,
+    message_id VARCHAR(128) UNIQUE,  -- 消息唯一 ID
+    content TEXT,                      -- 消息内容
+    status VARCHAR(16),               -- PENDING/SENT/CONFIRMED
+    retry_count INT DEFAULT 0,         -- 重试次数
+    next_retry_at DATETIME,            -- 下次重试时间
+    created_at DATETIME,
+    updated_at DATETIME
+);
+
+-- 1. 业务操作和消息写入在同一个本地事务中
+BEGIN;
+INSERT INTO orders (...) VALUES (...);
+INSERT INTO local_message (...) VALUES (...);
+COMMIT;
+
+-- 2. 定时任务扫描 PENDING 状态的消息发送到 MQ
+-- 3. 消费者处理成功后回调标记为 CONFIRMED
+-- 4. 超过重试次数的消息进入死信队列人工处理</code></pre>
+        </div>
+
+        <!-- 2-2 最大努力通知 -->
+        <h3 id="s2-2">最大努力通知</h3>
+
+        <div class="card">
+          <h4>最大努力通知模式</h4>
+          <ul>
+            <li>业务操作完成后，向下游系统发送通知（通常通过 MQ 或 HTTP 回调）</li>
+            <li>如果通知失败，按策略重试（如 1min、5min、30min、1h、6h、12h）</li>
+            <li>达到最大重试次数后停止通知，需要人工介入</li>
+            <li><strong>适用于：</strong>对一致性要求不高的跨平台通知场景</li>
+            <li><strong>典型场景：</strong>支付结果通知（支付宝/微信支付回调商户）</li>
+          </ul>
+          <div class="tip">最大努力通知与本地消息表的区别：最大努力通知侧重于跨系统的"通知"，接受最终可能失败需要人工介入；本地消息表通过消息表+重试机制保证消息一定会被消费。</div>
+        </div>
+
+        <!-- 2-3 各方案对比 -->
+        <h3 id="s2-3">各方案对比</h3>
+
+        <div class="card">
+          <h4>分布式事务方案综合对比</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>一致性</th><th>性能</th><th>复杂度</th><th>业务侵入</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>2PC</strong></td><td>强一致</td><td><span class="badge badge-orange">低</span></td><td>中</td><td>小</td><td>数据库层面 XA 事务</td></tr>
+              <tr><td><strong>3PC</strong></td><td>强一致</td><td><span class="badge badge-blue">中</span></td><td>高</td><td>小</td><td>理论模型，实际少用</td></tr>
+              <tr><td><strong>TCC</strong></td><td>最终一致</td><td><span class="badge badge-green">高</span></td><td>高</td><td>大</td><td>资金、库存等核心业务</td></tr>
+              <tr><td><strong>Saga</strong></td><td>最终一致</td><td><span class="badge badge-green">高</span></td><td>中</td><td>中</td><td>长事务、跨多服务</td></tr>
+              <tr><td><strong>本地消息表</strong></td><td>最终一致</td><td><span class="badge badge-green">高</span></td><td>中</td><td>中</td><td>异步场景、跨服务调用</td></tr>
+              <tr><td><strong>最大努力通知</strong></td><td>最终一致</td><td><span class="badge badge-green">高</span></td><td>低</td><td>小</td><td>跨平台通知、支付回调</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 Seata 框架详解 -->
+        <h3 id="s2-4">Seata 框架详解</h3>
+
+        <div class="card">
+          <h4>Seata 架构</h4>
+          <div class="diagram">
+            <div class="diagram-title">Seata 三大组件</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box">TM（Transaction Manager）<br><small>事务管理器</small><br><small>开启/提交/回滚全局事务</small></div>
+                <div class="arch-box" style="margin-left:1rem">RM（Resource Manager）<br><small>资源管理器</small><br><small>管理分支事务资源</small></div>
+                <div class="arch-box" style="margin-left:1rem">TC（Transaction Coordinator）<br><small>事务协调者</small><br><small>Seata Server，维护全局状态</small></div>
+              </div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>TM：</strong>在业务入口开启全局事务（<code>@GlobalTransactional</code>），负责全局提交或回滚</li>
+            <li><strong>RM：</strong>每个参与微服务是一个 RM，负责注册分支事务和报告状态</li>
+            <li><strong>TC：</strong>独立部署的 Server，维护全局事务和分支事务状态，协调提交或回滚</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Seata 四种事务模式</h4>
+          <table>
+            <thead>
+              <tr><th>模式</th><th>原理</th><th>优点</th><th>缺点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>AT 模式</strong></td>
+                <td>自动代理 DataSource，拦截 SQL 生成 undo log，自动回滚</td>
+                <td>零侵入，使用简单</td>
+                <td>需要 undo_log 表，全局锁影响性能</td>
+                <td>大多数 CRUD 场景</td>
+              </tr>
+              <tr>
+                <td><strong>TCC 模式</strong></td>
+                <td>手动实现 Try/Confirm/Cancel</td>
+                <td>性能好，灵活</td>
+                <td>业务侵入大</td>
+                <td>资金、库存等核心业务</td>
+              </tr>
+              <tr>
+                <td><strong>Saga 模式</strong></td>
+                <td>状态机定义正向和补偿操作</td>
+                <td>长事务支持，补偿灵活</td>
+                <td>不保证隔离性</td>
+                <td>长流程业务（如审批）</td>
+              </tr>
+              <tr>
+                <td><strong>XA 模式</strong></td>
+                <td>基于数据库 XA 协议（2PC）</td>
+                <td>强一致性</td>
+                <td>性能差，阻塞</td>
+                <td>对一致性要求极高的场景</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Seata AT 模式原理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">TM 开启全局事务<br><small>@GlobalTransactional</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">RM 执行业务 SQL<br><small>拦截 SQL，记录 before image</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">记录 after image<br><small>写入 undo_log 表</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">注册分支事务<br>获取全局锁</div>
+          </div>
+          <ul>
+            <li><strong>一阶段：</strong>拦截业务 SQL，记录 before/after image 到 undo_log 表，本地事务提交</li>
+            <li><strong>二阶段提交：</strong>删除 undo_log，释放全局锁</li>
+            <li><strong>二阶段回滚：</strong>根据 undo_log 中的 before image 反向生成补偿 SQL，恢复数据</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>实际选型建议</h4>
+          <table>
+            <thead>
+              <tr><th>场景</th><th>推荐方案</th><th>理由</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>普通 CRUD 微服务</td><td>Seata AT</td><td>零侵入，开发效率高</td></tr>
+              <tr><td>资金交易</td><td>Seata TCC</td><td>高性能，资源预留保证安全</td></tr>
+              <tr><td>复杂长流程</td><td>Seata Saga</td><td>状态机编排，补偿逻辑灵活</td></tr>
+              <tr><td>异步通知</td><td>本地消息表</td><td>可靠消息，最终一致</td></tr>
+              <tr><td>跨平台回调</td><td>最大努力通知</td><td>简单，接受最终一致</td></tr>
+              <tr><td>数据库层面</td><td>XA（2PC）</td><td>强一致，但性能差</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是分布式事务？有哪些解决方案？</div>
+          <div class="a">
+            <strong>参考：</strong>分布式事务是指事务参与者、资源服务器、事务管理器位于不同节点上，需要跨服务/跨数据库保证数据一致性。解决方案分为刚性事务（2PC/3PC，强一致但性能差）和柔性事务（TCC/Saga/本地消息表/最大努力通知，最终一致但性能好）。实际选型：大多数场景用 Seata AT 模式（零侵入），资金等核心场景用 TCC，长流程用 Saga，异步场景用本地消息表。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">2PC 有什么问题？为什么不推荐在微服务中使用？</div>
+          <div class="a">
+            <strong>参考：</strong>2PC 的主要问题：1）同步阻塞——Prepare 阶段参与者锁定资源，等待 Commit/Abort，期间资源被占用，吞吐量低；2）单点故障——协调者宕机，参与者一直阻塞不释放资源；3）数据不一致——Commit 消息丢失时部分提交部分未提交。微服务架构中，服务间调用延迟较高，2PC 的阻塞问题更加严重，且微服务强调松耦合，不适合强依赖协调者的模式。推荐使用 TCC、Saga 等柔性事务方案。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TCC 模式是什么？如何解决空回滚、幂等、悬挂问题？</div>
+          <div class="a">
+            <strong>参考：</strong>TCC 将事务分为 Try（预留资源）、Confirm（确认执行）、Cancel（取消释放）三个阶段。三大难题解决方案：1）空回滚——Cancel 时检查 Try 是否执行过，通过事务状态表记录状态，未执行则标记为已取消并跳过；2）幂等——Confirm/Cancel 使用事务状态表或唯一事务 ID，已处理则直接返回成功；3）悬挂——Try 执行前检查是否已 Cancel，是则拒绝执行。通用做法是使用一张事务状态表记录每个全局事务的状态。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Saga 模式和 TCC 有什么区别？各适用于什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>核心区别：1）TCC 在 Try 阶段预留资源，有隔离性保证；Saga 直接执行业务，无资源预留，隔离性差；2）TCC 需要业务侵入（实现三个接口），Saga 只需实现正向和补偿操作；3）TCC 适合短事务，Saga 适合长事务（如审批流程）。适用场景：TCC 适合对隔离性要求高的场景（资金、库存），需要冻结资源防止脏读；Saga 适合长流程、跨多服务的场景，补偿逻辑简单明确。Saga 不保证隔离性，需要业务层自行处理（如乐观锁）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">本地消息表是如何保证分布式事务最终一致的？</div>
+          <div class="a">
+            <strong>参考：</strong>核心原理：业务操作和消息写入在同一个本地事务中完成，保证了"业务成功则消息一定存在"。具体流程：1）本地事务中同时执行业务 SQL 和插入消息表；2）定时任务扫描未发送的消息，发送到 MQ；3）消费者消费消息执行下游业务，保证幂等；4）处理成功后标记消息为已确认。可靠性保证：如果消息发送失败，定时任务会重试；如果消费失败，消费者重试。最终所有消息都会被成功消费，保证最终一致性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Seata 的 AT 模式是如何工作的？有什么限制？</div>
+          <div class="a">
+            <strong>参考：</strong>AT 模式自动代理 DataSource，拦截业务 SQL。一阶段：记录 before image（修改前数据），执行 SQL，记录 after image（修改后数据），写入 undo_log 表，本地事务提交，同时向 TC 注册分支事务获取全局锁。二阶段提交：删除 undo_log，释放全局锁。二阶段回滚：根据 before image 生成反向 SQL 恢复数据。限制：1）需要在每个数据库创建 undo_log 表；2）全局锁会影响并发性能；3）不支持含有外键等复杂 SQL；4）需要数据库支持本地事务。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">在实际项目中如何选择分布式事务方案？</div>
+          <div class="a">
+            <strong>参考：</strong>选型依据：1）一致性要求——强一致选 2PC/XA，最终一致选 TCC/Saga/消息表；2）性能要求——高并发选 TCC（资源预留时间短）或本地消息表（异步）；3）开发成本——低成本选 Seata AT（零侵入）或最大努力通知；4）业务场景——资金用 TCC，长流程用 Saga，异步用消息表。实际推荐：大多数场景用 Seata AT 模式即可满足需求；对性能和隔离性要求高的核心业务（如支付）用 Seata TCC；跨系统异步通知用本地消息表或最大努力通知。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          分布式事务 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

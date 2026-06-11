@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🛡️ Sentinel</h1>
+    <p class="subtitle">限流 · 熔断降级 · 热点防护 · 系统自适应保护</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">核心概念</a></li>
+          <li class="sub"><a href="#s1-2">限流算法</a></li>
+          <li class="sub"><a href="#s1-3">流控规则</a></li>
+          <li class="sub"><a href="#s1-4">熔断降级</a></li>
+          <li class="sub"><a href="#s1-5">热点参数限流</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">系统自适应保护</a></li>
+          <li class="sub"><a href="#s2-2">Sentinel vs Hystrix</a></li>
+          <li class="sub"><a href="#s2-3">Dashboard 控制台</a></li>
+          <li class="sub"><a href="#s2-4">Spring Cloud 集成</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 核心概念 -->
+        <h3 id="s1-1">核心概念</h3>
+
+        <div class="card">
+          <h4>Sentinel 核心概念</h4>
+          <table>
+            <thead>
+              <tr><th>概念</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Resource</strong></td><td>需要保护的资源，可以是方法、接口、代码块</td></tr>
+              <tr><td><strong>Entry</strong></td><td>资源访问的入口，每次访问资源都需通过 Entry</td></tr>
+              <tr><td><strong>Slot Chain</strong></td><td>处理链，多个 Slot 按顺序处理（责任链模式）</td></tr>
+              <tr><td><strong>Node</strong></td><td>资源的实时统计节点（QPS、线程数、异常数等）</td></tr>
+              <tr><td><strong>Context</strong></td><td>调用上下文，包含入口名、调用链信息</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Slot Chain 处理链</h4>
+          <div class="diagram">
+            <div class="diagram-title">Sentinel Slot Chain</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">NodeSelectorSlot<br><small>构建调用树</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">ClusterBuilderSlot<br><small>集群统计</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">StatisticSlot<br><small>实时统计</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">FlowSlot<br><small>限流判断</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">DegradeSlot<br><small>熔断判断</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-blue">AuthoritySlot<br><small>授权检查</small></div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>NodeSelectorSlot：</strong>构建资源的调用树结构，用于统计入口流量</li>
+            <li><strong>ClusterBuilderSlot：</strong>构建资源的集群维度统计（ClusterNode）</li>
+            <li><strong>StatisticSlot：</strong>核心统计 Slot，记录 QPS、线程数、响应时间等</li>
+            <li><strong>FlowSlot：</strong>限流判断，根据 FlowRule 决定是否通过</li>
+            <li><strong>DegradeSlot：</strong>熔断判断，根据 DegradeRule 决定是否熔断</li>
+            <li><strong>AuthoritySlot：</strong>黑白名单授权检查</li>
+            <li><strong>SystemSlot：</strong>系统维度保护（CPU、负载等）</li>
+          </ul>
+          <div class="tip">Sentinel 的核心设计思想：所有保护功能都是 Slot Chain 中的一个 Slot，通过责任链模式串联，每个 Slot 职责单一，可插拔。</div>
+        </div>
+
+        <!-- 1-2 限流算法 -->
+        <h3 id="s1-2">限流算法</h3>
+
+        <div class="card">
+          <h4>四种限流算法</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>原理</th><th>优点</th><th>缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>固定窗口</strong></td>
+                <td>固定时间窗口内计数</td>
+                <td>实现简单</td>
+                <td>窗口边界突发流量问题</td>
+              </tr>
+              <tr>
+                <td><strong>滑动窗口</strong></td>
+                <td>将窗口细分为多个小格，滑动统计</td>
+                <td>解决边界问题，统计精确</td>
+                <td>内存占用稍高</td>
+              </tr>
+              <tr>
+                <td><strong>漏桶</strong></td>
+                <td>固定速率流出，多余的丢弃</td>
+                <td>流量平滑</td>
+                <td>无法应对突发流量</td>
+              </tr>
+              <tr>
+                <td><strong>令牌桶</strong></td>
+                <td>固定速率生成令牌，请求需获取令牌</td>
+                <td>允许一定突发</td>
+                <td>实现相对复杂</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tip">Sentinel 默认使用<strong>滑动窗口</strong>算法（LeapArray），将时间窗口划分为多个 bucket（默认 2 个，interval 为 1 秒），每个 bucket 统计该时间片内的请求数据。</div>
+        </div>
+
+        <div class="card">
+          <h4>Sentinel 滑动窗口实现</h4>
+          <pre><code>// Sentinel 的滑动窗口核心结构 LeapArray
+public class LeapArray&lt;T&gt; {
+    int windowLengthInMs;   // 每个 bucket 的时间长度（毫秒）
+    int sampleCount;        // bucket 数量
+    int intervalInMs;       // 总时间窗口长度
+    AtomicReferenceArray&lt;WindowWrap&lt;T&gt;&gt; array; // bucket 数组
+
+    // 默认配置：2 个 bucket，每个 500ms，总窗口 1 秒
+    // 统计时：获取当前时间所在的 bucket
+    // 如果 bucket 已过期（跨窗口），重置 bucket 数据
+    // 累加当前 bucket 的计数
+    // 返回总窗口内的计数总和
+}
+
+// WindowWrap 包装
+class WindowWrap&lt;T&gt; {
+    long windowStart;  // 窗口开始时间
+    int windowLength;  // 窗口长度
+    T value;           // 统计数据（MetricBucket）
+}
+
+// MetricBucket 统计计数
+class MetricBucket {
+    LongAdder[] counters;  // 不同事件类型的计数器
+    // PASS - 通过的请求
+    // BLOCK - 被拦截的请求
+    // EXCEPTION - 异常请求
+    // SUCCESS - 成功请求
+    // RT - 响应时间
+}</code></pre>
+        </div>
+
+        <!-- 1-3 流控规则 -->
+        <h3 id="s1-3">流控规则</h3>
+
+        <div class="card">
+          <h4>流控规则配置</h4>
+          <table>
+            <thead>
+              <tr><th>属性</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>resource</strong></td><td>资源名称</td></tr>
+              <tr><td><strong>grade</strong></td><td>限流阈值类型：QPS(0) / 线程数(1)</td></tr>
+              <tr><td><strong>count</strong></td><td>限流阈值</td></tr>
+              <tr><td><strong>strategy</strong></td><td>流控模式：直接(0) / 关联(1) / 链路(2)</td></tr>
+              <tr><td><strong>controlBehavior</strong></td><td>流控效果：快速失败(0) / Warm Up(1) / 排队等待(2)</td></tr>
+              <tr><td><strong>warmUpPeriodSec</strong></td><td>预热时长（秒）</td></tr>
+              <tr><td><strong>maxQueueingTimeMs</strong></td><td>最大排队等待时间（毫秒）</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 流控模式
+// 1. 直接：资源本身超过阈值就限流
+// 2. 关联：关联资源超过阈值，限流当前资源
+//    例：读 /write 超过阈值，限流 /read（保护写优先）
+// 3. 链路：入口资源超过阈值，限流从该入口的调用
+//    例：入口 A 和 B 都调用 resource，只限制从 A 的调用
+
+// 流控效果
+// 1. 快速失败（默认）：直接拒绝，抛出 BlockException
+// 2. Warm Up：预热模式，阈值从 threshold/coldFactor 开始
+//    经过预热时长逐步升至设定阈值（适合冷启动场景）
+// 3. 排队等待：匀速排队，漏桶模式
+//    超过阈值的请求排队等待，超时则拒绝</code></pre>
+        </div>
+
+        <!-- 1-4 熔断降级 -->
+        <h3 id="s1-4">熔断降级</h3>
+
+        <div class="card">
+          <h4>熔断策略</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>触发条件</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">慢调用比例</span></td><td>慢调用比例超过阈值</td><td>响应时间超过设定值的请求占比</td></tr>
+              <tr><td><span class="badge badge-green">异常比例</span></td><td>异常比例超过阈值</td><td>异常请求占总请求的比例</td></tr>
+              <tr><td><span class="badge badge-purple">异常数</span></td><td>异常数超过阈值</td><td>单位时间内的异常绝对数量</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>熔断器状态机</h4>
+          <div class="diagram">
+            <div class="diagram-title">熔断器状态转换</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box" style="background:var(--green)">CLOSED<br><small>关闭（正常放行）</small></div>
+                <div class="arch-box" style="margin-left:1.5rem;background:var(--red)">OPEN<br><small>打开（拒绝所有）</small></div>
+                <div class="arch-box" style="margin-left:1.5rem;background:var(--orange)">HALF-OPEN<br><small>半开（试探放行）</small></div>
+              </div>
+              <div class="arch-connector">
+                触发条件满足 → CLOSED → OPEN（熔断）<br>
+                熔断时长结束 → OPEN → HALF-OPEN（试探）<br>
+                试探成功 → HALF-OPEN → CLOSED（恢复）<br>
+                试探失败 → HALF-OPEN → OPEN（继续熔断）
+              </div>
+            </div>
+          </div>
+          <pre><code>// 熔断规则配置
+DegradeRule rule = new DegradeRule("resource")
+    .setGrade(CircuitBreakerStrategy.SLOW_REQUEST_RATIO.getType())
+    .setCount(0.5)              // 慢调用比例阈值 50%
+    .setSlowRatioThreshold(200) // 慢调用 RT 阈值 200ms
+    .setTimeWindow(10)          // 熔断持续时间 10 秒
+    .setMinRequestAmount(5)     // 最小请求数（防止样本不足）
+    .setStatIntervalMs(10000);  // 统计窗口 10 秒</code></pre>
+        </div>
+
+        <!-- 1-5 热点参数限流 -->
+        <h3 id="s1-5">热点参数限流</h3>
+
+        <div class="card">
+          <h4>热点参数限流</h4>
+          <pre><code>// 热点参数限流：针对特定参数值设置不同阈值
+// 例如：商品 ID=1001 是热门商品，限流阈值 100 QPS
+//       其他商品阈值 1000 QPS
+
+@SentinelResource(value = "getProduct", blockHandler = "getBlock")
+public Product getProduct(Long productId) {
+    return productService.getById(productId);
+}
+
+// 配置热点规则
+ParamFlowRule rule = new ParamFlowRule("getProduct")
+    .setParamIdx(0)              // 参数索引（0 = 第一个参数）
+    .setGrade(RuleConstant.FLOW_GRADE_QPS)
+    .setCount(1000);             // 默认阈值
+
+// 特殊值配置
+ParamFlowItem item = new ParamFlowItem()
+    .setObject(String.valueOf(1001L))  // 商品 ID 1001
+    .setClassType(long.class)
+    .setCount(100);                    // 热门商品限流 100 QPS
+rule.setParamFlowItemList(Collections.singletonList(item));</code></pre>
+          <div class="tip">热点参数限流是 Sentinel 的特色功能，适合秒杀、热门商品等场景。底层使用 LRU 缓存 + 滑动窗口统计每个参数值的 QPS。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 系统自适应保护 -->
+        <h3 id="s2-1">系统自适应保护</h3>
+
+        <div class="card">
+          <h4>系统保护规则</h4>
+          <table>
+            <thead>
+              <tr><th>指标</th><th>说明</th><th>阈值</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>系统负载 (load)</strong></td><td>系统 1 分钟平均负载</td><td>当 load > 阈值且当前线程数 > QPS 时触发</td></tr>
+              <tr><td><strong>CPU 使用率</strong></td><td>系统 CPU 使用率</td><td>CPU > 阈值时触发</td></tr>
+              <tr><td><strong>平均 RT</strong></td><td>所有入口资源的平均响应时间</td><td>RT > 阈值时触发</td></tr>
+              <tr><td><strong>入口 QPS</strong></td><td>所有入口资源的总 QPS</td><td>QPS > 阈值时触发</td></tr>
+              <tr><td><strong>并发线程数</strong></td><td>所有入口资源的并发线程数</td><td>线程数 > 阈值时触发</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 系统保护规则
+SystemRule rule = new SystemRule();
+rule.setHighestSystemLoad(5.0);      // 系统负载 > 5 时触发
+rule.setHighestCpuUsage(0.8);        // CPU > 80% 时触发
+rule.setAvgRt(200);                  // 平均 RT > 200ms 时触发
+rule.setMaxThread(200);              // 并发线程 > 200 时触发
+rule.setQps(1000);                   // 入口 QPS > 1000 时触发</code></pre>
+          <div class="tip">系统自适应保护是全局维度的防护，当系统整体负载过高时，自动降低所有入口的流量，防止系统过载崩溃。</div>
+        </div>
+
+        <!-- 2-2 Sentinel vs Hystrix -->
+        <h3 id="s2-2">Sentinel vs Hystrix</h3>
+
+        <div class="card">
+          <h4>Sentinel 与 Hystrix 对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Sentinel</th><th>Hystrix</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>隔离策略</td><td>信号量（并发控制）</td><td>信号量 + 线程池</td></tr>
+              <tr><td>熔断策略</td><td>慢调用比例/异常比例/异常数</td><td>异常比例/异常数</td></tr>
+              <tr><td>限流</td><td>QPS/线程数，多维度</td><td>❌ 无内置限流</td></tr>
+              <tr><td>热点限流</td><td>✅ 支持</td><td>❌</td></tr>
+              <tr><td>系统保护</td><td>✅ CPU/负载/RT</td><td>❌</td></tr>
+              <tr><td>动态规则</td><td>✅ Dashboard 推送</td><td>需配合 Archaius</td></tr>
+              <tr><td>实时监控</td><td>✅ Dashboard 控制台</td><td>Hystrix Dashboard</td></tr>
+              <tr><td>扩展性</td><td>Slot Chain 可扩展</td><td>Command 模式</td></tr>
+              <tr><td>维护状态</td><td>✅ 活跃维护</td><td>❌ 已停止维护</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Sentinel 是 Hystrix 的全面升级替代品。Hystrix 已于 2018 年进入维护模式，Netflix 官方推荐使用 Resilience4j，而 Spring Cloud 生态推荐 Sentinel。</div>
+        </div>
+
+        <!-- 2-3 Dashboard -->
+        <h3 id="s2-3">Dashboard 控制台</h3>
+
+        <div class="card">
+          <h4>Dashboard 功能</h4>
+          <ul>
+            <li><strong>实时监控：</strong>实时展示资源的 QPS、响应时间、异常数等指标</li>
+            <li><strong>规则管理：</strong>在线配置流控、降级、热点、系统、授权规则</li>
+            <li><strong>集群聚合：</strong>支持集群维度的流量统计和规则管理</li>
+            <li><strong>机器发现：</strong>自动发现接入 Sentinel 的应用实例</li>
+          </ul>
+          <pre><code># 启动 Dashboard
+java -Dserver.port=8080 -Dcsp.sentinel.dashboard.server=localhost:8080 \
+     -jar sentinel-dashboard.jar
+
+# 应用接入 Dashboard
+spring:
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8080  # Dashboard 地址
+        port: 8719                 # 与 Dashboard 通信端口</code></pre>
+        </div>
+
+        <!-- 2-4 Spring Cloud 集成 -->
+        <h3 id="s2-4">Spring Cloud 集成</h3>
+
+        <div class="card">
+          <h4>@SentinelResource 注解</h4>
+          <pre><code>// @SentinelResource 核心注解
+@SentinelResource(
+    value = "getOrder",                    // 资源名
+    blockHandler = "getOrderBlock",        // 限流/熔断处理方法
+    blockHandlerClass = OrderBlock.class,  // 处理方法所在类
+    fallback = "getOrderFallback",         // 业务异常兜底方法
+    fallbackClass = OrderFallback.class,   // 兜底方法所在类
+    exceptionsToIgnore = {IllegalArgumentException.class} // 忽略的异常
+)
+public Order getOrder(Long orderId) {
+    return orderService.getById(orderId);
+}
+
+// blockHandler：处理 BlockException（限流/熔断）
+// 必须在原方法同签名基础上加 BlockException 参数
+public class OrderBlock {
+    public static Order getOrderBlock(Long orderId, BlockException ex) {
+        return new Order(orderId, "限流降级");
+    }
+}
+
+// fallback：处理业务异常
+// 必须在原方法同签名基础上加 Throwable 参数
+public class OrderFallback {
+    public static Order getOrderFallback(Long orderId, Throwable t) {
+        return new Order(orderId, "业务降级");
+    }
+}
+
+// 优先级：blockHandler > fallback > 全局兜底</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>动态规则数据源</h4>
+          <pre><code>// 支持多种动态规则数据源
+// 1. Nacos 数据源（推荐）
+spring:
+  cloud:
+    sentinel:
+      datasource:
+        flow:
+          nacos:
+            server-addr: localhost:8848
+            dataId: sentinel-flow-rules
+            groupId: SENTINEL_GROUP
+            rule-type: flow        # flow/degrade/param-flow/system/authority
+            data-type: json
+
+// 2. Apollo 数据源
+// 3. Zookeeper 数据源
+// 4. 文件数据源
+// 5. Redis 数据源
+
+// 规则推送流程：
+// Dashboard → Nacos（持久化） → Sentinel Client（拉取/推送）
+// Nacos 变更 → Sentinel Client 收到通知 → 更新内存规则</code></pre>
+          <div class="tip">生产环境建议使用 Nacos 作为规则数据源，实现规则持久化和动态推送。Dashboard 配置的规则默认只在内存中，重启后丢失。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Sentinel 的核心架构是什么？Slot Chain 是如何工作的？</div>
+          <div class="a">
+            <strong>参考：</strong>Sentinel 的核心是 Slot Chain（处理链），采用责任链模式。每次访问资源时，通过 SphU.entry() 创建 Entry，依次经过各个 Slot 处理：NodeSelectorSlot（构建调用树）→ ClusterBuilderSlot（集群统计）→ StatisticSlot（实时统计 QPS/RT/线程数）→ FlowSlot（限流判断）→ DegradeSlot（熔断判断）→ AuthoritySlot（授权检查）→ SystemSlot（系统保护）。每个 Slot 职责单一，可插拔扩展。StatisticSlot 是核心，负责统计实时指标供其他 Slot 使用。如果某个 Slot 判定拦截，会抛出 BlockException。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Sentinel 的流控模式有哪些？关联模式和链路模式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Sentinel 有三种流控模式：1）直接模式 — 资源本身超过阈值就限流；2）关联模式 — 当关联资源超过阈值时限流当前资源，例如写接口 /write 超过阈值时限流读接口 /read，保护写优先；3）链路模式 — 从特定入口调用的资源被限流，例如入口 A 和 B 都调用 resource，只限制从 A 进入的调用，B 不受影响。区别：关联模式关注的是"别的资源"的流量，链路模式关注的是"特定入口"的流量。链路模式需要配合 @SentinelResource 的 entry 属性使用。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Sentinel 的熔断器状态机是怎样的？从 CLOSED 到 OPEN 的转换条件是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>Sentinel 熔断器有三个状态：CLOSED（正常放行）、OPEN（拒绝所有请求）、HALF-OPEN（试探放行）。从 CLOSED 到 OPEN 的转换条件取决于熔断策略：1）慢调用比例 — 在统计窗口内，响应时间超过阈值的请求比例超过设定值；2）异常比例 — 异常请求占总请求的比例超过设定值；3）异常数 — 异常请求绝对数量超过设定值。触发熔断后进入 OPEN 状态，拒绝所有请求。经过熔断时长（timeWindow）后进入 HALF-OPEN，放行一个试探请求。试探成功回到 CLOSED，失败回到 OPEN。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Sentinel 的热点参数限流是什么原理？适用于什么场景？</div>
+          <div class="a">
+            <strong>参考：</strong>热点参数限流是 Sentinel 的特色功能，可以针对方法参数的特定值设置不同的限流阈值。例如商品详情接口，热门商品 ID=1001 设置 100 QPS，其他商品 1000 QPS。底层实现：使用 LRU 缓存存储每个参数值的统计窗口，每个参数值独立维护一个滑窗口计数器。适用场景：秒杀场景（特定商品限流）、热点新闻（特定文章 ID 限流）、用户维度限流（防止刷接口）。配置时需要指定参数索引和特殊值列表，不在特殊值列表中的参数使用默认阈值。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Sentinel 和 Hystrix 有什么区别？为什么推荐用 Sentinel？</div>
+          <div class="a">
+            <strong>参考：</strong>主要区别：1）Sentinel 有限流功能（QPS/线程数/热点），Hystrix 只有熔断；2）Sentinel 支持系统自适应保护（CPU/负载），Hystrix 没有；3）Sentinel 有 Dashboard 控制台可在线管理规则，Hystrix 需配合 Archaius；4）Sentinel 的 Slot Chain 架构更灵活可扩展；5）Hystrix 已于 2018 年停止维护，Sentinel 持续更新。推荐 Sentinel 的原因：功能更全面（限流+熔断+系统保护+热点+授权），生态更活跃，与 Spring Cloud Alibaba 深度集成。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">@SentinelResource 中 blockHandler 和 fallback 有什么区别？优先级如何？</div>
+          <div class="a">
+            <strong>参考：</strong>blockHandler 处理 Sentinel 规则触发的 BlockException（限流、熔断、系统保护等），fallback 处理业务异常（Java Exception）。优先级：blockHandler > fallback > 全局兜底。执行顺序：如果 Sentinel 规则触发拦截，优先走 blockHandler；如果是业务异常，走 fallback；如果都没配置，走全局 fallback。blockHandler 方法必须在原方法参数基础上加 BlockException 参数；fallback 方法可以加 Throwable 参数。blockHandlerClass/fallbackClass 可以将处理方法抽取到独立类中，避免与业务代码耦合。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Sentinel 的滑动窗口算法是怎么实现的？为什么不用固定窗口？</div>
+          <div class="a">
+            <strong>参考：</strong>Sentinel 使用 LeapArray 实现滑动窗口：将时间窗口划分为多个小 bucket（默认 2 个，每个 500ms），每个 bucket 独立统计计数。统计时根据当前时间定位到对应的 bucket，如果 bucket 已过期则重置并复用。通过跨多个 bucket 累加实现"滑动"效果。不用固定窗口的原因：固定窗口在窗口边界会出现"双倍突发"问题——例如限流 100 QPS，在第一个窗口末尾涌入 100 个请求，第二个窗口开头又涌入 100 个请求，实际上 1 秒内有 200 个请求，超过了限流阈值。滑动窗口通过细分时间片解决了这个问题。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Sentinel · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

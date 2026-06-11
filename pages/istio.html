@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Istio - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔀 Istio</h1>
+    <p class="subtitle">Service Mesh · Sidecar · 流量管理 · 安全 · 可观测</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Service Mesh 概念</a></li>
+          <li class="sub"><a href="#s1-2">Istio 架构</a></li>
+          <li class="sub"><a href="#s1-3">流量管理</a></li>
+          <li class="sub"><a href="#s1-4">金丝雀发布</a></li>
+          <li class="sub"><a href="#s1-5">熔断与重试</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">安全（mTLS）</a></li>
+          <li class="sub"><a href="#s2-2">可观测</a></li>
+          <li class="sub"><a href="#s2-3">Envoy 原理</a></li>
+          <li class="sub"><a href="#s2-4">与 Linkerd / Consul 对比</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 Service Mesh 概念 -->
+        <h3 id="s1-1">Service Mesh 概念</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Service Mesh 架构模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent2);background:rgba(129,140,248,0.06);">
+                <strong>控制平面（Control Plane）</strong><br>
+                <small>Istiod：配置管理 · 证书分发 · 服务发现</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ xDS 协议下发配置 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                <strong>数据平面（Data Plane）</strong><br>
+                <small>Envoy Sidecar：流量代理 · 负载均衡 · 熔断 · mTLS</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ Sidecar 拦截 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Service A<br><small>App Container</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;border-color:var(--accent);">Envoy<br><small>Sidecar Proxy</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">Envoy<br><small>Sidecar Proxy</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Service B<br><small>App Container</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Service Mesh 核心价值</h4>
+          <ul>
+            <li><strong>基础设施下沉：</strong>将服务通信（负载均衡、熔断、重试、mTLS）从业务代码下沉到基础设施层</li>
+            <li><strong>语言无关：</strong>业务代码无需关心通信细节，适用于任何编程语言</li>
+            <li><strong>零侵入：</strong>通过 Sidecar 模式透明拦截流量，业务代码无需修改</li>
+            <li><strong>统一治理：</strong>通过控制平面统一管理所有服务的通信策略</li>
+          </ul>
+        </div>
+
+        <!-- 1-2 Istio 架构 -->
+        <h3 id="s1-2">Istio 架构</h3>
+
+        <div class="card">
+          <h4>核心组件</h4>
+          <table>
+            <thead>
+              <tr><th>组件</th><th>位置</th><th>职责</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Istiod</strong></td><td>控制平面</td><td>统一控制平面，包含 Pilot（流量管理）、Citadel（证书管理）、Galley（配置验证）</td></tr>
+              <tr><td><strong>Envoy</strong></td><td>数据平面</td><td>Sidecar 代理，拦截所有进出 Pod 的流量，执行负载均衡、路由、mTLS</td></tr>
+              <tr><td><strong>Ingress Gateway</strong></td><td>入口网关</td><td>处理进入网格的外部流量（替代 K8s Ingress）</td></tr>
+              <tr><td><strong>Egress Gateway</strong></td><td>出口网关</td><td>控制网格到外部服务的流量</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-3 流量管理 -->
+        <h3 id="s1-3">流量管理</h3>
+
+        <div class="card">
+          <h4>VirtualService</h4>
+          <pre><code>apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myapp-vs
+spec:
+  hosts:
+    - myapp-service
+  http:
+    - match:
+        - headers:
+            x-version:
+              exact: "v2"
+      route:
+        - destination:
+            host: myapp-service
+            subset: v2
+    - route:
+        - destination:
+            host: myapp-service
+            subset: v1
+          weight: 90
+        - destination:
+            host: myapp-service
+            subset: v2
+          weight: 10
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+      timeout: 10s</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>DestinationRule</h4>
+          <pre><code>apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: myapp-dr
+spec:
+  host: myapp-service
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: DEFAULT
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+    outlierDetection:
+      consecutive5xxErrors: 5       # 连续 5 次 5xx 错误
+      interval: 30s                  # 检测间隔
+      baseEjectionTime: 30s          # 驱逐时间
+      maxEjectionPercent: 50         # 最大驱逐比例
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: v2
+      labels:
+        version: v2</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Gateway</h4>
+          <pre><code>apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: myapp-gateway
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "myapp.example.com"
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: myapp-tls-secret
+      hosts:
+        - "myapp.example.com"</code></pre>
+        </div>
+
+        <!-- 1-4 金丝雀发布 -->
+        <h3 id="s1-4">金丝雀发布</h3>
+
+        <div class="card">
+          <h4>基于权重的金丝雀</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">用户请求<br><small>myapp.example.com</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Ingress Gateway<br><small>Istio Gateway</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">VirtualService<br><small>权重路由</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">v1 (90%)<br>v2 (10%)</div>
+          </div>
+          <pre><code># 权重路由配置
+http:
+  - route:
+      - destination:
+          host: myapp-service
+          subset: v1
+        weight: 90
+      - destination:
+          host: myapp-service
+          subset: v2
+        weight: 10</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>基于 Header 的路由</h4>
+          <pre><code># 内部测试人员访问 v2
+http:
+  - match:
+      - headers:
+          x-canary-user:
+            exact: "true"
+    route:
+      - destination:
+          host: myapp-service
+          subset: v2
+  # 其他用户访问 v1
+  - route:
+      - destination:
+          host: myapp-service
+          subset: v1</code></pre>
+          <div class="tip">基于 Header 的路由适合内部测试：测试人员在请求头中添加 <code>x-canary-user: true</code>，流量直接导向 v2，其他用户不受影响。</div>
+        </div>
+
+        <!-- 1-5 熔断与重试 -->
+        <h3 id="s1-5">熔断与重试</h3>
+
+        <div class="card">
+          <h4>熔断（Outlier Detection）</h4>
+          <ul>
+            <li>Istio 的熔断基于 Envoy 的<strong>异常检测</strong>（Outlier Detection）</li>
+            <li>当后端实例连续返回 5xx 错误超过阈值时，自动将其从负载均衡池中驱逐</li>
+            <li>驱逐时间结束后自动恢复探测</li>
+            <li>可配置最大驱逐比例，避免全部实例被驱逐</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>重试策略</h4>
+          <pre><code>http:
+  - route:
+      - destination:
+          host: myapp-service
+    retries:
+      attempts: 3              # 最多重试 3 次
+      perTryTimeout: 2s        # 每次超时 2 秒
+      retryOn: "5xx,reset,connect-failure,retriable-4xx"
+      retryRemoteLocalities: true</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 安全 -->
+        <h3 id="s2-1">安全（mTLS）</h3>
+
+        <div class="card">
+          <h4>mTLS（双向 TLS）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Service A<br><small>客户端证书</small></div>
+            <div class="flow-arrow">⇄</div>
+            <div class="flow-box flow-purple">Envoy A<br><small>发起 mTLS</small></div>
+            <div class="flow-arrow">⇄</div>
+            <div class="flow-box flow-green">Envoy B<br><small>验证证书</small></div>
+            <div class="flow-arrow">⇄</div>
+            <div class="flow-box flow-orange">Service B<br><small>服务端证书</small></div>
+          </div>
+          <ul>
+            <li><strong>PERMISSIVE 模式：</strong>同时接受 mTLS 和明文流量（迁移过渡期）</li>
+            <li><strong>STRICT 模式：</strong>只接受 mTLS 流量（生产推荐）</li>
+            <li>Istiod 自动为每个服务签发证书，自动轮换</li>
+            <li>证书格式：SPIFFE ID（如 <code>spiffe://cluster.local/ns/default/sa/myapp</code>）</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>授权策略（AuthorizationPolicy）</h4>
+          <pre><code>apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: myapp-policy
+spec:
+  selector:
+    matchLabels:
+      app: myapp
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/default/sa/frontend"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/api/*"]
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/metrics"]</code></pre>
+        </div>
+
+        <!-- 2-2 可观测 -->
+        <h3 id="s2-2">可观测</h3>
+
+        <div class="card">
+          <h4>三大可观测支柱</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>工具</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>指标（Metrics）</strong></td><td>Envoy 自动采集请求指标（QPS、延迟、错误率）</td><td>Prometheus + Grafana</td></tr>
+              <tr><td><strong>链路追踪（Tracing）</strong></td><td>自动注入追踪 Header，生成分布式链路</td><td>Jaeger / Zipkin / SkyWalking</td></tr>
+              <tr><td><strong>日志（Logging）</strong></td><td>Envoy 访问日志，记录所有请求</td><td>ELK / Loki</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Istio 的可观测是自动的，无需修改应用代码。Envoy Sidecar 自动采集指标、生成链路追踪、记录访问日志。</div>
+        </div>
+
+        <!-- 2-3 Envoy 原理 -->
+        <h3 id="s2-3">Envoy 原理</h3>
+
+        <div class="card">
+          <h4>核心概念</h4>
+          <table>
+            <thead>
+              <tr><th>概念</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Listener</strong></td><td>监听端口，接收连接。Envoy 至少有一个 Listener（如 15006 端口拦截入站流量）</td></tr>
+              <tr><td><strong>Route</strong></td><td>路由规则，根据条件（Header、Path）将请求转发到不同 Cluster</td></tr>
+              <tr><td><strong>Cluster</strong></td><td>后端服务集群，包含一组 Endpoint（IP:Port）</td></tr>
+              <tr><td><strong>Endpoint</strong></td><td>后端服务实例的具体地址</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>xDS 协议</h4>
+          <ul>
+            <li>xDS 是 Envoy 与控制平面（Istiod）之间的配置下发协议</li>
+            <li><strong>LDS：</strong>Listener Discovery Service，下发监听器配置</li>
+            <li><strong>RDS：</strong>Route Discovery Service，下发路由规则</li>
+            <li><strong>CDS：</strong>Cluster Discovery Service，下发集群配置</li>
+            <li><strong>EDS：</strong>Endpoint Discovery Service，下发端点列表</li>
+            <li>Istiod 通过 xDS 将配置实时推送给所有 Envoy Sidecar</li>
+          </ul>
+        </div>
+
+        <!-- 2-4 对比 -->
+        <h3 id="s2-4">Sidecar 模式 vs Proxyless Mesh</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>Sidecar 模式（传统）</h4>
+            <ul>
+              <li>每个 Pod 注入 Envoy Sidecar</li>
+              <li>流量透明拦截（iptables）</li>
+              <li>语言无关，零侵入</li>
+              <li>每个 Pod 多一个容器，资源开销增加</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>Proxyless Mesh（无代理）</h4>
+              <ul>
+                <li>应用直接与控制平面通信</li>
+                <li>通过 SDK 集成 xDS 协议</li>
+                <li>无 Sidecar，延迟更低</li>
+                <li>需要应用代码修改（有侵入）</li>
+              </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Istio vs Linkerd vs Consul Connect</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Istio</th><th>Linkerd</th><th>Consul Connect</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>数据平面</td><td>Envoy</td><td>Linkerd2-proxy（Rust）</td><td>Envoy</td></tr>
+              <tr><td>资源占用</td><td>较高</td><td><span class="badge badge-green">低</span></td><td>中等</td></tr>
+              <tr><td>功能丰富度</td><td><span class="badge badge-green">最丰富</span></td><td>核心功能</td><td>中等</td></tr>
+              <tr><td>学习曲线</td><td>陡峭</td><td><span class="badge badge-green">简单</span></td><td>中等</td></tr>
+              <tr><td>多集群</td><td>支持</td><td>支持</td><td><span class="badge badge-green">原生</span></td></tr>
+              <tr><td>社区</td><td>CNCF 毕业项目</td><td>CNCF 毕业项目</td><td>HashiCorp</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是 Service Mesh？Istio 的架构是怎样的？</div>
+          <div class="a">
+            <strong>参考：</strong>Service Mesh 是一种基础设施层，将服务通信（负载均衡、熔断、重试、mTLS）从业务代码下沉到 Sidecar 代理。Istio 架构分为控制平面和数据平面。控制平面是 Istiod（包含 Pilot 流量管理、Citadel 证书管理、Galley 配置验证）。数据平面是 Envoy Sidecar，注入到每个 Pod 中，拦截所有进出流量。Istiod 通过 xDS 协议将配置下发给所有 Envoy。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Istio 如何实现金丝雀发布？</div>
+          <div class="a">
+            <strong>参考：</strong>Istio 通过 VirtualService 和 DestinationRule 实现金丝雀。VirtualService 定义路由规则：1）基于权重：v1 90% + v2 10%，逐步调整比例；2）基于 Header：内部测试人员在请求头加 x-canary-user: true 访问 v2，其他用户访问 v1。DestinationRule 定义服务版本子集（subset）。配合 Ingress Gateway 处理外部流量。优势：无需修改部署配置，纯流量控制。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Istio 的熔断是怎么实现的？</div>
+          <div class="a">
+            <strong>参考：</strong>Istio 的熔断基于 Envoy 的 Outlier Detection（异常检测）。在 DestinationRule 中配置：当后端实例连续返回 5xx 错误超过阈值（consecutive5xxErrors: 5），自动将其从负载均衡池中驱逐（eject）。驱逐时间结束后（baseEjectionTime: 30s），Envoy 自动恢复探测。可配置最大驱逐比例（maxEjectionPercent: 50），避免全部实例被驱逐。还可配置连接池限制（maxConnections）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Istio 的 mTLS 是如何工作的？PERMISSIVE 和 STRICT 模式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>mTLS（双向 TLS）要求客户端和服务端都出示证书，实现双向认证和加密通信。Istiod 自动为每个服务签发 SPIFFE 格式的证书，自动轮换。PERMISSIVE 模式同时接受 mTLS 和明文流量，适合从非网格迁移到网格的过渡期。STRICT 模式只接受 mTLS 流量，生产环境推荐。Envoy Sidecar 自动处理 mTLS 握手，应用代码无需关心。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>VirtualService 和 DestinationRule 分别是什么？有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>VirtualService 定义路由规则：根据条件（Header、Path、权重）将请求路由到不同版本的服务。DestinationRule 定义流量策略：连接池大小、熔断规则、负载均衡算法，以及服务版本子集（subset）。关系：VirtualService 管"路由到哪"，DestinationRule 管"到达后怎么处理"。两者配合使用：VirtualService 引用 DestinationRule 中定义的 subset。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>什么是 Envoy 的 xDS 协议？</div>
+          <div class="a">
+            <strong>参考：</strong>xDS 是 Envoy 与控制平面之间的配置发现协议。包括：LDS（Listener，监听器配置）、RDS（Route，路由规则）、CDS（Cluster，集群配置）、EDS（Endpoint，端点列表）、SDS（Secret，证书）。Istiod 通过 xDS 协议将配置实时推送给所有 Envoy Sidecar，实现配置的动态更新，无需重启服务。Envoy 支持增量 xDS，只推送变更部分。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Istio 和 Linkerd 该怎么选？</div>
+          <div class="a">
+            <strong>参考：</strong>Istio 功能最丰富（流量管理、安全、可观测），但资源占用较高、学习曲线陡峭。Linkerd 更轻量（Rust 编写的 Linkerd2-proxy），资源占用低、部署简单，但功能相对较少。选择建议：需要复杂流量管理（金丝雀、熔断、多集群）选 Istio；追求简单轻量、快速上手选 Linkerd。两者都是 CNCF 毕业项目，生产可用。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Istio · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

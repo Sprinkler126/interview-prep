@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consul - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔗 Consul</h1>
+    <p class="subtitle">服务发现 · KV 存储 · 健康检查 · 多数据中心 · Service Mesh</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">服务注册与发现</a></li>
+          <li class="sub"><a href="#s1-3">健康检查</a></li>
+          <li class="sub"><a href="#s1-4">KV 存储</a></li>
+          <li class="sub"><a href="#s1-5">Gossip 协议</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">多数据中心</a></li>
+          <li class="sub"><a href="#s2-2">ACL 权限控制</a></li>
+          <li class="sub"><a href="#s2-3">与 Nacos/Eureka 对比</a></li>
+          <li class="sub"><a href="#s2-4">Consul Connect</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Consul 架构总览</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">Client Agent<br><small>无状态、转发请求</small></div>
+              <div class="arch-box" style="margin-left:1rem">Client Agent<br><small>无状态、转发请求</small></div>
+              <div class="arch-box" style="margin-left:1rem">Server Agent<br><small>有状态、存储数据</small></div>
+            </div>
+            <div class="arch-connector">↓ Gossip 协议通信 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Server (Leader)<br><small>Raft Leader</small></div>
+              <div class="arch-box" style="margin-left:1rem">Server (Follower)<br><small>Raft Follower</small></div>
+              <div class="arch-box" style="margin-left:1rem">Server (Follower)<br><small>Raft Follower</small></div>
+            </div>
+            <div class="arch-connector">↓ WAN Gossip ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Datacenter A<br><small>LAN Gossip Pool</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">Datacenter B<br><small>LAN Gossip Pool</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心角色</h4>
+          <table>
+            <thead>
+              <tr><th>角色</th><th>职责</th><th>部署要求</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Server</strong></td><td>存储数据、Raft 一致性、响应查询</td><td>3 或 5 个（奇数）</td></tr>
+              <tr><td><strong>Client</strong></td><td>无状态代理，转发请求到 Server</td><td>每台应用机器一个</td></tr>
+              <tr><td><strong>Agent</strong></td><td>每个节点上运行的守护进程</td><td>所有节点</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li>Client Agent 不存储数据，只负责健康检查和转发请求</li>
+            <li>Client 将 RPC 请求转发给 Server，本地缓存服务列表减少网络开销</li>
+            <li>Server 之间通过 Raft 协议保证数据一致性</li>
+            <li>Agent 运行在每个节点上，以 Client 或 Server 模式运行</li>
+          </ul>
+        </div>
+
+        <!-- 1-2 服务注册与发现 -->
+        <h3 id="s1-2">服务注册与发现</h3>
+
+        <div class="card">
+          <h4>服务注册</h4>
+          <pre><code>// 方式一：HTTP API 注册
+curl -X PUT http://localhost:8500/v1/agent/service/register \
+  -d '{
+    "ID": "user-service-1",
+    "Name": "user-service",
+    "Tags": ["v1", "primary"],
+    "Address": "192.168.1.100",
+    "Port": 8080,
+    "Check": {
+      "HTTP": "http://192.168.1.100:8080/actuator/health",
+      "Interval": "10s",
+      "Timeout": "3s"
+    }
+  }'
+
+// 方式二：配置文件注册（/etc/consul.d/user-service.json）
+{
+  "service": {
+    "name": "user-service",
+    "port": 8080,
+    "tags": ["v1"],
+    "check": {
+      "http": "http://localhost:8080/actuator/health",
+      "interval": "10s"
+    }
+  }
+}
+
+// 方式三：Spring Cloud 自动注册
+spring:
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        service-name: user-service
+        health-check-path: /actuator/health
+        health-check-interval: 10s</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>服务发现（两种方式）</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>HTTP API</h4>
+              <pre><code>// 查询所有健康实例
+GET /v1/health/service/user-service?passing=true
+
+// 响应
+[{
+  "Service": {
+    "ID": "user-service-1",
+    "Service": "user-service",
+    "Address": "192.168.1.100",
+    "Port": 8080
+  },
+  "Checks": [{
+    "Status": "passing"
+  }]
+}]</code></pre>
+            </div>
+            <div class="compare-box">
+              <h4>DNS 查询</h4>
+              <pre><code>// 通过 DNS 发现服务
+dig @127.0.0.1 -p 8600 user-service.service.consul
+
+// DNS 格式：tag.service.service.consul
+// 例：v1.user-service.service.consul
+//     → 返回带 v1 标签的实例
+
+// 支持 SRV 记录（获取地址+端口）
+dig @127.0.0.1 -p 8600 user-service.service.consul SRV</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-3 健康检查 -->
+        <h3 id="s1-3">健康检查</h3>
+
+        <div class="card">
+          <h4>健康检查类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>HTTP</strong></td><td>发送 HTTP GET，返回 2xx 为健康</td><td>Web 应用（最常用）</td></tr>
+              <tr><td><strong>TCP</strong></td><td>尝试 TCP 连接，成功则健康</td><td>数据库、Redis 等</td></tr>
+              <tr><td><strong>Script</strong></td><td>执行自定义脚本，退出码 0 为健康</td><td>复杂检查逻辑</td></tr>
+              <tr><td><strong>gRPC</strong></td><td>调用 gRPC 健康检查接口</td><td>gRPC 服务</td></tr>
+              <tr><td><strong>TTL</strong></td><td>服务主动上报心跳，超时则不健康</td><td>简单应用、脚本</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 健康检查配置
+// HTTP 检查
+{
+  "check": {
+    "http": "http://localhost:8080/health",
+    "interval": "10s",
+    "timeout": "3s",
+    "deregister_critical_service_after": "30m"  // 不健康 30 分钟后注销
+  }
+}
+
+// TTL 检查（服务主动上报）
+{
+  "check": {
+    "ttl": "15s"
+  }
+}
+// 服务端定期更新 TTL
+PUT /v1/agent/check/pass/service:my-service</code></pre>
+          <div class="tip">Consul 的健康检查比 Eureka 更丰富。Eureka 只有客户端心跳，Consul 支持服务端主动探测（HTTP/TCP/gRPC）和客户端心跳（TTL）两种模式。</div>
+        </div>
+
+        <!-- 1-4 KV 存储 -->
+        <h3 id="s1-4">KV 存储</h3>
+
+        <div class="card">
+          <h4>KV 存储操作</h4>
+          <pre><code>// 写入
+PUT /v1/kv/config/db/url "jdbc:mysql://localhost:3306/mydb"
+PUT /v1/kv/config/db/user "root"
+
+// 读取
+GET /v1/kv/config/db/url
+// 返回 Base64 编码的值
+
+// 列表（前缀匹配）
+GET /v1/kv/config/db/?keys
+
+// 删除
+DELETE /v1/kv/config/db/url
+
+// CAS（Check-And-Set，乐观锁）
+PUT /v1/kv/config/db/url?cas=5
+// 只有 ModifyIndex = 5 时才更新
+
+// 阻塞查询（Long Polling）
+GET /v1/kv/config/db/url?index=5&wait=30s
+// 当 ModifyIndex > 5 时立即返回，最多等 30 秒
+
+// 分布式锁（Session + KV）
+PUT /v1/session/create '{"Name": "my-lock"}'
+PUT /v1/kv/locks/my-resource?acquire=<session-id></code></pre>
+        </div>
+
+        <!-- 1-5 Gossip 协议 -->
+        <h3 id="s1-5">Gossip 协议</h3>
+
+        <div class="card">
+          <h4>Consul 的 Gossip 协议</h4>
+          <ul>
+            <li>Consul 使用两个 Gossip Pool：<strong>LAN Pool</strong>（数据中心内）和 <strong>WAN Pool</strong>（跨数据中心）</li>
+            <li>底层使用 <strong>Serf</strong> 库实现 Gossip 协议，基于 <strong>SWIM</strong>（Scalable Weakly-consistent Infection-style Process Group Membership）协议</li>
+            <li>LAN Pool：同一数据中心的所有 Agent 参加，用于节点发现、故障检测、事件广播</li>
+            <li>WAN Pool：所有 Server 节点参加，用于跨数据中心的 Server 发现和故障检测</li>
+          </ul>
+          <pre><code>// Gossip 协议工作原理：
+// 1. 每个节点维护一个成员列表
+// 2. 随机选择一个节点发送 Ping
+// 3. 如果收到 Ack → 节点正常
+// 4. 如果未收到 Ack → 间接 Ping（请求其他节点帮忙 Ping）
+// 5. 如果间接 Ping 也失败 → 标记为可疑（Suspect）
+// 6. 超时后标记为故障（Failed）
+
+// 优势：
+// - 去中心化，无单点故障
+// - 新节点加入只需知道集群中任意一个节点
+// - 最终一致性，消息传播速度快（O(logN)）
+// - 天然支持故障检测</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 多数据中心 -->
+        <h3 id="s2-1">多数据中心</h3>
+
+        <div class="card">
+          <h4>多数据中心架构</h4>
+          <ul>
+            <li>每个数据中心有独立的 Consul Server 集群（3~5 个 Server）</li>
+            <li>同一数据中心内的所有 Agent 通过 LAN Gossip 通信</li>
+            <li>不同数据中心的 Server 通过 WAN Gossip 通信</li>
+            <li>跨数据中心查询：本地 Server 收到请求后，通过 WAN Gossip 转发到目标数据中心的 Server</li>
+          </ul>
+          <pre><code>// 跨数据中心服务发现
+// 查询所有数据中心
+GET /v1/catalog/datacenters
+// ["dc1", "dc2"]
+
+// 查询 dc2 中的 user-service
+GET /v1/health/service/user-service?dc=dc2&passing=true
+
+// DNS 方式
+dig @127.0.0.1 -p 8600 user-service.service.dc2.consul
+
+// 只查询本地数据中心（默认）
+dig @127.0.0.1 -p 8600 user-service.service.consul</code></pre>
+          <div class="tip">多数据中心是 Consul 的核心竞争力。Nacos 和 Eureka 都不原生支持多数据中心，需要额外配置或改造。</div>
+        </div>
+
+        <!-- 2-2 ACL -->
+        <h3 id="s2-2">ACL 权限控制</h3>
+
+        <div class="card">
+          <h4>ACL 系统</h4>
+          <pre><code>// ACL Token 类型
+// 1. Management Token - 管理权限，可管理其他 Token
+// 2. Service Token - 服务级权限，定义可访问的资源
+
+// ACL Policy（HCL 格式）
+agent_prefix "" {
+  policy = "read"       # 读取 Agent 信息
+}
+node_prefix "" {
+  policy = "read"       # 读取节点信息
+}
+service_prefix "user-service" {
+  policy = "write"      # 读写 user-service
+}
+key_prefix "config/" {
+  policy = "read"       # 只读 config/ 前缀的 KV
+}
+
+// 使用 Token
+GET /v1/health/service/user-service?token=<acl-token>
+// 或设置 HTTP 头
+X-Consul-Token: <acl-token></code></pre>
+        </div>
+
+        <!-- 2-3 对比 -->
+        <h3 id="s2-3">与 Nacos/Eureka 对比</h3>
+
+        <div class="card">
+          <h4>注册中心对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Consul</th><th>Nacos</th><th>Eureka</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>语言</td><td>Go</td><td>Java</td><td>Java</td></tr>
+              <tr><td>一致性协议</td><td>Raft (CP)</td><td>AP + CP</td><td>AP</td></tr>
+              <tr><td>健康检查</td><td>HTTP/TCP/Script/gRPC/TTL</td><td>客户端心跳 + 服务端</td><td>客户端心跳</td></tr>
+              <tr><td>配置管理</td><td>KV 存储</td><td>✅ 内置</td><td>❌</td></tr>
+              <tr><td>多数据中心</td><td>✅ 原生支持</td><td>❌</td><td>❌</td></tr>
+              <tr><td>服务发现</td><td>HTTP + DNS</td><td>HTTP + gRPC</td><td>HTTP</td></tr>
+              <tr><td>雪崩保护</td><td>❌</td><td>✅</td><td>✅</td></tr>
+              <tr><td>Service Mesh</td><td>✅ Consul Connect</td><td>❌</td><td>❌</td></tr>
+              <tr><td>管理界面</td><td>✅ 内置</td><td>✅ 内置</td><td>❌</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 Consul Connect -->
+        <h3 id="s2-4">Consul Connect</h3>
+
+        <div class="card">
+          <h4>Consul Connect（Service Mesh）</h4>
+          <ul>
+            <li><strong>Service Mesh 功能：</strong>自动为服务间通信建立 mTLS（双向 TLS）加密</li>
+            <li><strong>Sidecar Proxy：</strong>每个服务旁部署一个 Envoy 代理，透明处理加密和授权</li>
+            <li><strong>Intentions：</strong>定义服务间通信的授权规则（允许/拒绝）</li>
+            <li><strong>Native Proxy：</strong>应用可直接使用 Consul 的 Connect API，无需 Sidecar</li>
+          </ul>
+          <pre><code>// 服务注册时启用 Connect
+{
+  "service": {
+    "name": "user-service",
+    "port": 8080,
+    "connect": {
+      "sidecar_service": {}   // 启用 Sidecar 代理
+    }
+  }
+}
+
+// Intention（服务间授权规则）
+// 允许 order-service 访问 user-service
+{
+  "SourceName": "order-service",
+  "DestinationName": "user-service",
+  "Action": "allow"
+}
+
+// 通过 API 管理 Intention
+PUT /v1/connect/intentions
+{
+  "SourceName": "*",
+  "DestinationName": "user-service",
+  "Action": "deny"       // 默认拒绝所有
+}</code></pre>
+          <div class="tip">Consul Connect 是 HashiCorp 的 Service Mesh 解决方案，与 Istio 不同的是，它与 Consul 深度集成，无需额外安装控制面。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请介绍 Consul 的架构，Server 和 Client Agent 分别是什么角色？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 架构中有两种角色：Server 和 Client。Server 是有状态节点，存储所有数据（服务注册信息、KV 数据、ACL 等），通过 Raft 协议保证一致性，通常部署 3 或 5 个。Client 是无状态代理，部署在每台应用机器上，负责本地健康检查和将请求转发给 Server。Client 不存储数据，只维护本地缓存。所有 Agent（无论 Server 还是 Client）通过 LAN Gossip 协议通信，实现节点发现和故障检测。这种架构的优势是 Client Agent 就近部署，减少网络延迟，同时 Server 数量可控。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul 的服务发现有哪两种方式？各有什么优缺点？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 支持 HTTP API 和 DNS 两种服务发现方式。HTTP API：通过 /v1/health/service/{name} 查询服务实例列表，返回详细信息（地址、端口、健康状态、元数据），支持过滤和阻塞查询，适合程序化调用。DNS 方式：通过标准 DNS 查询 {name}.service.consul，返回 IP 地址列表，支持 SRV 记录获取端口，适合任何支持 DNS 的客户端（如数据库连接池）。优点：DNS 方式无需 SDK，通用性好；HTTP API 信息丰富，支持高级过滤。缺点：DNS 方式信息有限，不支持标签过滤；HTTP API 需要集成 SDK。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul 的 Gossip 协议是什么？LAN Pool 和 WAN Pool 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 使用 Serf 库实现 Gossip 协议，基于 SWIM 协议。工作原理：节点随机选择其他节点发送 Ping，收到 Ack 则正常，未收到则请求其他节点间接 Ping，间接 Ping 也失败则标记故障。两个 Gossip Pool：LAN Pool 是同一数据中心内所有 Agent 参加的池，用于节点发现、故障检测和事件广播；WAN Pool 是所有数据中心的 Server 参加的池，用于跨数据中心的 Server 发现和故障检测。Gossip 协议的优势是去中心化、天然支持故障检测、新节点加入只需知道一个已有节点。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul 的多数据中心支持是怎么实现的？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 原生支持多数据中心。每个数据中心有独立的 Server 集群和 LAN Gossip Pool。不同数据中心的 Server 通过 WAN Gossip Pool 连接。跨数据中心查询流程：客户端请求本地 Server，如果请求指定其他数据中心（dc=dc2），本地 Server 通过 WAN Gossip 转发到目标数据中心的 Server，目标 Server 处理后返回结果。每个数据中心的数据是独立的（服务注册、KV 存储），跨数据中心只做查询转发。DNS 支持 {service}.service.{dc}.consul 格式查询特定数据中心的服务。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul 的健康检查有哪些类型？比 Eureka 有什么优势？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 支持五种健康检查：1）HTTP — 发送 GET 请求，返回 2xx 为健康；2）TCP — 尝试 TCP 连接，成功则健康；3）Script — 执行自定义脚本，退出码 0 为健康；4）gRPC — 调用 gRPC 健康检查接口；5）TTL — 服务主动上报心跳，超时则不健康。比 Eureka 的优势：Eureka 只有客户端心跳模式，Consul 额外支持服务端主动探测（HTTP/TCP/gRPC），可以在服务假死（进程在但无法处理请求）时准确发现不健康实例。Consul 还支持 deregister_critical_service_after，不健康实例在一定时间后自动注销。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul Connect 是什么？与 Istio 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul Connect 是 Consul 的 Service Mesh 功能，提供服务间 mTLS 加密和授权。核心组件：1）Sidecar Proxy — 每个服务旁部署 Envoy 代理，透明处理加密和授权；2）Intentions — 定义服务间通信的 ACL 规则（允许/拒绝）；3）CA — 内置证书颁发机构，自动管理 TLS 证书。与 Istio 的区别：Consul Connect 与 Consul 深度集成，无需额外安装控制面（Istio 需要 Pilot/Citadel/Galley）；Consul 支持多种注册中心（Kubernetes/Nomad/EC2），Istio 主要面向 Kubernetes；Consul 更轻量，Istio 功能更全面（流量管理、可观测性）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Consul 的 KV 存储可以用来做什么？CAS 操作是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>Consul 的 KV 存储是内置的分布式 KV 数据库，用途：1）配置管理 — 存储应用配置，通过阻塞查询（Long Polling）实现配置变更通知；2）分布式锁 — 结合 Session 实现（acquire/release）；3）Leader 选举 — 利用 CAS + Session；4）服务标记 — 存储服务的动态标记信息。CAS（Check-And-Set）是乐观锁操作：PUT 时指定 ModifyIndex，只有当前 ModifyIndex 匹配时才更新。阻塞查询（?index=N&wait=30s）在数据变更时立即返回，是实现配置实时推送的基础。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Consul · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

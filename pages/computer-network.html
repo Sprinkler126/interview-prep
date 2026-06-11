@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>计算机网络 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🌐 计算机网络</h1>
+    <p class="subtitle">TCP · HTTP · DNS · WebSocket · 网络模型 · 安全</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">网络模型</a></li>
+          <li class="sub"><a href="#s1-2">TCP 三次握手与四次挥手</a></li>
+          <li class="sub"><a href="#s1-3">TCP 可靠传输</a></li>
+          <li class="sub"><a href="#s1-4">TCP 拥塞控制</a></li>
+          <li class="sub"><a href="#s1-5">HTTP 协议演进</a></li>
+          <li class="sub"><a href="#s1-6">HTTPS 与 TLS</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">HTTP 缓存机制</a></li>
+          <li class="sub"><a href="#s2-2">DNS 解析</a></li>
+          <li class="sub"><a href="#s2-3">WebSocket</a></li>
+          <li class="sub"><a href="#s2-4">Cookie/Session/Token</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 网络模型</h3>
+        <div class="card">
+          <h4>OSI 七层 vs TCP/IP 四层</h4>
+          <table>
+            <thead><tr><th>OSI 七层</th><th>TCP/IP 四层</th><th>协议/设备</th><th>数据单位</th></tr></thead>
+            <tbody>
+              <tr><td><strong>应用层</strong></td><td rowspan="3">应用层</td><td>HTTP、FTP、SMTP、DNS、WebSocket</td><td>数据</td></tr>
+              <tr><td><strong>表示层</strong></td><td>SSL/TLS、JPEG、ASCII</td><td>数据</td></tr>
+              <tr><td><strong>会话层</strong></td><td>RPC、NetBIOS</td><td>数据</td></tr>
+              <tr><td><strong>传输层</strong></td><td>传输层</td><td>TCP、UDP</td><td>段（Segment）</td></tr>
+              <tr><td><strong>网络层</strong></td><td>网络层</td><td>IP、ICMP、ARP、路由器</td><td>包（Packet）</td></tr>
+              <tr><td><strong>数据链路层</strong></td><td rowspan="2">网络接口层</td><td>以太网、交换机、MAC</td><td>帧（Frame）</td></tr>
+              <tr><td><strong>物理层</strong></td><td>光纤、双绞线、集线器</td><td>比特（Bit）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>TCP vs UDP</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">TCP</h4>
+              <ul>
+                <li>面向连接，三次握手</li>
+                <li>可靠传输，有序、不丢失</li>
+                <li>流量控制、拥塞控制</li>
+                <li>全双工，字节流</li>
+                <li>适用：HTTP、FTP、邮件</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">UDP</h4>
+              <ul>
+                <li>无连接，直接发送</li>
+                <li>不可靠，可能丢包、乱序</li>
+                <li>无流量/拥塞控制</li>
+                <li>报文，有边界</li>
+                <li>适用：DNS、视频、游戏、直播</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="s1-2">1.2 TCP 三次握手与四次挥手</h3>
+        <div class="card">
+          <h4>三次握手（建立连接）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端 → SYN(seq=x) → 服务端</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">服务端 → SYN+ACK(seq=y, ack=x+1) → 客户端</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">客户端 → ACK(ack=y+1) → 服务端</div>
+          </div>
+          <ul>
+            <li><strong>第一次握手</strong>：客户端发送 SYN，进入 SYN_SENT 状态</li>
+            <li><strong>第二次握手</strong>：服务端收到后回复 SYN+ACK，进入 SYN_RCVD 状态</li>
+            <li><strong>第三次握手</strong>：客户端收到后发送 ACK，双方进入 ESTABLISHED 状态</li>
+            <li><strong>为什么三次？</strong>：① 确认双方的收发能力；② 防止历史重复连接的初始化（两次握手无法防止服务端建立过期连接）；③ 同步双方的初始序列号</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>四次挥手（断开连接）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端 → FIN → 服务端</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">服务端 → ACK → 客户端</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">服务端 → FIN → 客户端</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">客户端 → ACK → 服务端</div>
+          </div>
+          <ul>
+            <li><strong>为什么四次？</strong>：TCP 是全双工，每个方向需要单独关闭。服务端收到 FIN 后可能还有数据要发送，先回 ACK 确认收到，等数据发完再发 FIN</li>
+            <li><strong>TIME_WAIT</strong>：客户端发送最后一个 ACK 后等待 2MSL（约 60 秒），原因：① 确保 ACK 能到达服务端（若丢失，服务端会重发 FIN）；② 让旧连接的数据包在网络中消亡，防止影响新连接</li>
+            <li><strong>大量 TIME_WAIT</strong>：短连接场景（如 HTTP）常见，可通过 <code>SO_REUSEADDR</code> 或调整内核参数解决</li>
+            <li><strong>大量 CLOSE_WAIT</strong>：通常是服务端程序没有正确关闭连接（代码 bug）</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 TCP 可靠传输</h3>
+        <div class="card">
+          <h4>可靠传输机制</h4>
+          <table>
+            <thead><tr><th>机制</th><th>原理</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>序列号/确认号</strong></td><td>每个字节都有序列号，接收方通过 ACK 确认</td><td>保证数据有序、不丢失</td></tr>
+              <tr><td><strong>超时重传</strong></td><td>发送后启动定时器，超时未收到 ACK 则重传</td><td>RTO 动态计算（RTT 估算）</td></tr>
+              <tr><td><strong>滑动窗口</strong></td><td>发送窗口内的数据可以连续发送，无需等待 ACK</td><td>提高吞吐量</td></tr>
+              <tr><td><strong>流量控制</strong></td><td>接收方通过窗口大小（rwnd）告知发送方自己的接收能力</td><td>防止发送方淹没接收方</td></tr>
+              <tr><td><strong>拥塞控制</strong></td><td>发送方维护拥塞窗口（cwnd），根据网络状况调整</td><td>防止网络拥塞</td></tr>
+              <tr><td><strong>校验和</strong></td><td>对 TCP 首部和数据计算校验和</td><td>检测传输错误</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-4">1.4 TCP 拥塞控制</h3>
+        <div class="card">
+          <h4>拥塞控制四阶段</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">慢启动</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">拥塞避免</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">快重传</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">快恢复</div>
+          </div>
+          <table>
+            <thead><tr><th>阶段</th><th>cwnd 变化</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td><strong>慢启动</strong></td><td>每 RTT 翻倍（指数增长），从 1 MSS 开始</td><td>连接开始或超时</td></tr>
+              <tr><td><strong>拥塞避免</strong></td><td>每 RTT 增加 1 MSS（线性增长）</td><td>cwnd &ge; ssthresh</td></tr>
+              <tr><td><strong>快重传</strong></td><td>收到 3 个重复 ACK 立即重传丢失段</td><td>收到 3 个重复 ACK</td></tr>
+              <tr><td><strong>快恢复</strong></td><td>ssthresh = cwnd/2，cwnd = ssthresh + 3，进入拥塞避免</td><td>快重传后</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">超时重传：ssthresh = cwnd/2, cwnd = 1 MSS，重新慢启动。快重传/快恢复避免了从慢启动重新开始，减少了性能损失。</div>
+        </div>
+
+        <h3 id="s1-5">1.5 HTTP 协议演进</h3>
+        <div class="card">
+          <h4>HTTP 版本对比</h4>
+          <table>
+            <thead><tr><th>版本</th><th>核心特性</th><th>连接模型</th><th>头部压缩</th><th>多路复用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>HTTP/1.0</strong></td><td>基础请求/响应</td><td>短连接（每次新建 TCP）</td><td>无</td><td>无</td></tr>
+              <tr><td><strong>HTTP/1.1</strong></td><td>持久连接、管道化、Host 头</td><td>长连接（Keep-Alive）</td><td>无</td><td>无（管道化有队头阻塞）</td></tr>
+              <tr><td><strong>HTTP/2.0</strong></td><td>二进制帧、多路复用、服务器推送</td><td>单连接多流</td><td>HPACK</td><td><span class="badge badge-green">有</span></td></tr>
+              <tr><td><strong>HTTP/3.0</strong></td><td>基于 QUIC（UDP）</td><td>UDP 连接</td><td>QPACK</td><td><span class="badge badge-green">有</span>（无 TCP 队头阻塞）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>HTTP 请求方法</h4>
+          <table>
+            <thead><tr><th>方法</th><th>语义</th><th>幂等</th><th>安全</th><th>请求体</th></tr></thead>
+            <tbody>
+              <tr><td><strong>GET</strong></td><td>获取资源</td><td>是</td><td>是</td><td>无</td></tr>
+              <tr><td><strong>POST</strong></td><td>创建资源/提交数据</td><td>否</td><td>否</td><td>有</td></tr>
+              <tr><td><strong>PUT</strong></td><td>替换资源（全量）</td><td>是</td><td>否</td><td>有</td></tr>
+              <tr><td><strong>DELETE</strong></td><td>删除资源</td><td>是</td><td>否</td><td>可选</td></tr>
+              <tr><td><strong>PATCH</strong></td><td>部分更新资源</td><td>否</td><td>否</td><td>有</td></tr>
+              <tr><td><strong>HEAD</strong></td><td>获取响应头（无 body）</td><td>是</td><td>是</td><td>无</td></tr>
+              <tr><td><strong>OPTIONS</strong></td><td>查询支持的方法（CORS 预检）</td><td>是</td><td>是</td><td>无</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>HTTP 状态码</h4>
+          <table>
+            <thead><tr><th>类别</th><th>常见状态码</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">2xx 成功</span></td><td>200 OK / 201 Created / 204 No Content</td><td>请求成功处理</td></tr>
+              <tr><td><span class="badge badge-blue">3xx 重定向</span></td><td>301 永久移动 / 302 临时移动 / 304 Not Modified</td><td>需要进一步操作</td></tr>
+              <tr><td><span class="badge badge-orange">4xx 客户端错误</span></td><td>400 Bad Request / 401 未授权 / 403 禁止 / 404 未找到 / 405 方法不允许</td><td>客户端请求有误</td></tr>
+              <tr><td><span class="badge badge-red">5xx 服务端错误</span></td><td>500 内部错误 / 502 网关错误 / 503 服务不可用 / 504 网关超时</td><td>服务端处理出错</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-6">1.6 HTTPS 与 TLS</h3>
+        <div class="card">
+          <h4>TLS 握手过程（RSA 握手）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Client Hello（支持的加密套件、随机数）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Server Hello（选定加密套件、随机数 + 证书）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">客户端验证证书 → 生成预主密钥 → 用服务端公钥加密发送</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">双方用三个随机数生成会话密钥 → 加密通信</div>
+          </div>
+          <ul>
+            <li><strong>三个随机数</strong>：Client Random + Server Random + Pre-Master Secret → 生成对称会话密钥</li>
+            <li><strong>证书验证</strong>：浏览器检查证书链（服务器证书 → 中间 CA → 根 CA）、有效期、域名匹配、吊销状态</li>
+            <li><strong>TLS 1.3</strong>：1-RTT 握手（0-RTT 恢复），废弃 RSA 密钥交换（前向安全性），仅支持 ECDHE</li>
+          </ul>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 HTTP 缓存机制</h3>
+        <div class="card">
+          <h4>强缓存 vs 协商缓存</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">强缓存（不请求服务器）</h4>
+              <ul>
+                <li><strong>Cache-Control</strong>：<code>max-age=3600</code>（秒）、<code>no-cache</code>（协商缓存）、<code>no-store</code>（不缓存）、<code>public/private</code></li>
+                <li><strong>Expires</strong>：过期的绝对时间（HTTP/1.0，受客户端时间影响）</li>
+                <li>Cache-Control 优先级高于 Expires</li>
+                <li>命中时返回 200（from memory/disk cache）</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">协商缓存（请求服务器验证）</h4>
+              <ul>
+                <li><strong>Last-Modified / If-Modified-Since</strong>：基于文件修改时间，精度为秒</li>
+                <li><strong>ETag / If-None-Match</strong>：基于文件内容哈希，精度更高</li>
+                <li>ETag 优先级高于 Last-Modified</li>
+                <li>命中时返回 304 Not Modified</li>
+              </ul>
+            </div>
+          </div>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">浏览器发起请求</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">检查强缓存（Cache-Control/Expires）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">未命中 → 携带 If-None-Match/If-Modified-Since</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">服务端验证 → 304 或 200</div>
+          </div>
+        </div>
+
+        <h3 id="s2-2">2.2 DNS 解析</h3>
+        <div class="card">
+          <h4>DNS 解析过程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">浏览器缓存</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">OS 缓存（hosts 文件）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">本地 DNS 服务器</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">递归/迭代查询</div>
+          </div>
+          <ul>
+            <li><strong>递归查询</strong>：客户端只需问一次，本地 DNS 服务器负责完整解析</li>
+            <li><strong>迭代查询</strong>：本地 DNS 依次向根 DNS → 顶级域 DNS → 权威 DNS 查询</li>
+            <li><strong>解析顺序</strong>：浏览器缓存 → OS 缓存 → 路由器缓存 → ISP DNS 缓存 → 根 DNS → 顶级域 → 权威 DNS</li>
+            <li><strong>DNS 记录类型</strong>：A（IPv4）、AAAA（IPv6）、CNAME（别名）、MX（邮件）、NS（域名服务器）、TXT</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-3">2.3 WebSocket</h3>
+        <div class="card">
+          <h4>WebSocket 协议</h4>
+          <ul>
+            <li><strong>特点</strong>：全双工通信，服务端可主动推送，低延迟</li>
+            <li><strong>握手</strong>：基于 HTTP 升级协议（<code>Upgrade: websocket</code>），状态码 101 Switching Protocols</li>
+            <li><strong>帧格式</strong>：轻量级帧头（2~14 字节），比 HTTP 头小得多</li>
+            <li><strong>心跳机制</strong>：Ping/Pong 帧保持连接活跃</li>
+            <li><strong>适用场景</strong>：实时聊天、在线游戏、股票行情、协同编辑</li>
+          </ul>
+          <div class="compare-row" style="margin-top:0.8rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">WebSocket vs HTTP 轮询</h4>
+              <ul>
+                <li>轮询：客户端定时请求，浪费资源，有延迟</li>
+                <li>长轮询：服务端 hold 住请求直到有数据，有延迟</li>
+                <li>WebSocket：真正的实时双向通信</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">WebSocket vs SSE</h4>
+              <ul>
+                <li>SSE（Server-Sent Events）：服务端单向推送</li>
+                <li>SSE 基于 HTTP，自动重连，文本格式</li>
+                <li>WebSocket：双向，二进制支持，不自动重连</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="s2-4">2.4 Cookie / Session / Token</h3>
+        <div class="card">
+          <h4>认证方式对比</h4>
+          <table>
+            <thead><tr><th>特性</th><th>Cookie</th><th>Session</th><th>Token（JWT）</th></tr></thead>
+            <tbody>
+              <tr><td><strong>存储位置</strong></td><td>浏览器</td><td>服务端（内存/Redis）</td><td>客户端（localStorage/Cookie）</td></tr>
+              <tr><td><strong>安全性</strong></td><td>易 CSRF 攻击</td><td>较安全（ID 在 Cookie 中）</td><td>无 CSRF 问题（不自动携带）</td></tr>
+              <tr><td><strong>跨域</strong></td><td>受同源策略限制</td><td>需要共享 Session 存储</td><td>天然支持跨域</td></tr>
+              <tr><td><strong>扩展性</strong></td><td>4KB 限制</td><td>服务端有状态，难扩展</td><td>无状态，易水平扩展</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>简单状态管理</td><td>传统 Web 应用</td><td>前后端分离、微服务</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">JWT 结构：Header（算法）.Payload（声明）.Signature（签名）。服务端不存储状态，通过签名验证 token 合法性。注意：JWT 无法主动失效，可通过黑名单或短过期时间 + Refresh Token 解决。</div>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">TCP 三次握手的过程是什么？为什么不是两次或四次？</div>
+          <div class="a">
+            <strong>参考</strong>：① 客户端发 SYN；② 服务端回 SYN+ACK；③ 客户端发 ACK。两次握手不行：服务端无法确认客户端收到了 SYN+ACK，也无法防止历史连接。四次没必要：三次已经能确认双方收发能力，四次浪费资源。
+            <br><strong>追问</strong>：如果第三次 ACK 丢失会怎样？服务端处于 SYN_RCVD 状态，会重发 SYN+ACK，超时后关闭连接。客户端已进入 ESTABLISHED 状态，发数据时服务端会返回 RST。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">HTTP/1.1 和 HTTP/2.0 有什么区别？HTTP/2.0 解决了什么问题？</div>
+          <div class="a">
+            <strong>参考</strong>：HTTP/1.1 的问题：① 队头阻塞（管道化前面的请求阻塞后面）；② 每个连接一次只能处理一个请求；③ 头部冗余。HTTP/2.0 解决方案：① 二进制分帧，多路复用（同一连接并行多个流）；② HPACK 头部压缩；③ 服务器主动推送；④ 流优先级。
+            <br><strong>追问</strong>：HTTP/2.0 仍有 TCP 层队头阻塞，HTTP/3.0 用 QUIC（基于 UDP）彻底解决。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">HTTPS 的 TLS 握手过程？为什么需要三个随机数？</div>
+          <div class="a">
+            <strong>参考</strong>：Client Hello → Server Hello（证书）→ 客户端验证证书，生成 Pre-Master Secret 用服务端公钥加密发送 → 双方用三个随机数生成会话密钥。三个随机数的作用：Client Random 和 Server Random 是明文传输的，如果只用它们生成密钥不够安全。Pre-Master Secret 是加密传输的，三者结合确保密钥的随机性和安全性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TCP 的 TIME_WAIT 状态是什么？为什么需要等待 2MSL？</div>
+          <div class="a">
+            <strong>参考</strong>：主动关闭方发送最后一个 ACK 后进入 TIME_WAIT，等待 2MSL（约 60 秒）。原因：① 确保最后一个 ACK 能到达对方（若丢失，对方会重发 FIN）；② 让网络中残余的旧连接数据包过期，防止影响新连接。
+            <br><strong>追问</strong>：大量 TIME_WAIT 怎么办？短连接场景常见，可通过连接池复用连接、<code>SO_REUSEADDR</code>、调整内核参数 <code>tcp_tw_reuse</code> 解决。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">浏览器输入 URL 到页面展示，经历了哪些过程？</div>
+          <div class="a">
+            <strong>参考</strong>：① DNS 解析域名得到 IP；② TCP 三次握手建立连接（HTTPS 还需 TLS 握手）；③ 发送 HTTP 请求；④ 服务器处理请求，返回响应；⑤ 浏览器解析 HTML，构建 DOM 树；⑥ 解析 CSS，构建 CSSOM；⑦ 合并为渲染树；⑧ 布局（计算位置大小）；⑨ 绘制（GPU 光栅化）；⑩ 加载子资源（JS/CSS/图片），JS 可能阻塞解析和渲染。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TCP 拥塞控制的慢启动和拥塞避免有什么区别？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>慢启动</strong>：cwnd 从 1 MSS 开始，每收到一个 ACK 就增加 1 MSS（即每 RTT 翻倍），指数增长。<strong>拥塞避免</strong>：当 cwnd &ge; ssthresh 时切换，每 RTT 增加 1 MSS，线性增长。发生超时重传时：ssthresh = cwnd/2, cwnd = 1 MSS，重新慢启动。快重传/快恢复：收到 3 个重复 ACK 时，ssthresh = cwnd/2, cwnd = ssthresh + 3，进入拥塞避免（不从 1 开始）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Cookie、Session、Token 各自的优缺点？什么时候用 JWT？</div>
+          <div class="a">
+            <strong>参考</strong>：Cookie 存在浏览器，有 4KB 限制，易 CSRF；Session 存在服务端，安全但有状态，分布式环境需要共享存储；Token（JWT）无状态，天然跨域，适合前后端分离和微服务。
+            <br><strong>JWT 适用场景</strong>：① 前后端分离架构；② 微服务间认证；③ 第三方授权（OAuth）。<strong>不适用</strong>：需要即时吊销的场景（JWT 无法主动失效）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">DNS 解析过程是怎样的？什么是递归查询和迭代查询？</div>
+          <div class="a">
+            <strong>参考</strong>：浏览器输入域名后，先查浏览器缓存 → OS 缓存 → hosts 文件 → 本地 DNS 服务器。本地 DNS 服务器如果没有缓存，会进行递归查询或迭代查询。<strong>递归查询</strong>：客户端只问一次，本地 DNS 负责完整解析过程。<strong>迭代查询</strong>：本地 DNS 依次向根 DNS（返回顶级域地址）→ 顶级域 DNS（返回权威 DNS 地址）→ 权威 DNS（返回最终 IP）查询。
+            <br><strong>追问</strong>：DNS 用 TCP 还是 UDP？通常用 UDP（端口 53），数据量小、速度快。但区域传送（AXFR）和响应超过 512 字节时用 TCP。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">HTTP 状态码 301 和 302 有什么区别？304 是什么意思？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>301</strong>：永久重定向，浏览器会缓存，下次直接访问新地址。SEO 权重转移到新 URL。<strong>302</strong>：临时重定向，浏览器不缓存，每次仍请求原地址。<strong>304</strong>：Not Modified，协商缓存命中，资源未变化，使用浏览器缓存的版本。
+            <br><strong>追问</strong>：301 和 307 的区别？307 保证不会把 POST 改为 GET（301/302 在某些浏览器中会改变方法）。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          计算机网络 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

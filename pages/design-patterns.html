@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设计模式 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>📖 设计模式</h1>
+    <p class="subtitle">创建型 · 结构型 · 行为型 · SOLID · 面试常考</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">SOLID 原则</a></li>
+          <li class="sub"><a href="#s1-2">单例模式</a></li>
+          <li class="sub"><a href="#s1-3">工厂模式</a></li>
+          <li class="sub"><a href="#s1-4">建造者与原型</a></li>
+          <li class="sub"><a href="#s1-5">代理模式</a></li>
+          <li class="sub"><a href="#s1-6">结构型模式</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">行为型模式</a></li>
+          <li class="sub"><a href="#s2-2">模式对比与辨析</a></li>
+          <li class="sub"><a href="#s2-3">设计模式在框架中的应用</a></li>
+          <li class="sub"><a href="#s2-4">UML 类图</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 SOLID 原则</h3>
+        <div class="card">
+          <h4>五大设计原则</h4>
+          <table>
+            <thead><tr><th>原则</th><th>缩写</th><th>含义</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>单一职责</strong></td><td>SRP</td><td>一个类只有一个变化的原因</td><td>UserService 只管用户业务，不负责日志和缓存</td>
+              </tr>
+              <tr>
+                <td><strong>开闭原则</strong></td><td>OCP</td><td>对扩展开放，对修改关闭</td><td>新增支付方式不修改现有代码，只需实现接口</td>
+              </tr>
+              <tr>
+                <td><strong>里氏替换</strong></td><td>LSP</td><td>子类可以替换父类而不影响正确性</td><td>正方形不应继承长方形（setWidth 会破坏行为）</td>
+              </tr>
+              <tr>
+                <td><strong>接口隔离</strong></td><td>ISP</td><td>客户端不应依赖不需要的接口</td><td>拆分胖接口：Flyable、Swimmable 分开</td>
+              </tr>
+              <tr>
+                <td><strong>依赖反转</strong></td><td>DIP</td><td>高层不依赖低层，都依赖抽象</td><td>Service 依赖 Repository 接口，不依赖 MySQL 实现</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-2">1.2 单例模式</h3>
+        <div class="card">
+          <h4>单例模式实现方式</h4>
+          <table>
+            <thead><tr><th>方式</th><th>线程安全</th><th>懒加载</th><th>防反射/序列化</th><th>推荐</th></tr></thead>
+            <tbody>
+              <tr><td><strong>饿汉式</strong></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-red">否</span></td><td>否</td><td>简单场景</td></tr>
+              <tr><td><strong>懒汉式（synchronized）</strong></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-green">是</span></td><td>否</td><td>性能差</td></tr>
+              <tr><td><strong>DCL（双重检查锁）</strong></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-green">是</span></td><td>否</td><td><span class="badge badge-green">推荐</span></td></tr>
+              <tr><td><strong>静态内部类</strong></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-green">是</span></td><td>否</td><td><span class="badge badge-green">推荐</span></td></tr>
+              <tr><td><strong>枚举</strong></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-red">否</span></td><td><span class="badge badge-green">是</span></td><td><span class="badge badge-green">最佳</span></td></tr>
+            </tbody>
+          </table>
+          <pre><code>// DCL 双重检查锁
+public class Singleton {
+    private static volatile Singleton instance; // volatile 防止指令重排
+    private Singleton() {}
+    public static Singleton getInstance() {
+        if (instance == null) {                 // 第一次检查（无锁）
+            synchronized (Singleton.class) {
+                if (instance == null) {         // 第二次检查（有锁）
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+// 静态内部类（推荐）
+public class Singleton {
+    private Singleton() {}
+    private static class Holder {
+        static final Singleton INSTANCE = new Singleton();
+    }
+    public static Singleton getInstance() {
+        return Holder.INSTANCE; // 类加载时初始化，线程安全且懒加载
+    }
+}
+
+// 枚举（最佳，Effective Java 推荐）
+public enum Singleton {
+    INSTANCE;
+    public void doSomething() { }
+}</code></pre>
+          <div class="tip"><strong>为什么 DCL 需要 volatile？</strong><code>instance = new Singleton()</code> 不是原子操作：① 分配内存 → ② 初始化 → ③ 引用赋值。JVM 可能重排为 ①→③→②，导致其他线程获取到未初始化的对象。volatile 禁止重排序。</div>
+        </div>
+
+        <h3 id="s1-3">1.3 工厂模式</h3>
+        <div class="card">
+          <h4>工厂方法 vs 抽象工厂</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">工厂方法（Factory Method）</h4>
+              <ul>
+                <li>定义创建对象的接口，子类决定实例化哪个类</li>
+                <li>每个产品对应一个工厂</li>
+                <li>符合开闭原则（新增产品只需新增工厂）</li>
+                <li>示例：LoggerFactory → FileLogger / ConsoleLogger</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">抽象工厂（Abstract Factory）</h4>
+              <ul>
+                <li>创建一系列相关产品的接口</li>
+                <li>一个工厂生产多个产品</li>
+                <li>适合产品族场景</li>
+                <li>示例：GUIFactory → WinFactory（WinButton + WinTextBox）/ MacFactory</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// 简单工厂（不属于 GoF，但面试常考）
+public class LoggerFactory {
+    public static Logger create(String type) {
+        switch (type) {
+            case "file": return new FileLogger();
+            case "console": return new ConsoleLogger();
+            default: throw new IllegalArgumentException();
+        }
+    }
+}</code></pre>
+        </div>
+
+        <h3 id="s1-4">1.4 建造者与原型</h3>
+        <div class="card">
+          <h4>建造者模式（Builder）</h4>
+          <pre><code>// 链式调用构建复杂对象
+public class HttpRequest {
+    private String url;
+    private String method;
+    private Map&lt;String, String&gt; headers;
+    private String body;
+
+    public static class Builder {
+        private String url;
+        private String method = "GET";
+        private Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();
+        private String body;
+
+        public Builder url(String url) { this.url = url; return this; }
+        public Builder method(String method) { this.method = method; return this; }
+        public Builder header(String k, String v) { headers.put(k, v); return this; }
+        public Builder body(String body) { this.body = body; return this; }
+        public HttpRequest build() { return new HttpRequest(this); }
+    }
+}
+
+// 使用：new HttpRequest.Builder().url("...").method("POST").build();</code></pre>
+          <ul>
+            <li><strong>适用</strong>：对象有多个可选参数，构造函数参数过多</li>
+            <li><strong>变种</strong>：Lombok @Builder 自动生成</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>原型模式（Prototype）</h4>
+          <ul>
+            <li><strong>核心</strong>：通过克隆（clone）现有对象来创建新对象</li>
+            <li><strong>深拷贝 vs 浅拷贝</strong>：浅拷贝只复制引用，深拷贝递归复制所有引用对象</li>
+            <li><strong>实现</strong>：Java <code>Cloneable</code> 接口（浅拷贝）、序列化/反序列化（深拷贝）、手动递归复制</li>
+            <li><strong>适用</strong>：创建对象成本高（如数据库查询），需要大量相似对象</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-5">1.5 代理模式</h3>
+        <div class="card">
+          <h4>静态代理 vs 动态代理</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">静态代理</h4>
+              <ul>
+                <li>代理类在编译期就已确定</li>
+                <li>代理类实现与目标类相同的接口</li>
+                <li>每个接口需要写一个代理类</li>
+                <li>简单但不灵活</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">JDK 动态代理</h4>
+              <ul>
+                <li>基于<strong>接口</strong>，运行时生成代理类</li>
+                <li><code>Proxy.newProxyInstance(classLoader, interfaces, handler)</code></li>
+                <li>InvocationHandler 处理方法调用</li>
+                <li>Spring AOP 默认方式</li>
+              </ul>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:0.8rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">CGLIB 动态代理</h4>
+              <ul>
+                <li>基于<strong>继承</strong>，生成目标类的子类</li>
+                <li>不需要接口</li>
+                <li>通过 MethodInterceptor 拦截方法</li>
+                <li>不能代理 final 类和方法</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent5)">
+              <h4 style="color:var(--accent5)">对比</h4>
+              <ul>
+                <li>JDK：基于接口，反射调用，创建快</li>
+                <li>CGLIB：基于继承，字节码生成，创建慢但运行快</li>
+                <li>Spring：有接口用 JDK，无接口用 CGLIB</li>
+                <li>Spring Boot 2.x+ 默认使用 CGLIB</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="s1-6">1.6 结构型模式</h3>
+        <div class="card">
+          <h4>适配器 / 装饰器 / 外观 / 桥接</h4>
+          <table>
+            <thead><tr><th>模式</th><th>意图</th><th>关键区别</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>适配器</strong></td>
+                <td>将不兼容的接口转换为期望的接口</td>
+                <td>改变接口</td>
+                <td>Arrays.asList()、InputStreamReader</td>
+              </tr>
+              <tr>
+                <td><strong>装饰器</strong></td>
+                <td>动态地给对象添加职责</td>
+                <td>不改变接口，增强功能</td>
+                <td>IO 流包装（BufferedReader）、Collections.synchronizedList</td>
+              </tr>
+              <tr>
+                <td><strong>外观</strong></td>
+                <td>为子系统提供统一的高层接口</td>
+                <td>简化接口</td>
+                <td>SLF4J（统一日志接口）、JdbcTemplate</td>
+              </tr>
+              <tr>
+                <td><strong>桥接</strong></td>
+                <td>将抽象与实现分离，使它们独立变化</td>
+                <td>两个维度独立扩展</td>
+                <td>JDBC Driver（API + 实现分离）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 行为型模式</h3>
+        <div class="card">
+          <h4>策略模式（Strategy）</h4>
+          <pre><code>// 定义算法族，使它们可以互相替换
+public interface PaymentStrategy {
+    void pay(double amount);
+}
+public class AlipayStrategy implements PaymentStrategy { ... }
+public class WechatPayStrategy implements PaymentStrategy { ... }
+
+public class PaymentContext {
+    private PaymentStrategy strategy;
+    public void setStrategy(PaymentStrategy s) { this.strategy = s; }
+    public void executePayment(double amount) { strategy.pay(amount); }
+}</code></pre>
+          <ul>
+            <li><strong>适用</strong>：多种算法/策略可互换，避免大量 if-else</li>
+            <li><strong>示例</strong>：排序策略、支付方式、促销折扣、路由策略</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>观察者模式（Observer）</h4>
+          <pre><code>// 一对多依赖：对象状态变化时通知所有依赖者
+public interface Observer {
+    void update(String event);
+}
+public class EventBus {
+    private Map&lt;String, List&lt;Observer&gt;&gt; listeners = new HashMap&lt;&gt;();
+    public void subscribe(String event, Observer o) { ... }
+    public void publish(String event) {
+        for (Observer o : listeners.get(event)) o.update(event);
+    }
+}</code></pre>
+          <ul>
+            <li><strong>适用</strong>：事件驱动、发布-订阅、GUI 事件处理</li>
+            <li><strong>示例</strong>：Spring Event、MQ 消费者、Android LiveData</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>模板方法（Template Method）</h4>
+          <pre><code>// 定义算法骨架，子类实现具体步骤
+public abstract class AbstractExportService {
+    // 模板方法（final 防止子类覆盖）
+    public final void export() {
+        validate();       // 公共步骤
+        doExport();       // 抽象步骤，子类实现
+        log();            // 公共步骤
+    }
+    protected abstract void doExport();
+    private void validate() { ... }
+    private void log() { ... }
+}
+public class CsvExportService extends AbstractExportService {
+    protected void doExport() { /* CSV 导出逻辑 */ }
+}</code></pre>
+          <ul>
+            <li><strong>适用</strong>：算法骨架固定，部分步骤可变</li>
+            <li><strong>示例</strong>：JdbcTemplate、AbstractList、HttpServlet.service()</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>责任链模式（Chain of Responsibility）</h4>
+          <ul>
+            <li><strong>核心</strong>：将请求沿着处理链传递，每个处理者决定处理或转发</li>
+            <li><strong>适用</strong>：审批流程、过滤器链、中间件</li>
+            <li><strong>示例</strong>：Servlet Filter 链、Spring Security FilterChain、Netty ChannelPipeline</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>状态模式（State）</h4>
+          <ul>
+            <li><strong>核心</strong>：对象内部状态改变时改变其行为，看起来像改变了类</li>
+            <li><strong>适用</strong>：状态机、订单状态流转、TCP 连接状态</li>
+            <li><strong>与策略的区别</strong>：策略是客户端主动选择算法；状态是对象自身根据内部状态自动切换行为</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-2">2.2 模式对比与辨析</h3>
+        <div class="card">
+          <h4>代理 vs 装饰器</h4>
+          <table>
+            <thead><tr><th>维度</th><th>代理模式</th><th>装饰器模式</th></tr></thead>
+            <tbody>
+              <tr><td><strong>目的</strong></td><td>控制对象访问（权限、延迟、缓存）</td><td>增强对象功能</td></tr>
+              <tr><td><strong>对象创建</strong></td><td>代理通常自己创建目标对象</td><td>装饰器接收已有对象</td></tr>
+              <tr><td><strong>关注点</strong></td><td>能否访问</td><td>如何增强</td></tr>
+              <tr><td><strong>组合</strong></td><td>通常不嵌套</td><td>可以多层嵌套（如 IO 流）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>策略 vs 状态</h4>
+          <table>
+            <thead><tr><th>维度</th><th>策略模式</th><th>状态模式</th></tr></thead>
+            <tbody>
+              <tr><td><strong>切换主体</strong></td><td>客户端主动设置</td><td>对象内部自动切换</td></tr>
+              <tr><td><strong>感知</strong></td><td>客户端知道有哪些策略</td><td>客户端不知道内部状态</td></tr>
+              <tr><td><strong>上下文</strong></td><td>策略之间互不知道</td><td>状态之间可以互相转换</td></tr>
+              <tr><td><strong>示例</strong></td><td>支付方式选择</td><td>订单状态流转</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>观察者 vs 发布订阅</h4>
+          <table>
+            <thead><tr><th>维度</th><th>观察者模式</th><th>发布订阅模式</th></tr></thead>
+            <tbody>
+              <tr><td><strong>耦合</strong></td><td>Subject 直接通知 Observer（紧密耦合）</td><td>通过事件中心解耦（松耦合）</td></tr>
+              <tr><td><strong>通信</strong></td><td>Subject 维护 Observer 列表</td><td>Publisher 和 Subscriber 互不知道</td></tr>
+              <tr><td><strong>中间件</strong></td><td>无</td><td>有（EventBus/Broker）</td></tr>
+              <tr><td><strong>示例</strong></td><td>Java Observable、Spring Event</td><td>RabbitMQ、Kafka、Node.js EventEmitter</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-3">2.3 设计模式在框架中的应用</h3>
+        <div class="card">
+          <h4>Spring / JDK 中的设计模式</h4>
+          <table>
+            <thead><tr><th>模式</th><th>Spring 中的应用</th><th>JDK 中的应用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>工厂</strong></td><td>BeanFactory / ApplicationContext</td><td>Calendar.getInstance()、Executors</td></tr>
+              <tr><td><strong>单例</strong></td><td>Bean 默认作用域</td><td>Runtime.getRuntime()</td></tr>
+              <tr><td><strong>代理</strong></td><td>AOP（JDK/CGLIB 动态代理）</td><td>Proxy、RMI</td></tr>
+              <tr><td><strong>模板方法</strong></td><td>JdbcTemplate、RestTemplate</td><td>AbstractList、InputStream</td></tr>
+              <tr><td><strong>策略</strong></td><td>Resource 接口、HandlerMapping</td><td>Comparator、ThreadPoolExecutor 拒绝策略</td></tr>
+              <tr><td><strong>观察者</strong></td><td>ApplicationEvent / @EventListener</td><td>Observable、EventListener</td></tr>
+              <tr><td><strong>责任链</strong></td><td>FilterChain、Interceptor</td><td>ClassLoader（双亲委派）</td></tr>
+              <tr><td><strong>适配器</strong></td><td>HandlerAdapter</td><td>Arrays.asList()、InputStreamReader</td></tr>
+              <tr><td><strong>装饰器</strong></td><td>BeanWrapper</td><td>Collections.synchronizedList、IO 流</td></tr>
+              <tr><td><strong>建造者</strong></td><td>BeanDefinitionBuilder</td><td>StringBuilder、Stream.Builder</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-4">2.4 UML 类图</h3>
+        <div class="card">
+          <h4>类关系（从弱到强）</h4>
+          <table>
+            <thead><tr><th>关系</th><th>UML 符号</th><th>含义</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td><strong>依赖</strong></td><td>虚线箭头 - - -&gt;</td><td>临时使用（方法参数/局部变量）</td><td>Service 方法中 new Order()</td></tr>
+              <tr><td><strong>关联</strong></td><td>实线箭头 ——&gt;</td><td>长期持有引用（成员变量）</td><td>Order 持有 User 引用</td></tr>
+              <tr><td><strong>聚合</strong></td><td>空心菱形 ◇——</td><td>整体-部分，部分可独立存在</td><td>Department 包含 Employee</td></tr>
+              <tr><td><strong>组合</strong></td><td>实心菱形 ◆——</td><td>整体-部分，部分不可独立存在</td><td>Order 包含 OrderItem</td></tr>
+              <tr><td><strong>继承</strong></td><td>空心三角箭头 ——▷</td><td>is-a 关系</td><td>Dog extends Animal</td></tr>
+              <tr><td><strong>实现</strong></td><td>虚线三角箭头 - - -▷</td><td>实现接口</td><td>Dog implements Runnable</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请说说你对 SOLID 原则的理解，举一个实际项目中的例子。</div>
+          <div class="a">
+            <strong>参考</strong>：S 是单一职责，如 UserService 只管用户业务逻辑；O 是开闭原则，如新增支付方式只需新增类实现 PaymentStrategy 接口；L 是里氏替换，子类不能改变父类的语义；I 是接口隔离，不应该强迫实现不需要的方法；D 是依赖反转，Service 依赖 Repository 接口而不是 MySQL 实现。
+            <br><strong>项目示例</strong>：导出功能用策略模式，ExportStrategy 接口有 CsvExport、ExcelExport 实现，新增格式只需新增实现类，符合 OCP。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">单例模式有几种实现方式？为什么 DCL 需要 volatile？</div>
+          <div class="a">
+            <strong>参考</strong>：饿汉式、懒汉式（synchronized）、DCL、静态内部类、枚举。DCL 需要 volatile 是因为 <code>new Singleton()</code> 分为三步：分配内存、初始化、引用赋值。JVM 可能重排为 1→3→2，导致另一个线程在第一次 if 检查时拿到未初始化的对象。volatile 禁止指令重排序。
+            <br><strong>追问</strong>：枚举单例为什么最好？天然线程安全（JVM 保证枚举实例的唯一性）、防止反射攻击（JVM 禁止通过反射创建枚举实例）、防止反序列化破坏（readResolve 由 JVM 保证）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">JDK 动态代理和 CGLIB 动态代理有什么区别？Spring 怎么选择？</div>
+          <div class="a">
+            <strong>参考</strong>：JDK 动态代理基于接口，通过 <code>Proxy.newProxyInstance()</code> 在运行时生成代理类，只能代理实现了接口的类。CGLIB 基于继承，通过 ASM 字节码生成目标类的子类，不需要接口，但不能代理 final 类和方法。
+            <br><strong>Spring 选择</strong>：如果目标类有接口，默认用 JDK 动态代理；没有接口用 CGLIB。Spring Boot 2.x 默认使用 CGLIB（proxyTargetClass=true），因为 CGLIB 性能已优化且使用更简单。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">策略模式和状态模式有什么区别？</div>
+          <div class="a">
+            <strong>参考</strong>：结构类似（都是将行为委托给策略/状态对象），但意图不同。<strong>策略模式</strong>：客户端主动选择算法，策略之间互不知道，如选择支付方式。<strong>状态模式</strong>：对象根据内部状态自动切换行为，状态之间可以互相转换，如订单状态流转（待支付→已支付→已发货→已完成）。
+            <br><strong>关键区别</strong>：策略是外部选择，状态是内部驱动。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">观察者模式和发布订阅模式有什么区别？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>观察者模式</strong>：Subject 直接维护 Observer 列表并通知，两者紧密耦合。<strong>发布订阅模式</strong>：通过事件中心（EventBus/Broker）解耦，Publisher 和 Subscriber 互不知道对方存在。观察者模式是发布订阅的简化版。
+            <br><strong>追问</strong>：Spring Event 是观察者模式（ApplicationEventPublisher 直接发布，EventListener 直接监听），MQ（如 Kafka）是发布订阅模式。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">装饰器模式和代理模式有什么区别？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>装饰器</strong>：动态增强对象功能，不改变接口，可以多层嵌套（如 <code>new BufferedReader(new InputStreamReader(is))</code>）。<strong>代理</strong>：控制对象访问（权限校验、延迟加载、缓存），代理通常自己创建目标对象。
+            <br><strong>关键区别</strong>：装饰器关注"增强"，代理关注"控制"。装饰器通常由客户端传入被装饰对象，代理通常自己管理目标对象的生命周期。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Spring 中用到了哪些设计模式？请举例说明。</div>
+          <div class="a">
+            <strong>参考</strong>：① <strong>工厂</strong>：BeanFactory 创建 Bean；② <strong>单例</strong>：Bean 默认单例；③ <strong>代理</strong>：AOP 用 JDK/CGLIB 动态代理；④ <strong>模板方法</strong>：JdbcTemplate 封装 JDBC 操作；⑤ <strong>策略</strong>：Resource 接口有 ClassPathResource、FileSystemResource 等实现；⑥ <strong>观察者</strong>：ApplicationEvent + @EventListener；⑦ <strong>责任链</strong>：FilterChain、Interceptor 链；⑧ <strong>适配器</strong>：HandlerAdapter 适配不同类型的 Handler。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          设计模式 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

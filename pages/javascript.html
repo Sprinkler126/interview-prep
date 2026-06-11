@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JavaScript / TypeScript - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>📜 JavaScript / TypeScript</h1>
+    <p class="subtitle">事件循环 · 闭包 · 原型链 · Promise · TypeScript 类型系统</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">事件循环</a></li>
+          <li class="sub"><a href="#s1-2">闭包与作用域</a></li>
+          <li class="sub"><a href="#s1-3">原型链与继承</a></li>
+          <li class="sub"><a href="#s1-4">Promise 与 async/await</a></li>
+          <li class="sub"><a href="#s1-5">this 指向</a></li>
+          <li class="sub"><a href="#s1-6">ES6+ 核心特性</a></li>
+          <li class="sub"><a href="#s1-7">TypeScript 类型系统</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">异步编程模式</a></li>
+          <li class="sub"><a href="#s2-2">模块化方案</a></li>
+          <li class="sub"><a href="#s2-3">前端工程化</a></li>
+          <li class="sub"><a href="#s2-4">TS 实战技巧</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 事件循环 -->
+        <h3 id="s1-1">事件循环</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">浏览器事件循环（Event Loop）</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">调用栈（Call Stack）<br><small>同步代码执行</small><br><small>LIFO 结构</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">Web APIs<br><small>setTimeout / fetch</small><br><small>DOM 事件 / AJAX</small></div>
+            </div>
+            <div class="arch-connector">↓ 回调入队 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">微任务队列<br><small>Microtask Queue</small><br><small>Promise.then / MutationObserver</small><br><small>queueMicrotask</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">宏任务队列<br><small>Macrotask Queue</small><br><small>setTimeout / setInterval</small><br><small>I/O / UI 渲染</small></div>
+            </div>
+            <div class="arch-connector">↓ 事件循环 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">执行顺序：同步代码 → 微任务队列清空 → 一个宏任务 → 微任务队列清空 → 渲染 → 下一个宏任务 ...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>宏任务与微任务</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>常见来源</th><th>优先级</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">宏任务</span></td><td>setTimeout / setInterval / setImmediate / I/O / UI rendering / MessageChannel</td><td>低（每轮循环取一个）</td></tr>
+              <tr><td><span class="badge badge-green">微任务</span></td><td>Promise.then/catch/finally / MutationObserver / queueMicrotask / process.nextTick (Node.js)</td><td>高（每轮清空整个队列）</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 经典面试题：输出顺序
+console.log('1');                // 同步
+
+setTimeout(() => {
+  console.log('2');              // 宏任务
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log('3');              // 微任务
+});
+
+console.log('4');                // 同步
+
+// 输出：1 → 4 → 3 → 2
+// 解析：
+// 1. 执行同步代码：打印 1，注册 setTimeout 回调到宏任务队列，
+//    注册 Promise.then 回调到微任务队列，打印 4
+// 2. 清空微任务队列：打印 3
+// 3. 取一个宏任务执行：打印 2</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Node.js vs 浏览器事件循环</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>浏览器事件循环</h4>
+              <ul>
+                <li>一个宏任务 → 清空微任务 → 渲染 → 下一个宏任务</li>
+                <li>微任务：Promise.then、MutationObserver</li>
+                <li>宏任务：setTimeout、setInterval、I/O</li>
+                <li>渲染在微任务之后、宏任务之前</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>Node.js 事件循环</h4>
+              <ul>
+                <li>6 个阶段依次执行（timers → poll → check 等）</li>
+                <li>每个阶段执行完后清空微任务</li>
+                <li>process.nextTick 优先级高于 Promise.then</li>
+                <li>setImmediate 在 check 阶段执行</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// Node.js 事件循环 6 个阶段：
+// 1. timers：执行 setTimeout / setInterval 回调
+// 2. pending callbacks：执行系统级回调（如 TCP 错误）
+// 3. idle, prepare：内部使用
+// 4. poll：执行 I/O 回调，计算等待时间
+// 5. check：执行 setImmediate 回调
+// 6. close callbacks：执行 close 事件回调
+
+// Node.js 中的特殊行为
+setImmediate(() => console.log('immediate'));
+setTimeout(() => console.log('timeout'), 0);
+// 输出顺序不确定（取决于事件循环进入 timers 阶段的时机）
+
+// process.nextTick vs Promise.then
+process.nextTick(() => console.log('nextTick'));
+Promise.resolve().then(() => console.log('promise'));
+// 输出：nextTick → promise
+// nextTick 在当前阶段结束后立即执行，优先级最高</code></pre>
+        </div>
+
+        <!-- 1-2 闭包与作用域 -->
+        <h3 id="s1-2">闭包与作用域</h3>
+
+        <div class="card">
+          <h4>闭包原理</h4>
+          <pre><code>// 闭包（Closure）：函数能够访问其定义时所在的词法作用域
+// 即使该函数在其他地方执行
+
+function createCounter() {
+  let count = 0;  // 局部变量，外部无法直接访问
+  return {
+    increment() { return ++count; },
+    decrement() { return --count; },
+    getCount() { return count; }
+  };
+}
+
+const counter = createCounter();
+counter.increment(); // 1
+counter.increment(); // 2
+counter.getCount();  // 2
+// count 变量通过闭包存活，不会被 GC 回收
+
+// 闭包的底层机制：词法作用域 + 作用域链
+// JS 引擎通过 [[Environment]] 内部属性记录函数定义时的作用域链
+// 调用函数时，创建新的执行上下文，其作用域链 = [[Environment]] + 当前变量对象</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>闭包应用：防抖 / 节流 / 柯里化</h4>
+          <pre><code>// 防抖（Debounce）：延迟执行，多次触发重新计时
+function debounce(fn, delay) {
+  let timer = null;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+}
+// 应用：搜索框输入、窗口 resize
+
+// 节流（Throttle）：固定间隔执行一次
+function throttle(fn, interval) {
+  let lastTime = 0;
+  return function(...args) {
+    const now = Date.now();
+    if (now - lastTime >= interval) {
+      lastTime = now;
+      fn.apply(this, args);
+    }
+  };
+}
+// 应用：滚动事件、鼠标移动、按钮防重复点击
+
+// 柯里化（Currying）：将多参数函数转为一系列单参数函数
+function curry(fn) {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args);
+    }
+    return function(...args2) {
+      return curried.apply(this, args.concat(args2));
+    };
+  };
+}
+
+const add = curry((a, b, c) => a + b + c);
+add(1)(2)(3);     // 6
+add(1, 2)(3);     // 6
+add(1)(2, 3);     // 6</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>闭包与内存泄漏</h4>
+          <pre><code>// 闭包持有外部变量的引用，导致变量无法被 GC 回收
+
+// 内存泄漏示例
+function leak() {
+  const largeData = new Array(1000000).fill('*');
+  return function() {
+    // 即使不使用 largeData，闭包也会持有整个作用域的引用
+    // 现代 JS 引擎会优化未使用的变量（V8 的 Dead Code Elimination）
+    console.log('leak');
+  };
+}
+
+// 安全做法：不需要的引用手动置 null
+function safe() {
+  let largeData = new Array(1000000).fill('*');
+  const result = process(largeData);
+  largeData = null; // 手动释放引用
+  return function() {
+    console.log(result);
+  };
+}
+
+// 常见闭包内存泄漏场景：
+// 1. 定时器回调中引用了 DOM 元素
+// 2. 事件监听器未及时移除
+// 3. 缓存无限增长</code></pre>
+        </div>
+
+        <!-- 1-3 原型链与继承 -->
+        <h3 id="s1-3">原型链与继承</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">原型链关系图</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">instance<br><small>const obj = new Foo()</small></div>
+            </div>
+            <div class="arch-connector">↓ __proto__ ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Foo.prototype<br><small>constructor: Foo</small><br><small>共享方法和属性</small></div>
+            </div>
+            <div class="arch-connector">↓ __proto__ ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Object.prototype<br><small>toString / hasOwnProperty</small></div>
+            </div>
+            <div class="arch-connector">↓ __proto__ ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">null（原型链终点）</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>new 关键字的过程</h4>
+          <pre><code>// new 操作符的执行过程：
+// 1. 创建一个空对象 {}
+// 2. 将对象的 __proto__ 指向构造函数的 prototype
+// 3. 将构造函数的 this 指向该对象并执行
+// 4. 如果构造函数返回对象则使用该对象，否则返回新创建的对象
+
+// 手写 new
+function myNew(Constructor, ...args) {
+  // 1. 创建空对象，链接原型
+  const obj = Object.create(Constructor.prototype);
+  // 2. 执行构造函数
+  const result = Constructor.apply(obj, args);
+  // 3. 判断返回值
+  return result instanceof Object ? result : obj;
+}
+
+// ES6 class 语法
+class Animal {
+  constructor(name) {
+    this.name = name;
+  }
+  speak() {
+    console.log(`${this.name} makes a sound`);
+  }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name);  // 调用父类构造函数
+    this.breed = breed;
+  }
+  speak() {
+    console.log(`${this.name} barks`);
+  }
+}
+
+// class 本质还是基于原型链的语法糖
+// Dog.prototype.__proto__ === Animal.prototype</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>继承方式对比</h4>
+          <table>
+            <thead>
+              <tr><th>方式</th><th>原理</th><th>优点</th><th>缺点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>原型链继承</td><td>Sub.prototype = new Super()</td><td>简单</td><td>引用类型共享、无法传参</td></tr>
+              <tr><td>构造函数继承</td><td>Super.call(this)</td><td>可传参、不共享</td><td>方法不能复用（每次创建新函数）</td></tr>
+              <tr><td>组合继承</td><td>原型链 + 构造函数</td><td>可传参、方法复用</td><td>调用两次父构造函数</td></tr>
+              <tr><td>寄生组合继承</td><td>Object.create + call</td><td>最优方案</td><td>实现稍复杂</td></tr>
+              <tr><td><span class="badge badge-green">ES6 class</span></td><td>extends + super</td><td>语法清晰</td><td>本质是寄生组合继承的语法糖</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 寄生组合继承（最优方案）
+function inheritPrototype(Sub, Super) {
+  const proto = Object.create(Super.prototype); // 创建父类原型副本
+  proto.constructor = Sub;                       // 修复 constructor
+  Sub.prototype = proto;                         // 设置子类原型
+}
+
+function Parent(name) {
+  this.name = name;
+}
+Parent.prototype.sayHello = function() {
+  console.log(`Hello, I'm ${this.name}`);
+};
+
+function Child(name, age) {
+  Parent.call(this, name); // 继承属性（只调用一次父构造函数）
+  this.age = age;
+}
+inheritPrototype(Child, Parent); // 继承方法
+
+// ES6 class 等价实现
+class Child extends Parent {
+  constructor(name, age) {
+    super(name);
+    this.age = age;
+  }
+}</code></pre>
+        </div>
+
+        <!-- 1-4 Promise 与 async/await -->
+        <h3 id="s1-4">Promise 与 async/await</h3>
+
+        <div class="card">
+          <h4>Promise 状态机</h4>
+          <div class="diagram">
+            <div class="diagram-title">Promise 三种状态</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">pending<br><small>初始状态</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">fulfilled<br><small>resolve(value)</small><br><small>不可逆转</small></div>
+              <div class="flow-arrow">←</div>
+              <div class="flow-box flow-pink">rejected<br><small>reject(reason)</small><br><small>不可逆转</small></div>
+            </div>
+          </div>
+          <pre><code>// Promise 基本用法
+const promise = new Promise((resolve, reject) => {
+  if (success) {
+    resolve(value);   // 状态变为 fulfilled
+  } else {
+    reject(reason);   // 状态变为 rejected
+  }
+});
+
+promise
+  .then(value => { /* fulfilled */ })
+  .catch(reason => { /* rejected */ })
+  .finally(() => { /* 无论成功失败 */ });
+
+// 链式调用
+fetch('/api/user')
+  .then(res => res.json())           // 返回新 Promise
+  .then(user => fetch(`/api/orders/${user.id}`))
+  .then(res => res.json())
+  .then(orders => console.log(orders))
+  .catch(err => console.error(err));  // 捕获链中任何错误
+
+// Promise 静态方法
+Promise.all([p1, p2, p3])    // 全部成功才 resolve，一个失败就 reject
+Promise.allSettled([p1, p2]) // 等待所有完成（不管成功失败）
+Promise.race([p1, p2])       // 第一个完成的结果（无论成功失败）
+Promise.any([p1, p2])        // 第一个成功的结果（全部失败才 reject）</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>手写简化版 Promise</h4>
+          <pre><code>class MyPromise {
+  constructor(executor) {
+    this.state = 'pending';
+    this.value = undefined;
+    this.callbacks = [];
+
+    const resolve = (value) => {
+      if (this.state !== 'pending') return;
+      this.state = 'fulfilled';
+      this.value = value;
+      this.callbacks.forEach(cb => cb.onFulfilled(value));
+    };
+
+    const reject = (reason) => {
+      if (this.state !== 'pending') return;
+      this.state = 'rejected';
+      this.value = reason;
+      this.callbacks.forEach(cb => cb.onRejected(reason));
+    };
+
+    try {
+      executor(resolve, reject);
+    } catch (err) {
+      reject(err);
+    }
+  }
+
+  then(onFulfilled, onRejected) {
+    return new MyPromise((resolve, reject) => {
+      const handle = (fn) => {
+        try {
+          const result = fn(this.value);
+          if (result instanceof MyPromise) {
+            result.then(resolve, reject);
+          } else {
+            resolve(result);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      if (this.state === 'fulfilled') {
+        setTimeout(() => handle(onFulfilled), 0);
+      } else if (this.state === 'rejected') {
+        setTimeout(() => handle(onRejected), 0);
+      } else {
+        this.callbacks.push({
+          onFulfilled: () => handle(onFulfilled),
+          onRejected: () => handle(onRejected)
+        });
+      }
+    });
+  }
+
+  catch(onRejected) {
+    return this.then(null, onRejected);
+  }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>async/await</h4>
+          <pre><code>// async 函数总是返回 Promise
+async function fetchData() {
+  const user = await fetchUser();    // 等待 Promise resolve
+  const orders = await fetchOrders(user.id);
+  return { user, orders };           // 自动包装为 Promise.resolve(...)
+}
+
+// 等价于
+function fetchData() {
+  return fetchUser()
+    .then(user => fetchOrders(user.id)
+      .then(orders => ({ user, orders })));
+}
+
+// 错误处理
+async function safe() {
+  try {
+    const data = await riskyOperation();
+    return data;
+  } catch (err) {
+    console.error('Error:', err);
+    return defaultValue;
+  }
+}
+
+// 并发执行（不要在循环中 await）
+// 错误：顺序执行，总耗时 = sum(每个请求时间)
+for (const url of urls) {
+  const res = await fetch(url);  // 逐个等待
+}
+
+// 正确：并发执行，总耗时 = max(每个请求时间)
+const results = await Promise.all(
+  urls.map(url => fetch(url))
+);
+
+// for await...of（异步迭代器）
+async function* generate() {
+  yield await fetchPage(1);
+  yield await fetchPage(2);
+}
+for await (const page of generate()) {
+  console.log(page);
+}</code></pre>
+        </div>
+
+        <!-- 1-5 this 指向 -->
+        <h3 id="s1-5">this 指向</h3>
+
+        <div class="card">
+          <h4>this 绑定规则（优先级从高到低）</h4>
+          <table>
+            <thead>
+              <tr><th>规则</th><th>场景</th><th>this 指向</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">new 绑定</span></td><td>new Foo()</td><td>新创建的对象</td></tr>
+              <tr><td><span class="badge badge-purple">显式绑定</span></td><td>call / apply / bind</td><td>指定的对象</td></tr>
+              <tr><td><span class="badge badge-orange">隐式绑定</span></td><td>obj.fn()</td><td>调用的对象</td></tr>
+              <tr><td><span class="badge badge-blue">默认绑定</span></td><td>fn() 独立调用</td><td>严格模式 undefined，非严格 window</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 1. 默认绑定
+function foo() {
+  console.log(this); // 非严格模式: window, 严格模式: undefined
+}
+foo();
+
+// 2. 隐式绑定
+const obj = {
+  name: 'test',
+  foo() { console.log(this.name); } // 'test'（this = obj）
+};
+obj.foo();
+
+// 隐式丢失
+const fn = obj.foo;
+fn(); // undefined（赋值后独立调用，this 变为 window）
+
+// 3. 显式绑定
+function greet(greeting) {
+  console.log(greeting + ', ' + this.name);
+}
+greet.call({ name: 'Alice' }, 'Hello');   // 立即调用
+greet.apply({ name: 'Alice' }, ['Hello']); // 立即调用（参数为数组）
+const bound = greet.bind({ name: 'Alice' }); // 返回新函数，永久绑定
+bound('Hello');
+
+// 4. new 绑定
+function Person(name) {
+  this.name = name; // this = 新创建的对象
+}
+new Person('Alice');
+
+// 箭头函数：没有自己的 this，继承外层作用域的 this
+const obj2 = {
+  name: 'test',
+  foo: () => {
+    console.log(this.name); // undefined（this 是外层作用域的 this，即 window）
+  },
+  bar() {
+    setTimeout(() => {
+      console.log(this.name); // 'test'（箭头函数继承 bar 的 this）
+    }, 100);
+  }
+};</code></pre>
+          <div class="warn">箭头函数的 this 在定义时确定，不可通过 call/apply/bind 修改。箭头函数也不能作为构造函数（不能 new）。</div>
+        </div>
+
+        <!-- 1-6 ES6+ 核心特性 -->
+        <h3 id="s1-6">ES6+ 核心特性</h3>
+
+        <div class="card">
+          <h4>解构赋值与展开运算符</h4>
+          <pre><code>// 数组解构
+const [a, b, ...rest] = [1, 2, 3, 4, 5];
+// a=1, b=2, rest=[3,4,5]
+
+const [first = 'default'] = []; // 默认值
+
+// 对象解构
+const { name, age, city = 'Beijing' } = { name: 'Alice', age: 25 };
+const { name: userName } = { name: 'Alice' }; // 重命名
+const { info: { score } } = { info: { score: 95 } }; // 嵌套解构
+
+// 展开运算符（浅拷贝）
+const arr1 = [1, 2];
+const arr2 = [...arr1, 3, 4]; // [1, 2, 3, 4]
+
+const obj1 = { a: 1, b: 2 };
+const obj2 = { ...obj1, c: 3 }; // { a: 1, b: 2, c: 3 }
+
+// 剩余参数
+function sum(...numbers) {
+  return numbers.reduce((acc, n) => acc + n, 0);
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Proxy / Reflect / Symbol</h4>
+          <pre><code>// Proxy：拦截对象操作（元编程）
+const handler = {
+  get(target, prop, receiver) {
+    console.log(`get ${prop}`);
+    return Reflect.get(target, prop, receiver);
+  },
+  set(target, prop, value, receiver) {
+    console.log(`set ${prop} = ${value}`);
+    return Reflect.set(target, prop, value, receiver);
+  },
+  has(target, prop) {
+    console.log(`has ${prop}`);
+    return prop in target;
+  }
+};
+
+const proxy = new Proxy({ name: 'test' }, handler);
+proxy.name;          // get name
+proxy.age = 25;      // set age = 25
+'name' in proxy;     // has name
+
+// Vue 3 响应式原理就是基于 Proxy
+// Symbol：唯一标识符
+const sym1 = Symbol('key');
+const sym2 = Symbol('key');
+sym1 === sym2; // false（每个 Symbol 唯一）
+
+// 内置 Symbol
+const arr = [1, 2, 3];
+arr[Symbol.iterator]; // 迭代器协议
+
+// Symbol.for：全局注册表
+Symbol.for('key') === Symbol.for('key'); // true</code></pre>
+        </div>
+
+        <!-- 1-7 TypeScript 类型系统 -->
+        <h3 id="s1-7">TypeScript 类型系统</h3>
+
+        <div class="card">
+          <h4>泛型</h4>
+          <pre><code>// 泛型函数
+function identity&lt;T&gt;(arg: T): T {
+  return arg;
+}
+identity&lt;string&gt;('hello');  // 显式指定
+identity(42);                // 类型推断
+
+// 泛型约束
+interface HasLength {
+  length: number;
+}
+function logLength&lt;T extends HasLength&gt;(arg: T): T {
+  console.log(arg.length);
+  return arg;
+}
+logLength('hello');     // OK
+logLength([1, 2, 3]);   // OK
+// logLength(42);        // Error: number 没有 length
+
+// 泛型接口
+interface ApiResponse&lt;T&gt; {
+  code: number;
+  message: string;
+  data: T;
+}
+type UserResponse = ApiResponse&lt;{ id: number; name: string }&gt;;
+
+// 泛型类
+class Stack&lt;T&gt; {
+  private items: T[] = [];
+  push(item: T) { this.items.push(item); }
+  pop(): T | undefined { return this.items.pop(); }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>条件类型与 infer</h4>
+          <pre><code>// 条件类型：T extends U ? X : Y
+type IsString&lt;T&gt; = T extends string ? 'yes' : 'no';
+type A = IsString&lt;string&gt;;  // 'yes'
+type B = IsString&lt;number&gt;;  // 'no'
+
+// infer：在条件类型中推断类型
+type ReturnType&lt;T&gt; = T extends (...args: any[]) => infer R ? R : never;
+type C = ReturnType&lt;() => string&gt;; // string
+
+type ElementType&lt;T&gt; = T extends (infer E)[] ? E : never;
+type D = ElementType&lt;number[]&gt;; // number
+
+// 提取 Promise 内部类型
+type Awaited&lt;T&gt; = T extends Promise&lt;infer U&gt; ? Awaited&lt;U&gt; : T;
+type E = Awaited&lt;Promise&lt;Promise&lt;string&gt;&gt;&gt;; // string（递归解包）
+
+// 分布式条件类型
+type ToArray&lt;T&gt; = T extends any ? T[] : never;
+type F = ToArray&lt;string | number&gt;; // string[] | number[]</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>映射类型与工具类型</h4>
+          <pre><code>// 映射类型：遍历联合类型的每个成员生成新类型
+type Readonly&lt;T&gt; = {
+  readonly [K in keyof T]: T[K];
+};
+
+type Partial&lt;T&gt; = {
+  [K in keyof T]?: T[K];
+};
+
+// 内置工具类型
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  age: number;
+}
+
+type PartialUser = Partial&lt;User&gt;;          // 所有属性变可选
+type RequiredUser = Required&lt;PartialUser&gt;; // 所有属性变必选
+type ReadonlyUser = Readonly&lt;User&gt;;        // 所有属性变只读
+
+type PickUser = Pick&lt;User, 'id' | 'name'&gt;; // 选取部分属性
+// { id: number; name: string }
+
+type OmitUser = Omit&lt;User, 'email'&gt;;       // 排除部分属性
+// { id: number; name: string; age: number }
+
+type RecordMap = Record&lt;'a' | 'b' | 'c', number&gt;;
+// { a: number; b: number; c: number }
+
+type ExcludeT = Exclude&lt;'a' | 'b' | 'c', 'a'&gt;;   // 'b' | 'c'
+type ExtractT = Extract&lt;'a' | 'b' | 'c', 'a' | 'd'&gt;; // 'a'
+type NonNullableT = NonNullable&lt;string | null | undefined&gt;; // string
+
+// 实用工具类型示例
+type UserCreateInput = Omit&lt;User, 'id'&gt;;            // 创建时不需 id
+type UserUpdateInput = Partial&lt;Omit&lt;User, 'id'&gt;&gt;&gt;; // 更新时所有字段可选
+type UserSummary = Pick&lt;User, 'id' | 'name'&gt;;       // 简要信息</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>模板字面量类型与类型推断技巧</h4>
+          <pre><code>// 模板字面量类型（Template Literal Types）
+type EventName = 'click' | 'scroll' | 'mousemove';
+type EventHandler = `on${Capitalize&lt;EventName&gt;}`;
+// 'onClick' | 'onScroll' | 'onMousemove'
+
+type CSSProperty = 'margin' | 'padding';
+type CSSDirection = 'top' | 'right' | 'bottom' | 'left';
+type CSSKey = `${CSSProperty}-${CSSDirection}`;
+// 'margin-top' | 'margin-right' | ... | 'padding-left'
+
+// keyof 与 typeof 组合
+const routes = {
+  home: '/',
+  user: '/user/:id',
+  settings: '/settings'
+} as const;
+
+type RouteKey = keyof typeof routes; // 'home' | 'user' | 'settings'
+type RoutePath = typeof routes[RouteKey]; // '/' | '/user/:id' | '/settings'
+
+// satisfies 操作符（TS 4.9+）
+const theme = {
+  primary: '#007bff',
+  secondary: '#6c757d',
+  fontSizes: [12, 14, 16, 18, 20]
+} satisfies Record&lt;string, string | number[]&gt;;
+// theme.primary 类型推断为 string（不是 string | number[]）
+// theme.fontSizes 类型推断为 number[]（保留精确类型）</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 异步编程模式 -->
+        <h3 id="s2-1">异步编程模式</h3>
+
+        <div class="card">
+          <h4>异步模式演进</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">回调函数<br><small>Callback Hell</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Promise<br><small>链式调用</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Generator<br><small>yield 暂停</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">async/await<br><small>同步写法</small></div>
+          </div>
+          <pre><code>// Promise 并发控制（限制并发数）
+async function parallelLimit(tasks, limit = 3) {
+  const results = [];
+  const executing = new Set();
+
+  for (const [index, task] of tasks.entries()) {
+    const p = task().then(result => {
+      executing.delete(p);
+      return result;
+    });
+    executing.add(p);
+    results[index] = p;
+
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+
+  return Promise.all(results);
+}
+
+// Promise 重试
+async function retry(fn, maxRetries = 3, delay = 1000) {
+  for (let i = 0; i &lt;= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === maxRetries) throw err;
+      await new Promise(r => setTimeout(r, delay * 2 ** i));
+    }
+  }
+}</code></pre>
+        </div>
+
+        <!-- 2-2 模块化方案 -->
+        <h3 id="s2-2">模块化方案</h3>
+
+        <div class="card">
+          <h4>CommonJS vs ESM</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>CommonJS（CJS）</h4>
+              <p><span class="badge badge-blue">Node.js 默认</span></p>
+              <ul>
+                <li>require() 同步加载</li>
+                <li>module.exports 导出</li>
+                <li>运行时加载（值的拷贝）</li>
+                <li>可在条件语句中使用</li>
+                <li>this 指向 module.exports</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>ES Module（ESM）</h4>
+              <p><span class="badge badge-green">浏览器原生 / Node.js 12+</span></p>
+              <ul>
+                <li>import 静态分析</li>
+                <li>export / export default 导出</li>
+                <li>编译时加载（值的引用）</li>
+                <li>必须在顶层使用（静态结构）</li>
+                <li>this 指向 undefined</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// CommonJS
+const fs = require('fs');              // 内置模块
+const lodash = require('lodash');       // 第三方模块
+const utils = require('./utils');       // 本地模块
+
+module.exports = { foo: 'bar' };
+// 或 exports.foo = 'bar';
+
+// ES Module
+import fs from 'fs';                    // 默认导入
+import { readFile, writeFile } from 'fs'; // 命名导入
+import * as utils from './utils.js';    // 全部导入
+
+export const foo = 'bar';              // 命名导出
+export default class MyClass {}         // 默认导出
+
+// 动态导入（按需加载）
+const module = await import('./module.js');
+
+// CJS 与 ESM 互操作
+// CJS 中使用 ESM：dynamic import()
+const { default: lodash } = await import('lodash');
+
+// ESM 中使用 CJS：自动包装为 default 导出
+import pkg from 'cjs-package';
+const { method } = pkg;</code></pre>
+        </div>
+
+        <!-- 2-3 前端工程化 -->
+        <h3 id="s2-3">前端工程化</h3>
+
+        <div class="card">
+          <h4>构建工具对比</h4>
+          <table>
+            <thead>
+              <tr><th>工具</th><th>核心特性</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Webpack</td><td>模块打包、Loader/Plugin 生态</td><td>大型项目、高度自定义</td></tr>
+              <tr><td>Vite</td><td>ESM + esbuild 预构建、HMR 极快</td><td>新项目首选、Vue/React</td></tr>
+              <tr><td>Rollup</td><td>Tree Shaking、ESM 输出</td><td>库开发、打包</td></tr>
+              <tr><td>esbuild</td><td>Go 编写、极快</td><td>开发环境、预构建</td></tr>
+              <tr><td>Turbopack</td><td>Rust 编写、增量编译</td><td>Next.js 13+ 默认</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 TS 实战技巧 -->
+        <h3 id="s2-4">TS 实战技巧</h3>
+
+        <div class="card">
+          <h4>类型安全最佳实践</h4>
+          <pre><code>// 1. 使用 as const 断言获取精确类型
+const COLORS = ['red', 'green', 'blue'] as const;
+type Color = typeof COLORS[number]; // 'red' | 'green' | 'blue'
+
+// 2. 使用 discriminated union 实现类型安全的联合类型
+type Shape =
+  | { kind: 'circle'; radius: number }
+  | { kind: 'rectangle'; width: number; height: number };
+
+function area(shape: Shape): number {
+  switch (shape.kind) {
+    case 'circle':
+      return Math.PI * shape.radius ** 2; // TS 自动收窄类型
+    case 'rectangle':
+      return shape.width * shape.height;
+  }
+}
+
+// 3. 函数重载
+function createElement(tag: 'a'): HTMLAnchorElement;
+function createElement(tag: 'div'): HTMLDivElement;
+function createElement(tag: string): HTMLElement;
+function createElement(tag: string): HTMLElement {
+  return document.createElement(tag);
+}
+
+// 4. 类型守卫
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function process(value: string | number) {
+  if (isString(value)) {
+    console.log(value.toUpperCase()); // TS 知道这里 value 是 string
+  }
+}
+
+// 5. 使用 keyof 约束属性访问
+function getProperty&lt;T, K extends keyof T&gt;(obj: T, key: K): T[K] {
+  return obj[key];
+}
+
+const user = { name: 'Alice', age: 25 };
+getProperty(user, 'name'); // OK: string
+// getProperty(user, 'email'); // Error: 'email' 不在 keyof User 中</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请解释 JavaScript 的事件循环机制，宏任务和微任务的执行顺序是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>JS 是单线程的，通过事件循环实现异步。事件循环不断执行以下步骤：1）从调用栈中执行同步代码；2）调用栈清空后，清空微任务队列（所有微任务）；3）从宏任务队列取一个宏任务执行；4）重复步骤 2 和 3。<br>
+            微任务优先级高于宏任务。每次执行完一个宏任务后，会清空所有微任务，然后才执行下一个宏任务。微任务包括 Promise.then/catch/finally、MutationObserver、queueMicrotask。宏任务包括 setTimeout、setInterval、I/O、UI 渲染。<br>
+            <strong>追问：Node.js 的事件循环有什么不同？</strong> Node.js 事件循环分为 6 个阶段（timers → pending → idle → poll → check → close），每个阶段执行完后清空微任务。process.nextTick 的优先级高于 Promise.then。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是闭包？闭包有哪些应用场景和注意事项？</div>
+          <div class="a">
+            <strong>参考：</strong>闭包是指函数能够访问其定义时所在的词法作用域，即使该函数在其他地方执行。本质是函数的 [[Environment]] 内部属性记录了创建时的作用域链。<br>
+            应用场景：1）数据封装和私有变量（模块模式）；2）函数工厂（柯里化、偏函数）；3）回调函数保持上下文（事件处理、定时器）；4）防抖和节流。<br>
+            注意事项：1）闭包持有外部变量引用，可能导致内存泄漏（不再需要时手动置 null）；2）循环中的闭包陷阱（用 let 替代 var，或使用 IIFE）；3）闭包变量是引用而非拷贝。<br>
+            <strong>追问：循环中的闭包经典问题？</strong> for 循环中 var 声明的变量被所有回调共享（因为 var 是函数作用域）。解决：1）用 let（块作用域）；2）IIFE 创建独立作用域。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">JavaScript 的原型链是什么？new 操作符做了什么？</div>
+          <div class="a">
+            <strong>参考：</strong>每个对象都有一个 __proto__ 属性指向其构造函数的 prototype。当访问对象的属性时，先在对象自身查找，找不到则沿 __proto__ 向上查找，直到 null，形成原型链。<br>
+            new 操作符做了 4 件事：1）创建一个空对象 {}；2）将对象的 __proto__ 指向构造函数的 prototype；3）将构造函数的 this 指向该对象并执行；4）如果构造函数返回对象则使用该对象，否则返回新创建的对象。<br>
+            ES6 的 class 是基于原型链的语法糖，extends + super 实现继承，本质是寄生组合继承。<br>
+            <strong>追问：__proto__ 和 prototype 有什么区别？</strong> __proto__ 是每个对象都有的内部属性（指向原型），prototype 只有函数才有（作为构造函数时，实例的 __proto__ 指向它）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Promise 的三种状态是什么？手写一个简化版 Promise 需要注意什么？</div>
+          <div class="a">
+            <strong>参考：</strong>Promise 有三种状态：pending（初始）、fulfilled（成功）、rejected（失败）。状态只能从 pending 变为 fulfilled 或 rejected，不可逆转。<br>
+            手写 Promise 需要注意：1）executor 同步执行，但 then/catch 回调要异步执行（微任务，用 setTimeout 或 queueMicrotask 模拟）；2）支持链式调用（then 返回新 Promise）；3）值穿透（then 的参数不是函数时，值透传给下一个 then）；4）错误冒泡（catch 捕获链中任何错误）；5）支持 Promise 解析过程（then 回调返回 Promise 时要等待 resolve）。<br>
+            <strong>追问：Promise.all 和 Promise.allSettled 有什么区别？</strong> all 在任意一个 Promise reject 时立即 reject，其他结果被忽略。allSettled 等待所有 Promise 完成（无论成功失败），返回每个 Promise 的状态和结果。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">箭头函数和普通函数有什么区别？this 的绑定规则是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>箭头函数和普通函数的核心区别：1）箭头函数没有自己的 this，继承外层作用域的 this（定义时确定，不可改变）；2）箭头函数不能作为构造函数（不能 new）；3）箭头函数没有 arguments 对象（使用 rest 参数代替）；4）箭头函数没有 prototype 属性。<br>
+            this 的绑定规则（优先级从高到低）：1）new 绑定：new Foo() → this 是新对象；2）显式绑定：call/apply/bind → this 是指定对象；3）隐式绑定：obj.fn() → this 是调用对象；4）默认绑定：fn() → 严格模式 undefined，非严格 window。<br>
+            <strong>追问：setTimeout 中的 this 指向？</strong> 普通函数回调中 this 是 window（默认绑定）。箭头函数回调中 this 继承外层的 this。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TypeScript 的泛型、条件类型、映射类型分别是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>泛型是参数化的类型，允许在定义时不指定类型，使用时再确定。如 <code>function identity&lt;T&gt;(arg: T): T</code>。泛型可以约束（extends）、设置默认值（= DefaultType）。<br>
+            条件类型是三元表达式的类型版本：<code>T extends U ? X : Y</code>。配合 infer 关键字可以在条件分支中推断类型（如提取函数返回类型 <code>T extends (...args: any[]) => infer R ? R : never</code>）。<br>
+            映射类型遍历联合类型的每个成员生成新类型：<code>{ [K in keyof T]: T[K] }</code>。内置工具类型 Partial、Required、Readonly、Pick、Omit 都是映射类型的实现。<br>
+            <strong>追问：Pick 和 Omit 怎么实现的？</strong> <code>type Pick&lt;T, K extends keyof T&gt; = { [P in K]: T[P] }</code>；<code>type Omit&lt;T, K extends keyof any&gt; = Pick&lt;T, Exclude&lt;keyof T, K&gt;&gt;</code>。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">CommonJS 和 ES Module 有什么区别？Tree Shaking 的原理是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>CommonJS 是运行时加载，require() 同步执行，得到的是值的拷贝。ES Module 是编译时静态分析，import/export 在代码解析阶段确定依赖关系，得到的是值的引用。ESM 支持 Tree Shaking，CJS 不支持。<br>
+            Tree Shaking 的原理：ESM 的 import/export 是静态结构（必须在顶层），打包工具在编译时可以分析出哪些导出没有被使用，从而在最终产物中删除未使用的代码。CJS 的 require 是动态的（可在条件语句中使用），编译时无法确定哪些模块被使用，所以不能 Tree Shaking。<br>
+            <strong>追问：为什么 package.json 要设置 "type": "module"？</strong> 告诉 Node.js 将 .js 文件视为 ES Module 而非 CommonJS。也可以用 .mjs（ESM）和 .cjs（CJS）扩展名区分。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TypeScript 的类型体操中，infer 关键字有什么用？举例说明。</div>
+          <div class="a">
+            <strong>参考：</strong>infer 在条件类型中用于声明一个待推断的类型变量，让 TypeScript 自动推断。类似于函数参数中的形参，但用在类型层面。<br>
+            常见用法：1）提取函数返回类型：<code>type Return&lt;T&gt; = T extends (...args: any[]) => infer R ? R : never</code>；2）提取数组元素类型：<code>type Element&lt;T&gt; = T extends (infer E)[] ? E : never</code>；3）提取 Promise 内部类型（递归）：<code>type Awaited&lt;T&gt; = T extends Promise&lt;infer U&gt; ? Awaited&lt;U&gt; : T</code>；4）提取函数参数类型：<code>type Params&lt;T&gt; = T extends (...args: infer P) => any ? P : never</code>。<br>
+            <strong>追问：infer 的约束？</strong> infer 只能在 extends 子句中使用。多个 infer 时，协变位置推断为联合类型，逆变位置推断为交叉类型。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          JavaScript / TypeScript · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

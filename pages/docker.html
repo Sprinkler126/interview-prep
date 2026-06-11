@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docker - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🐳 Docker</h1>
+    <p class="subtitle">镜像 · 容器 · Dockerfile · 网络 · 存储 · 编排</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">容器 vs 虚拟机</a></li>
+          <li class="sub"><a href="#s1-2">镜像分层原理</a></li>
+          <li class="sub"><a href="#s1-3">Dockerfile 指令详解</a></li>
+          <li class="sub"><a href="#s1-4">CMD vs ENTRYPOINT</a></li>
+          <li class="sub"><a href="#s1-5">容器网络模式</a></li>
+          <li class="sub"><a href="#s1-6">存储驱动与数据卷</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">多阶段构建</a></li>
+          <li class="sub"><a href="#s2-2">Docker Compose</a></li>
+          <li class="sub"><a href="#s2-3">安全最佳实践</a></li>
+          <li class="sub"><a href="#s2-4">容器编排：Swarm vs K8s</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 容器 vs 虚拟机 -->
+        <h3 id="s1-1">容器 vs 虚拟机</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">容器与虚拟机架构对比</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">App A &nbsp; App B &nbsp; App C<br><small>容器：共享 Host OS 内核</small></div>
+              <div class="arch-box" style="margin-left:2rem">App A &nbsp; App B &nbsp; App C<br><small>虚拟机：各自独立 Guest OS</small></div>
+            </div>
+            <div class="arch-connector">↓ ↓ ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">Docker Engine（容器运行时）<br><small>利用 Linux Namespace + Cgroups 实现隔离</small></div>
+              <div class="arch-box-wide" style="margin-left:2rem">Hypervisor（KVM / VMware）<br><small>硬件虚拟化，完整 OS</small></div>
+            </div>
+            <div class="arch-connector">↓ ↓ ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">Host OS（Linux Kernel）</div>
+              <div class="arch-box-wide" style="margin-left:2rem">Host OS（Linux Kernel）</div>
+            </div>
+            <div class="arch-connector">↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">硬件基础设施</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心区别对比</h4>
+          <table>
+            <thead>
+              <tr><th>维度</th><th>容器（Container）</th><th>虚拟机（VM）</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>隔离级别</td><td>进程级隔离（Namespace + Cgroups）</td><td>硬件级隔离（Hypervisor）</td></tr>
+              <tr><td>启动速度</td><td>毫秒~秒级</td><td>分钟级</td></tr>
+              <tr><td>资源占用</td><td>MB 级，共享内核</td><td>GB 级，完整 OS</td></tr>
+              <tr><td>性能损耗</td><td>几乎无（接近原生）</td><td>5%~15%（硬件虚拟化）</td></tr>
+              <tr><td>镜像大小</td><td>MB~百 MB</td><td>GB 级</td></tr>
+              <tr><td>密度</td><td>单机可运行数百容器</td><td>单机通常数十 VM</td></tr>
+              <tr><td>安全性</td><td>共享内核，隔离较弱</td><td>独立内核，隔离强</td></tr>
+              <tr><td>适用场景</td><td>微服务、CI/CD、弹性伸缩</td><td>强隔离需求、异构 OS</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Linux 底层技术</h4>
+          <ul>
+            <li><strong>Namespace（命名空间）：</strong>隔离进程视图。包括 PID（进程号）、NET（网络）、MNT（挂载）、UTS（主机名）、IPC（进程间通信）、USER（用户）、Cgroup 等 7 种</li>
+            <li><strong>Cgroups（控制组）：</strong>限制资源使用。控制 CPU、内存、磁盘 IO、网络带宽等资源上限</li>
+            <li><strong>UnionFS（联合文件系统）：</strong>实现镜像分层共享，多个容器可共享相同的底层镜像层</li>
+            <li><strong>Capabilities：</strong>细粒度权限控制，替代传统的 root 全权限模型</li>
+          </ul>
+        </div>
+
+        <!-- 1-2 镜像分层原理 -->
+        <h3 id="s1-2">镜像分层原理</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Docker 镜像分层结构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.08);">
+                容器可写层（Container Layer）<br><small>Copy-on-Write · 容器销毁时删除</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 基于 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);">apt-get install<br><small>Layer 4</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;border-color:var(--accent);">COPY app.jar<br><small>Layer 3</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;border-color:var(--accent);">RUN mkdir /app<br><small>Layer 2</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;border-color:var(--accent2);">Ubuntu Base<br><small>Layer 1</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>UnionFS 联合文件系统</h4>
+          <ul>
+            <li>Docker 镜像由多个只读层（read-only layer）叠加组成，每层对应 Dockerfile 中的一条指令</li>
+            <li>使用 <strong>UnionFS</strong>（如 overlay2）将多个层合并为一个统一的文件系统视图</li>
+            <li>相同的基础镜像层可以在多个镜像之间<strong>共享</strong>，节省磁盘空间</li>
+            <li>容器启动时在最顶层添加一个可写层（Container Layer），所有修改都在此层</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Copy-on-Write（写时复制）</h4>
+          <ul>
+            <li>读取文件时，直接从只读层读取，无需复制</li>
+            <li>修改文件时，先将文件从只读层<strong>复制</strong>到可写层，再在可写层修改</li>
+            <li>删除文件时，在可写层创建一个 <strong>whiteout</strong> 标记，隐藏只读层的文件</li>
+            <li>这种机制使得容器启动极快，且多个容器可以共享相同的只读镜像层</li>
+          </ul>
+          <div class="tip">理解 CoW 对优化 Dockerfile 至关重要：频繁修改的层应放在 Dockerfile 后面，利用构建缓存加速。</div>
+        </div>
+
+        <!-- 1-3 Dockerfile 指令 -->
+        <h3 id="s1-3">Dockerfile 指令详解</h3>
+
+        <div class="card">
+          <h4>核心指令一览</h4>
+          <table>
+            <thead>
+              <tr><th>指令</th><th>作用</th><th>是否产生新层</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>FROM</code></td><td>指定基础镜像</td><td>是</td><td><code>FROM openjdk:17-slim</code></td></tr>
+              <tr><td><code>RUN</code></td><td>执行命令并提交为新层</td><td>是</td><td><code>RUN apt-get update && apt-get install -y curl</code></td></tr>
+              <tr><td><code>CMD</code></td><td>容器启动默认命令（可被覆盖）</td><td>否</td><td><code>CMD ["java","-jar","app.jar"]</code></td></tr>
+              <tr><td><code>ENTRYPOINT</code></td><td>容器启动入口（不易覆盖）</td><td>否</td><td><code>ENTRYPOINT ["java","-jar"]</code></td></tr>
+              <tr><td><code>COPY</code></td><td>复制文件到镜像</td><td>是</td><td><code>COPY target/app.jar /app.jar</code></td></tr>
+              <tr><td><code>ADD</code></td><td>类似 COPY + 自动解压 tar</td><td>是</td><td><code>ADD app.tar.gz /app/</code></td></tr>
+              <tr><td><code>ENV</code></td><td>设置环境变量</td><td>否</td><td><code>ENV JAVA_OPTS="-Xmx512m"</code></td></tr>
+              <tr><td><code>EXPOSE</code></td><td>声明容器监听端口（文档作用）</td><td>否</td><td><code>EXPOSE 8080</code></td></tr>
+              <tr><td><code>VOLUME</code></td><td>声明挂载点</td><td>否</td><td><code>VOLUME /data</code></td></tr>
+              <tr><td><code>WORKDIR</code></td><td>设置工作目录</td><td>否</td><td><code>WORKDIR /app</code></td></tr>
+              <tr><td><code>ARG</code></td><td>构建时参数（不进入镜像）</td><td>否</td><td><code>ARG VERSION=1.0</code></td></tr>
+              <tr><td><code>USER</code></td><td>指定运行用户</td><td>否</td><td><code>USER appuser</code></td></tr>
+              <tr><td><code>HEALTHCHECK</code></td><td>健康检查命令</td><td>否</td><td><code>HEALTHCHECK CMD curl -f http://localhost/</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>RUN 指令优化</h4>
+          <pre><code># 不推荐：多个 RUN 产生多层
+RUN apt-get update
+RUN apt-get install -y curl
+RUN apt-get install -y vim
+RUN rm -rf /var/lib/apt/lists/*
+
+# 推荐：合并为一条 RUN，减少层数
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl vim && \
+    rm -rf /var/lib/apt/lists/*</code></pre>
+          <div class="tip">每条 RUN 指令都会创建一个新的镜像层。合并相关命令可以减少镜像层数和大小。使用 <code>&&</code> 链接命令，<code>\</code> 换行保持可读性。</div>
+        </div>
+
+        <!-- 1-4 CMD vs ENTRYPOINT -->
+        <h3 id="s1-4">CMD vs ENTRYPOINT</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>CMD</h4>
+            <ul>
+              <li>提供容器启动的<strong>默认命令</strong></li>
+              <li>可以被 <code>docker run</code> 后面的命令<strong>完全覆盖</strong></li>
+              <li>一个 Dockerfile 中只有最后一条 CMD 生效</li>
+              <li>推荐使用 exec 格式：<code>CMD ["executable","param1"]</code></li>
+              <li>三种写法：<code>CMD ["exec","param"]</code>（exec 格式）、<code>CMD command param</code>（shell 格式）、<code>CMD ["param1","param2"]</code>（配合 ENTRYPOINT）</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>ENTRYPOINT</h4>
+            <ul>
+              <li>定义容器的<strong>主进程</strong></li>
+              <li>不会被 <code>docker run</code> 后面的命令覆盖（需 <code>--entrypoint</code>）</li>
+              <li><code>docker run</code> 的参数会<strong>追加</strong>到 ENTRYPOINT 后面</li>
+              <li>适合将容器作为可执行程序使用</li>
+              <li>一个 Dockerfile 中只有最后一条 ENTRYPOINT 生效</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>CMD 与 ENTRYPOINT 组合使用</h4>
+          <pre><code># 典型组合：ENTRYPOINT 定义主命令，CMD 提供默认参数
+FROM nginx:latest
+ENTRYPOINT ["nginx"]
+CMD ["-g", "daemon off;"]
+
+# 运行时：docker run mynginx → nginx -g "daemon off;"
+# 追加参数：docker run mynginx -c /etc/nginx/custom.conf → nginx -c /etc/nginx/custom.conf</code></pre>
+          <table>
+            <thead>
+              <tr><th>Dockerfile</th><th>docker run img</th><th>docker run img cmd</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>只有 CMD</td><td>执行 CMD</td><td>cmd <strong>覆盖</strong> CMD</td></tr>
+              <tr><td>只有 ENTRYPOINT</td><td>执行 ENTRYPOINT</td><td>cmd <strong>追加</strong>到 ENTRYPOINT</td></tr>
+              <tr><td>两者都有</td><td>ENTRYPOINT + CMD</td><td>ENTRYPOINT + cmd（cmd 替换 CMD）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-5 容器网络模式 -->
+        <h3 id="s1-5">容器网络模式</h3>
+
+        <div class="card">
+          <h4>五种网络模式</h4>
+          <table>
+            <thead>
+              <tr><th>模式</th><th>说明</th><th>使用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">bridge</span>（默认）</td>
+                <td>容器拥有独立 Network Namespace，通过 docker0 虚拟网桥与宿主机通信。容器有独立 IP，通过 NAT 访问外部</td>
+                <td>单机多容器通信（最常用）</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">host</span></td>
+                <td>容器与宿主机共享 Network Namespace，使用宿主机的 IP 和端口</td>
+                <td>对网络性能要求极高，不需要端口映射</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">none</span></td>
+                <td>容器拥有独立 Network Namespace，但不配置任何网络</td>
+                <td>安全隔离、不需要网络的容器</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">overlay</span></td>
+                <td>跨主机容器通信，基于 VXLAN 隧道技术</td>
+                <td>Docker Swarm / K8s 跨节点通信</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-pink">macvlan</span></td>
+                <td>容器拥有独立 MAC 地址，在网络中表现为独立物理设备</td>
+                <td>需要容器直接接入物理网络</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>bridge 网络详解</h4>
+          <div class="diagram">
+            <div class="diagram-title">bridge 网络通信流程</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">容器 A<br><small>172.17.0.2</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">veth pair<br><small>虚拟网卡对</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">docker0 网桥<br><small>172.17.0.1</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">iptables NAT<br><small>端口映射</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">外部网络</div>
+            </div>
+          </div>
+          <ul>
+            <li>每个容器分配独立 IP（默认 172.17.0.0/16 网段）</li>
+            <li>容器之间通过 docker0 网桥直接通信</li>
+            <li>容器访问外部通过 iptables SNAT（源地址转换）</li>
+            <li>外部访问容器通过 <code>-p</code> 端口映射（DNAT）</li>
+            <li><code>--link</code> 已过时，推荐使用自定义网络（<code>docker network create</code>）</li>
+          </ul>
+        </div>
+
+        <!-- 1-6 存储驱动与数据卷 -->
+        <h3 id="s1-6">存储驱动与数据卷</h3>
+
+        <div class="card">
+          <h4>存储驱动（Storage Driver）</h4>
+          <p>Docker 使用存储驱动管理镜像层和容器可写层。<strong>overlay2</strong> 是推荐的存储驱动（Linux 4.0+ 内核）。</p>
+          <table>
+            <thead>
+              <tr><th>驱动</th><th>文件系统</th><th>特点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">overlay2</span></td><td>OverlayFS</td><td>推荐，性能好，稳定，内核原生支持</td></tr>
+              <tr><td>devicemapper</td><td>Device Mapper</td><td>块级别操作，适合 RHEL/CentOS</td></tr>
+              <tr><td>btrfs</td><td>Btrfs</td><td>快照、压缩，适合 SUSE</td></tr>
+              <tr><td>zfs</td><td>ZFS</td><td>数据完整性、快照，适合 Ubuntu</td></tr>
+              <tr><td>aufs</td><td>AUFS</td><td>已弃用，曾是默认驱动</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>三种存储方式对比</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>生命周期</th><th>使用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-green">Volume</span></td>
+                <td>Docker 管理的存储卷，存储在 <code>/var/lib/docker/volumes/</code></td>
+                <td>独立于容器，容器删除后保留</td>
+                <td><strong>推荐</strong>，数据库数据、持久化存储</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">Bind Mount</span></td>
+                <td>将宿主机目录挂载到容器中</td>
+                <td>依赖宿主机目录结构</td>
+                <td>开发环境挂载代码、配置文件</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">tmpfs</span></td>
+                <td>存储在内存中，不写入磁盘</td>
+                <td>容器停止后消失</td>
+                <td>敏感数据、临时缓存</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code># Volume 使用
+docker volume create mydata
+docker run -v mydata:/app/data nginx
+
+# Bind Mount 使用
+docker run -v /host/path:/container/path nginx
+
+# tmpfs 使用
+docker run --tmpfs /app/temp nginx</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 多阶段构建 -->
+        <h3 id="s2-1">多阶段构建（Multi-stage Build）</h3>
+
+        <div class="card">
+          <h4>为什么需要多阶段构建？</h4>
+          <p>传统构建方式将编译环境和运行环境放在同一个镜像中，导致镜像体积巨大。多阶段构建允许在多个 FROM 指令间<strong>只复制需要的产物</strong>，最终镜像只包含运行时必要文件。</p>
+          <pre><code># === 多阶段构建示例（Java 应用） ===
+
+# 阶段 1：构建（命名为 builder）
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline        # 缓存依赖层
+COPY src ./src
+RUN mvn package -DskipTests -B
+
+# 阶段 2：运行（精简镜像）
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+# 从 builder 阶段复制产物
+COPY --from=builder /app/target/app.jar ./app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+          <table>
+            <thead>
+              <tr><th>方式</th><th>镜像大小</th><th>包含内容</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>单阶段构建</td><td>~800MB+</td><td>JDK + Maven + 源码 + 编译产物</td></tr>
+              <tr><td>多阶段构建</td><td>~200MB</td><td>仅 JRE + JAR 包</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>前端多阶段构建示例</h4>
+          <pre><code># 阶段 1：构建前端资源
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# 阶段 2：Nginx 托管静态文件
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]</code></pre>
+          <div class="tip">多阶段构建是 Docker 最佳实践之一。构建阶段可以使用完整 SDK 镜像（如 Maven、Node），运行阶段只需精简的 Runtime 镜像（如 JRE-alpine、Nginx-alpine）。</div>
+        </div>
+
+        <!-- 2-2 Docker Compose -->
+        <h3 id="s2-2">Docker Compose</h3>
+
+        <div class="card">
+          <h4>docker-compose.yml 语法</h4>
+          <pre><code># docker-compose.yml 示例：Spring Boot + MySQL + Redis
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: mydb
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass redis123
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-net
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  app-net:
+    driver: bridge</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>常用命令</h4>
+          <pre><code># 启动所有服务（后台运行）
+docker-compose up -d
+
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f app
+
+# 停止并删除容器、网络
+docker-compose down
+
+# 停止并删除容器、网络、数据卷
+docker-compose down -v
+
+# 重新构建镜像并启动
+docker-compose up -d --build
+
+# 扩展服务实例数
+docker-compose up -d --scale app=3</code></pre>
+        </div>
+
+        <!-- 2-3 安全最佳实践 -->
+        <h3 id="s2-3">安全最佳实践</h3>
+
+        <div class="card">
+          <h4>最小镜像原则</h4>
+          <pre><code># 不推荐：使用完整 Ubuntu（~200MB+）
+FROM ubuntu:22.04
+
+# 推荐：使用 Alpine（~5MB）
+FROM alpine:3.18
+
+# 推荐：使用 distroless（Google 出品，仅运行时）
+FROM gcr.io/distroless/java17-debian12
+
+# 推荐：使用 slim 版本
+FROM python:3.11-slim</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>安全清单</h4>
+          <table>
+            <thead>
+              <tr><th>措施</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>非 root 用户</td><td>避免容器以 root 运行</td><td><code>RUN adduser appuser && USER appuser</code></td></tr>
+              <tr><td>只读文件系统</td><td>容器文件系统只读</td><td><code>docker run --read-only</code></td></tr>
+              <tr><td>最小基础镜像</td><td>减少攻击面</td><td>alpine / distroless / scratch</td></tr>
+              <tr><td>扫描漏洞</td><td>镜像安全扫描</td><td>Trivy / Snyk / Docker Scout</td></tr>
+              <tr><td>不安装不必要包</td><td>减少攻击面</td><td><code>--no-install-recommends</code></td></tr>
+              <tr><td>使用 .dockerignore</td><td>避免复制敏感文件</td><td>忽略 .git / .env / node_modules</td></tr>
+              <tr><td>固定版本标签</td><td>避免使用 latest</td><td><code>FROM node:18.17.0-alpine</code></td></tr>
+              <tr><td>多阶段构建</td><td>构建工具不进入最终镜像</td><td>Maven / npm 构建阶段独立</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">生产环境必须以非 root 用户运行容器。Docker 默认以 root 运行，一旦容器被攻破，攻击者将获得宿主机 root 权限（尽管有 Namespace 隔离）。</div>
+        </div>
+
+        <!-- 2-4 容器编排 -->
+        <h3 id="s2-4">容器编排：Swarm vs Kubernetes</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>Docker Swarm</h4>
+            <ul>
+              <li>Docker 原生编排工具</li>
+              <li>部署简单，与 Docker CLI 完美集成</li>
+              <li>适合小规模集群（数十节点）</li>
+              <li>功能较简单，社区活跃度下降</li>
+              <li>自动负载均衡、服务发现</li>
+              <li>声明式服务定义（与 Compose 兼容）</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>Kubernetes</h4>
+            <ul>
+              <li>Google 开源，行业标准</li>
+              <li>功能强大，生态丰富</li>
+              <li>适合大规模集群（数千节点）</li>
+              <li>学习曲线陡峭，运维复杂</li>
+              <li>自动扩缩容、滚动更新、自愈</li>
+              <li>CNI / CSI / CRI 扩展机制</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>对比总结</h4>
+          <table>
+            <thead>
+              <tr><th>维度</th><th>Docker Swarm</th><th>Kubernetes</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>部署难度</td><td><span class="badge badge-green">简单</span> <code>docker swarm init</code></td><td><span class="badge badge-orange">复杂</span> kubeadm / 云托管</td></tr>
+              <tr><td>扩展性</td><td>中小规模</td><td>大规模生产级</td></tr>
+              <tr><td>自动扩缩容</td><td>不支持</td><td>HPA / VPA / Cluster Autoscaler</td></tr>
+              <tr><td>滚动更新</td><td>基础支持</td><td>精细控制（maxSurge / maxUnavailable）</td></tr>
+              <tr><td>网络</td><td>Overlay 网络</td><td>CNI 插件（Calico / Flannel / Cilium）</td></tr>
+              <tr><td>存储</td><td>Volume Driver</td><td>PV / PVC / StorageClass</td></tr>
+              <tr><td>社区</td><td>活跃度下降</td><td>最活跃的开源项目之一</td></tr>
+              <tr><td>适用建议</td><td>小团队快速上手</td><td>生产环境首选</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">面试加分点：当前行业标准是 Kubernetes。Docker Swarm 已逐渐边缘化。了解 Swarm 的优缺点可以展示你对技术选型的判断力。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Docker 容器和虚拟机有什么区别？为什么容器更快？</div>
+          <div class="a">
+            <strong>参考：</strong>虚拟机通过 Hypervisor 虚拟化硬件，每个 VM 运行独立的 Guest OS，启动需要分钟级，资源开销大。容器利用 Linux Namespace 实现进程隔离、Cgroups 限制资源，共享宿主机内核，启动只需毫秒~秒级，几乎无性能损耗。容器本质上是宿主机上被隔离的进程，而虚拟机是完整的操作系统。<br>
+            <strong>追问：容器的安全隔离不如虚拟机怎么办？</strong> 可以使用 gVisor（用户态内核）或 Kata Containers（轻量 VM）增强容器隔离，在安全性和性能间取得平衡。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Docker 镜像的分层原理是什么？什么是 Copy-on-Write？</div>
+          <div class="a">
+            <strong>参考：</strong>Docker 镜像由多个只读层叠加组成，每层对应 Dockerfile 中的一条指令。使用 UnionFS（如 overlay2）将多层合并为统一视图。容器启动时在顶层添加可写层。Copy-on-Write 是指读取文件时直接从只读层读，修改时先将文件复制到可写层再修改，删除时添加 whiteout 标记。这种机制使容器启动极快，多个容器可共享底层镜像。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">CMD 和 ENTRYPOINT 有什么区别？什么时候用哪个？</div>
+          <div class="a">
+            <strong>参考：</strong>CMD 提供容器启动的默认命令和参数，可以被 <code>docker run</code> 后面的命令完全覆盖。ENTRYPOINT 定义容器的主进程，不会被覆盖，<code>docker run</code> 的参数会追加到 ENTRYPOINT 后面。典型用法是 ENTRYPOINT 定义主命令（如 <code>java -jar</code>），CMD 提供默认参数（如 <code>app.jar</code>），运行时可灵活替换参数。<br>
+            <strong>追问：如何覆盖 ENTRYPOINT？</strong> 使用 <code>docker run --entrypoint /bin/bash image</code>。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Docker 的 bridge 网络是怎么工作的？</div>
+          <div class="a">
+            <strong>参考：</strong>bridge 是默认网络模式。Docker 在宿主机创建 docker0 虚拟网桥（172.17.0.1），每个容器通过 veth pair 连接到网桥，获得独立 IP。容器间通过网桥直接通信。容器访问外部通过 iptables SNAT，外部访问容器通过 <code>-p</code> 端口映射（DNAT）。生产建议使用自定义 bridge 网络（<code>docker network create</code>），支持 DNS 自动解析容器名。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Volume、Bind Mount、tmpfs 三种存储方式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Volume 由 Docker 管理，存储在 <code>/var/lib/docker/volumes/</code>，独立于容器生命周期，适合持久化数据。Bind Mount 将宿主机目录直接挂载到容器，依赖宿主机路径，适合开发环境。tmpfs 存储在内存中，容器停止后消失，适合敏感数据和临时缓存。生产环境推荐 Volume，开发环境推荐 Bind Mount。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是多阶段构建？为什么要用它？</div>
+          <div class="a">
+            <strong>参考：</strong>多阶段构建允许在一个 Dockerfile 中使用多个 FROM 指令，每个阶段可以使用不同的基础镜像。构建阶段使用完整 SDK 镜像（如 Maven + JDK），运行阶段只复制编译产物到精简的 Runtime 镜像（如 JRE-alpine）。好处：1）镜像体积大幅减小（从 800MB 到 200MB）；2）构建工具不进入最终镜像，减少攻击面；3）利用构建缓存加速 CI/CD。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何优化 Docker 镜像的大小？</div>
+          <div class="a">
+            <strong>参考：</strong>1）使用小基础镜像（alpine / distroless / slim）；2）多阶段构建，只复制运行时必要文件；3）合并 RUN 指令减少层数，清理包管理器缓存；4）使用 <code>.dockerignore</code> 排除不必要文件；5）利用构建缓存，不常变的层放前面；6）使用 <code>--no-install-recommends</code> 避免安装推荐包；7）固定版本标签避免拉取过大 latest 镜像。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Docker Swarm 和 Kubernetes 该怎么选？</div>
+          <div class="a">
+            <strong>参考：</strong>看团队规模和业务复杂度。小团队（< 50 容器）快速上手选 Swarm，一条命令初始化集群，与 Docker CLI 完美集成。生产环境、大规模集群选 Kubernetes，支持自动扩缩容、精细的滚动更新、丰富的存储和网络插件。当前行业标准是 Kubernetes，Swarm 社区活跃度已下降。如果已有 K8s 经验，不建议回退到 Swarm。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Docker · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

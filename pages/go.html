@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Go - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🐹 Go</h1>
+    <p class="subtitle">Goroutine · Channel · GC · Interface · 并发模式</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Goroutine 与 GMP 调度</a></li>
+          <li class="sub"><a href="#s1-2">Channel 机制</a></li>
+          <li class="sub"><a href="#s1-3">select 多路复用</a></li>
+          <li class="sub"><a href="#s1-4">GC 垃圾回收</a></li>
+          <li class="sub"><a href="#s1-5">Interface 与鸭子类型</a></li>
+          <li class="sub"><a href="#s1-6">sync 包</a></li>
+          <li class="sub"><a href="#s1-7">内存模型</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">并发模式</a></li>
+          <li class="sub"><a href="#s2-2">Context 用法</a></li>
+          <li class="sub"><a href="#s2-3">性能调优</a></li>
+          <li class="sub"><a href="#s2-4">微服务开发</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 Goroutine 与 GMP 调度 -->
+        <h3 id="s1-1">Goroutine 与 GMP 调度</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">GMP 调度模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">G（Goroutine）<br><small>用户态协程</small><br><small>栈大小 2KB~1GB</small><br><small>可动态伸缩栈</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">M（Machine）<br><small>OS 线程</small><br><small>默认最大 10000</small><br><small>执行 Goroutine</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">P（Processor）<br><small>逻辑处理器</small><br><small>默认 = CPU 核心数</small><br><small>持有本地队列</small></div>
+            </div>
+            <div class="arch-connector">↓ 调度关系 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">P 持有本地队列（Local Run Queue，最多 256 个 G）+ 全局队列（Global Run Queue）</div>
+            </div>
+            <div class="arch-connector">↓ 绑定关系 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">M 必须绑定 P 才能执行 G &nbsp;&nbsp;|&nbsp;&nbsp; P 的数量 = GOMAXPROCS &nbsp;&nbsp;|&nbsp;&nbsp; M 的数量可远大于 P</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>GMP 调度策略</h4>
+          <pre><code>// GMP 模型核心要点：
+// G (Goroutine)：用户态轻量级线程，初始栈 2KB（可动态增长到 1GB）
+// M (Machine)：操作系统线程，真正执行计算
+// P (Processor)：逻辑处理器，数量 = GOMAXPROCS（默认 = CPU 核心数）
+
+// 调度流程：
+// 1. 新建 G 优先放入当前 P 的本地队列
+// 2. 本地队列满（256）时，将一半 G 转移到全局队列
+// 3. M 从绑定的 P 的本地队列获取 G 执行
+// 4. 本地队列为空时，从全局队列获取（每 61 次调度检查一次）
+// 5. 全局队列也为空时，尝试从其他 P 偷取 G（Work Stealing）
+
+// Work Stealing（工作窃取）：
+// 当前 P 的本地队列为空时，随机从其他 P 的本地队列窃取一半 G
+// 保证所有 M 都有活干，充分利用多核
+
+// G 阻塞时的处理：
+// 1. 系统调用阻塞（如文件 IO）：M 阻塞，P 与 M 解绑
+//    P 绑定空闲 M 或创建新 M，继续执行其他 G
+//    阻塞的 M 完成后尝试获取空闲 P，否则 G 放入全局队列
+// 2. channel/mutex 阻塞：G 被放入等待队列，M 继续执行其他 G
+//    （不占用 M，比系统调用阻塞更高效）
+
+// 设置 P 的数量
+import "runtime"
+runtime.GOMAXPROCS(4) // 设置为 4</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Goroutine 与线程的区别</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Goroutine</th><th>OS 线程</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>初始栈大小</td><td>2KB（动态伸缩）</td><td>1~8MB（固定）</td></tr>
+              <tr><td>调度方式</td><td>用户态调度（Go Scheduler）</td><td>内核态调度</td></tr>
+              <tr><td>切换开销</td><td>~200ns（寄存器保存）</td><td>~1us（内核上下文切换）</td></tr>
+              <tr><td>创建开销</td><td>极低（栈分配 + 结构体）</td><td>较高（内核资源分配）</td></tr>
+              <tr><td>数量</td><td>轻松百万级</td><td>通常千级</td></tr>
+              <tr><td>通信方式</td><td>Channel（CSP 模型）</td><td>共享内存 + 锁</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-2 Channel 机制 -->
+        <h3 id="s1-2">Channel 机制</h3>
+
+        <div class="card">
+          <h4>Channel 类型与操作</h4>
+          <pre><code>// 无缓冲 Channel（同步通信）
+ch := make(chan int)     // 发送和接收必须同时就绪
+ch <- 42                // 发送：阻塞直到有接收者
+val := <-ch             // 接收：阻塞直到有发送者
+
+// 有缓冲 Channel（异步通信）
+ch := make(chan int, 10) // 缓冲区大小 10
+ch <- 42                // 缓冲区未满时不阻塞
+val := <-ch             // 缓冲区不为空时不阻塞
+
+// Channel 方向限制
+func producer(ch chan<- int) { // 只写 Channel
+    ch <- 42
+}
+func consumer(ch <-chan int) { // 只读 Channel
+    val := <-ch
+}
+
+// 关闭 Channel
+close(ch)               // 关闭后不能发送，可以接收
+val, ok := <-ch         // ok=false 表示 Channel 已关闭且无数据
+
+// 遍历 Channel
+for val := range ch {   // 自动在 Channel 关闭时退出循环
+    fmt.Println(val)
+}
+
+// 注意事项：
+// 1. 向已关闭的 Channel 发送数据会 panic
+// 2. 关闭已关闭的 Channel 会 panic
+// 3. 只有发送方应该关闭 Channel（接收方关闭可能导致发送方 panic）
+// 4. 无缓冲 Channel 适用于同步协调，有缓冲 Channel 适用于解耦</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Channel 底层结构（hchan）</h4>
+          <pre><code>// Channel 底层结构体 hchan
+type hchan struct {
+    qcount   uint           // 队列中的元素数量
+    dataqsiz uint           // 缓冲区大小
+    buf      unsafe.Pointer // 缓冲区指针（环形数组）
+    elemsize uint16         // 元素大小
+    closed   uint32         // 是否关闭
+    elemtype *_type         // 元素类型
+    sendx    uint           // 发送索引（环形缓冲区）
+    recvx    uint           // 接收索引（环形缓冲区）
+    recvq    waitq          // 接收等待队列（双向链表，存放阻塞的 G）
+    sendq    waitq          // 发送等待队列
+    lock     mutex          // 互斥锁（保护所有字段）
+}
+
+// 发送数据流程：
+// 1. 加锁
+// 2. 如果有等待的接收者（recvq 不为空）：直接将数据交给接收者（Goroutine 间直接传递）
+// 3. 如果缓冲区有空位：将数据放入缓冲区
+// 4. 否则：将当前 G 加入 sendq，挂起等待（gopark）
+// 5. 解锁
+
+// 接收数据流程：
+// 1. 加锁
+// 2. 如果有等待的发送者（sendq 不为空）：直接从发送者获取数据
+// 3. 如果缓冲区有数据：从缓冲区取出
+// 4. 否则：将当前 G 加入 recvq，挂起等待
+// 5. 解锁</code></pre>
+        </div>
+
+        <!-- 1-3 select 多路复用 -->
+        <h3 id="s1-3">select 多路复用</h3>
+
+        <div class="card">
+          <h4>select 语句</h4>
+          <pre><code>// select：同时监听多个 Channel 操作
+select {
+case msg := <-ch1:
+    fmt.Println("从 ch1 收到:", msg)
+case ch2 <- 42:
+    fmt.Println("向 ch2 发送 42")
+case <-time.After(3 * time.Second):
+    fmt.Println("超时 3 秒")
+default:
+    fmt.Println("没有就绪的 Channel（非阻塞）")
+}
+
+// select 特性：
+// 1. 随机选择：多个 case 同时就绪时，随机选择一个执行
+// 2. 阻塞等待：没有 default 且无 case 就绪时，当前 G 阻塞
+// 3. 非阻塞：有 default 时，无 case 就绪立即执行 default
+// 4. 空 select：select{} 永远阻塞（常用于保持 main 不退出）
+
+// 超时控制
+select {
+case result := <-asyncCall():
+    handle(result)
+case <-ctx.Done():
+    return ctx.Err() // 取消
+case <-time.After(5 * time.Second):
+    return errors.New("timeout")
+}
+
+// 非阻塞 Channel 操作
+select {
+case msg := <-ch:
+    fmt.Println("收到:", msg)
+default:
+    fmt.Println("没有数据")
+}</code></pre>
+        </div>
+
+        <!-- 1-4 GC 垃圾回收 -->
+        <h3 id="s1-4">GC 垃圾回收</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Go GC 三色标记法</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">白色<br><small>未访问（可能垃圾）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">灰色<br><small>已访问，子对象未扫描</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">黑色<br><small>已访问，子对象已扫描</small><br><small>确认存活</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>GC 三色标记 + 写屏障</h4>
+          <pre><code>// Go 的 GC 算法：三色标记 + 混合写屏障（Concurrent GC）
+
+// 三色标记过程：
+// 1. 初始状态：所有对象标记为白色
+// 2. 标记阶段：从 GC Root（全局变量、goroutine 栈）出发
+//    - 将 Root 直接引用的对象标记为灰色
+//    - 从灰色队列取出对象，扫描其引用的对象，标记为灰色
+//    - 当前对象标记为黑色（子对象都已扫描）
+// 3. 回收阶段：所有仍为白色的对象被回收
+
+// STW（Stop The World）：
+// Go 的 GC 大部分与用户代码并发执行，但有两个短暂 STW 阶段：
+// 1. Mark Setup（标记准备）：开启写屏障，极短（< 1ms）
+// 2. Mark Termination（标记终止）：关闭写屏障，极短
+
+// 写屏障（Write Barrier）：
+// 在并发标记期间，用户代码可能修改引用关系
+// 写屏障保证：不会漏标（黑色对象引用白色对象时，白色对象变灰）
+// Go 1.8+ 使用混合写屏障（hybrid write barrier）：
+// - 插入写屏障：新增引用时标灰
+// - 删除写屏障：删除引用时标灰
+// - 混合：结合两者，无需对栈重新扫描
+
+// GC 触发条件：
+// 1. 内存增长：堆内存达到 GOGC 阈值（默认 GOGC=100，增长 100% 触发）
+// 2. 定时触发：默认 2 分钟未 GC 则强制触发
+// 3. 手动触发：runtime.GC()
+
+// GC 调优：
+// GOGC=100（默认）：堆增长 100% 触发 GC
+// GOGC=50：堆增长 50% 触发 GC（更频繁，内存更低）
+// GOGC=off：关闭 GC
+// GOMEMLIMIT：设置内存上限（Go 1.19+），GC 会努力不超过此限制</code></pre>
+        </div>
+
+        <!-- 1-5 Interface 与鸭子类型 -->
+        <h3 id="s1-5">Interface 与鸭子类型</h3>
+
+        <div class="card">
+          <h4>Interface 底层实现</h4>
+          <pre><code>// Go 的接口是鸭子类型（Duck Typing）：只要实现了接口的方法，就是该接口的类型
+// 不需要显式声明 implements
+
+// Interface 底层有两种结构：
+// 1. eface（空接口 interface{}）：任意类型都实现了空接口
+type eface struct {
+    _type *_type         // 类型信息
+    data  unsafe.Pointer // 数据指针
+}
+
+// 2. iface（非空接口）：有方法的接口
+type iface struct {
+    tab  *itab           // 接口表（类型 + 方法列表）
+    data unsafe.Pointer  // 数据指针
+}
+type itab struct {
+    inter *interfacetype // 接口类型
+    _type *_type         // 动态类型
+    hash  uint32         // 类型 hash（用于类型断言优化）
+    fun   [1]uintptr     // 方法地址数组（实际长度可变）
+}
+
+// 类型断言
+var i interface{} = "hello"
+
+// 方式 1：直接断言（失败会 panic）
+s := i.(string)
+
+// 方式 2：安全断言（comma-ok 模式）
+s, ok := i.(string)
+if ok {
+    fmt.Println(s)
+}
+
+// 方式 3：类型 switch
+switch v := i.(type) {
+case string:
+    fmt.Println("string:", v)
+case int:
+    fmt.Println("int:", v)
+case nil:
+    fmt.Println("nil")
+default:
+    fmt.Println("unknown:", v)
+}
+
+// interface{} / any（Go 1.18+ any 是 interface{} 的别名）
+func PrintAny(v interface{}) { // 接收任意类型
+    fmt.Printf("%T: %v\n", v, v)
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Interface 设计原则</h4>
+          <div class="tip">
+            <p><strong>接口隔离：</strong>Go 推荐小接口（1~3 个方法），如 io.Reader（只有 Read 方法）、io.Writer（只有 Write 方法）。标准库中最大的接口也通常不超过 5 个方法。</p>
+            <p><strong>"Accept interfaces, return structs"：</strong>函数参数使用接口（灵活），返回值使用具体类型（高效）。这使得调用方可以自由选择实现。</p>
+            <p><strong>隐式实现：</strong>不需要修改已有类型就能适配新接口，实现了解耦。在测试中特别有用（mock 实现接口即可）。</p>
+          </div>
+        </div>
+
+        <!-- 1-6 sync 包 -->
+        <h3 id="s1-6">sync 包</h3>
+
+        <div class="card">
+          <h4>sync 包核心工具</h4>
+          <pre><code>// 1. sync.Mutex（互斥锁）
+var mu sync.Mutex
+mu.Lock()
+// 临界区
+mu.Unlock()
+
+// 2. sync.RWMutex（读写锁）
+var rwmu sync.RWMutex
+rwmu.RLock()         // 读锁（多个读可以并发）
+// 读操作
+rwmu.RUnlock()
+rwmu.Lock()          // 写锁（互斥）
+// 写操作
+rwmu.Unlock()
+
+// 3. sync.WaitGroup（等待组）
+var wg sync.WaitGroup
+for i := 0; i &lt; 10; i++ {
+    wg.Add(1)
+    go func(id int) {
+        defer wg.Done()
+        doWork(id)
+    }(i)
+}
+wg.Wait() // 阻塞直到所有 goroutine 完成
+
+// 4. sync.Once（单次执行）
+var once sync.Once
+var instance *Singleton
+
+func GetInstance() *Singleton {
+    once.Do(func() {
+        instance = &Singleton{}
+    })
+    return instance
+}
+
+// 5. sync.Map（并发安全 Map）
+var m sync.Map
+m.Store("key", "value")
+val, ok := m.Load("key")
+m.Delete("key")
+m.Range(func(key, value interface{}) bool { // 遍历
+    fmt.Println(key, value)
+    return true // 返回 false 停止遍历
+})
+
+// sync.Map 适用场景：
+// 1. 读多写少（内部使用 read-only map + dirty map）
+// 2. key 集合稳定（减少 dirty -> read 的晋升开销）
+// 3. 不适合频繁写入的场景（此时 Mutex + map 更优）
+
+// 6. sync.Pool（对象池，减少 GC 压力）
+var pool = sync.Pool{
+    New: func() interface{} {
+        return make([]byte, 4096)
+    },
+}
+
+buf := pool.Get().([]byte) // 获取对象
+// 使用 buf
+pool.Put(buf)              // 归还对象（GC 时可能被回收）</code></pre>
+        </div>
+
+        <!-- 1-7 内存模型 -->
+        <h3 id="s1-7">内存模型与 defer/panic/recover</h3>
+
+        <div class="card">
+          <h4>defer / panic / recover</h4>
+          <pre><code>// defer：延迟执行（LIFO 顺序）
+func readFile() {
+    f, _ := os.Open("file.txt")
+    defer f.Close()  // 函数返回前执行
+    // 即使中间发生 panic，defer 也会执行
+}
+
+// defer 执行顺序：LIFO（后进先出）
+defer fmt.Println("1")
+defer fmt.Println("2")
+defer fmt.Println("3")
+// 输出：3, 2, 1
+
+// defer 参数求值时机：声明时立即求值
+func test() {
+    x := 1
+    defer fmt.Println(x) // 打印 1（不是 2）
+    x = 2
+}
+
+// defer 常见模式
+func doSomething() (err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("panic: %v", r)
+        }
+    }()
+    // 可能 panic 的代码
+}
+
+// panic：运行时恐慌（中断正常控制流）
+func divide(a, b int) int {
+    if b == 0 {
+        panic("division by zero")
+    }
+    return a / b
+}
+
+// recover：捕获 panic（只能在 defer 中有效）
+func safeDivide(a, b int) (result int, err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("%v", r)
+        }
+    }()
+    return a / b, nil
+}
+
+// panic/recover 规则：
+// 1. recover() 只在 defer 函数中有效
+// 2. 捕获当前 goroutine 的 panic
+// 3. 嵌套 panic 不会被上层 recover 捕获
+// 4. 子 goroutine 的 panic 不会传播到父 goroutine
+//    子 goroutine panic 会导致整个程序崩溃，必须在子 goroutine 中 recover</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>happens-before 规则</h4>
+          <pre><code>// Go 内存模型定义了 happens-before 关系
+// 如果事件 A happens-before 事件 B，则 A 的结果对 B 可见
+
+// 关键 happens-before 规则：
+// 1. goroutine 创建 happens-before goroutine 执行
+go doWork() // 创建 happens-before doWork 开始执行
+
+// 2. Channel 发送 happens-before 对应的接收
+ch <- data   // 发送 happens-before
+val := <-ch  // 接收
+
+// 3. 无缓冲 Channel 的接收 happens-before 发送完成
+go func() { ch <- data }() // 发送
+val := <-ch                 // 接收 happens-before 发送完成
+
+// 4. sync.Mutex.Unlock happens-before 对应的 Lock
+mu.Unlock()  // 解锁 happens-before
+mu.Lock()    // 下一次加锁
+
+// 5. sync.Once.Do 中 f() 的返回 happens-before 任何 Do 调用返回
+
+// 这些规则保证了并发编程中的可见性
+// 没有 happens-before 关系时，不同 goroutine 对共享变量的读写顺序不确定</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 并发模式 -->
+        <h3 id="s2-1">并发模式</h3>
+
+        <div class="card">
+          <h4>常见并发模式</h4>
+          <pre><code>// 1. Fan-Out / Fan-In（扇出/扇入）
+func fanOut(input <-chan int, workers int) []<-chan int {
+    channels := make([]<-chan int, workers)
+    for i := 0; i &lt; workers; i++ {
+        channels[i] = worker(input) // 多个 worker 读取同一个 input
+    }
+    return channels
+}
+
+func fanIn(channels ...<-chan int) <-chan int {
+    var wg sync.WaitGroup
+    merged := make(chan int)
+    for _, ch := range channels {
+        wg.Add(1)
+        go func(c <-chan int) {
+            defer wg.Done()
+            for val := range c {
+                merged <- val
+            }
+        }(ch)
+    }
+    go func() { wg.Wait(); close(merged) }()
+    return merged
+}
+
+// 2. Pipeline（管道）
+func pipeline() {
+    nums := generate(2, 3, 4, 5)       // 阶段 1：生成数据
+    squares := square(nums)             // 阶段 2：平方
+    for val := range squares {
+        fmt.Println(val)                // 阶段 3：消费
+    }
+}
+
+func generate(nums ...int) <-chan int {
+    out := make(chan int)
+    go func() {
+        for _, n := range nums {
+            out <- n
+        }
+        close(out)
+    }()
+    return out
+}
+
+func square(in <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        for n := range in {
+            out <- n * n
+        }
+        close(out)
+    }()
+    return out
+}
+
+// 3. Worker Pool（工作池）
+func workerPool(jobs <-chan int, results chan<- int, workers int) {
+    var wg sync.WaitGroup
+    for i := 0; i &lt; workers; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            for job := range jobs {
+                results <- process(job)
+            }
+        }(i)
+    }
+    go func() { wg.Wait(); close(results) }()
+}</code></pre>
+        </div>
+
+        <!-- 2-2 Context 用法 -->
+        <h3 id="s2-2">Context 用法</h3>
+
+        <div class="card">
+          <h4>Context 核心 API</h4>
+          <pre><code>import "context"
+
+// Context 类型：
+// context.Background() — 根 Context，通常在 main/init/请求入口创建
+// context.TODO()       — 不确定用什么 Context 时使用
+
+// 1. WithCancel：手动取消
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel() // 必须调用，释放资源
+go func() {
+    select {
+    case <-ctx.Done():
+        fmt.Println("cancelled:", ctx.Err())
+        return
+    case result := <-doWork():
+        fmt.Println("done:", result)
+    }
+}()
+cancel() // 手动取消
+
+// 2. WithTimeout：超时自动取消
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+result, err := queryWithContext(ctx, "SELECT ...")
+if ctx.Err() == context.DeadlineExceeded {
+    fmt.Println("查询超时")
+}
+
+// 3. WithDeadline：指定截止时间
+deadline := time.Now().Add(3 * time.Second)
+ctx, cancel := context.WithDeadline(context.Background(), deadline)
+defer cancel()
+
+// 4. WithValue：传递请求级数据（谨慎使用）
+ctx = context.WithValue(ctx, "requestID", "abc-123")
+requestID := ctx.Value("requestID").(string)
+
+// Context 传播规则：
+// 1. Context 是不可变的，WithXxx 返回新的 Context（形成树状结构）
+// 2. 父 Context 取消时，所有子 Context 也会被取消
+// 3. 子 Context 不能取消父 Context
+// 4. WithValue 应只传递请求域数据（如 traceID、userID），不传业务参数
+
+// 最佳实践：
+// 1. Context 作为函数第一个参数：func DoSomething(ctx context.Context, ...)
+// 2. 不要将 Context 存储在结构体中
+// 3. 即使函数不需要 Context，也建议传递（便于后续扩展）
+// 4. 使用 context.TODO() 标记待完善的 Context</code></pre>
+        </div>
+
+        <!-- 2-3 性能调优 -->
+        <h3 id="s2-3">性能调优</h3>
+
+        <div class="card">
+          <h4>Go 性能优化技巧</h4>
+          <pre><code>// 1. 减少内存分配
+// 使用 sync.Pool 复用对象
+var bufPool = sync.Pool{
+    New: func() interface{} { return new(bytes.Buffer) },
+}
+
+func process(data []byte) {
+    buf := bufPool.Get().(*bytes.Buffer)
+    defer func() {
+        buf.Reset()
+        bufPool.Put(buf)
+    }()
+    buf.Write(data)
+    // ...
+}
+
+// 2. 预分配 slice/map 容量
+// 慢：多次扩容
+s := []int{}
+for i := 0; i &lt; 10000; i++ {
+    s = append(s, i) // 多次 grow
+}
+
+// 快：一次分配
+s := make([]int, 0, 10000)
+for i := 0; i &lt; 10000; i++ {
+    s = append(s, i) // 无需扩容
+}
+
+// 3. 避免逃逸到堆
+// 使用 go build -gcflags="-m" 查看逃逸分析
+func createUser() *User {
+    u := User{Name: "test"} // 逃逸到堆（返回指针）
+    return &u
+}
+
+// 4. 字符串拼接
+// 慢：循环中 +=
+s := ""
+for _, word := range words {
+    s += word
+}
+
+// 快：strings.Builder
+var sb strings.Builder
+sb.Grow(totalLen) // 预分配
+for _, word := range words {
+    sb.WriteString(word)
+}
+s := sb.String()
+
+// 5. 减少锁竞争
+// 使用 atomic 替代 Mutex
+var count int64
+atomic.AddInt64(&count, 1)
+
+// 使用分片锁减少竞争
+type ShardedMap struct {
+    shards [256]struct {
+        mu sync.RWMutex
+        m  map[string]interface{}
+    }
+}</code></pre>
+        </div>
+
+        <!-- 2-4 微服务开发 -->
+        <h3 id="s2-4">微服务开发</h3>
+
+        <div class="card">
+          <h4>Go 微服务技术栈</h4>
+          <table>
+            <thead>
+              <tr><th>类别</th><th>技术选型</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>RPC 框架</td><td>gRPC / go-kit / go-zero / Kratos</td><td>gRPC 基于 HTTP/2 + Protobuf，高性能</td></tr>
+              <tr><td>服务发现</td><td>Consul / etcd / Nacos</td><td>注册与发现、健康检查</td></tr>
+              <tr><td>配置中心</td><td>Nacos / Apollo / Viper</td><td>动态配置管理</td></tr>
+              <tr><td>网关</td><td>Kong / APISIX / Traefik</td><td>统一入口、限流、鉴权</td></tr>
+              <tr><td>链路追踪</td><td>Jaeger / Zipkin / SkyWalking</td><td>分布式链路追踪</td></tr>
+              <tr><td>日志</td><td>zap / zerolog + ELK</td><td>结构化日志收集</td></tr>
+              <tr><td>监控</td><td>Prometheus + Grafana</td><td>指标采集与可视化</td></tr>
+              <tr><td>消息队列</td><td>Kafka / RocketMQ / RabbitMQ</td><td>异步解耦</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// gRPC 服务定义示例
+// user.proto
+syntax = "proto3";
+package user;
+service UserService {
+    rpc GetUser(GetUserRequest) returns (UserResponse);
+    rpc ListUsers(ListUsersRequest) returns (stream UserResponse); // 服务端流
+}
+message GetUserRequest {
+    int64 id = 1;
+}
+message UserResponse {
+    int64 id = 1;
+    string name = 2;
+    string email = 3;
+}</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Go 的 GMP 调度模型是什么？为什么需要 P？</div>
+          <div class="a">
+            <strong>参考：</strong>GMP 模型中，G 是 Goroutine（用户态协程），M 是 OS 线程（Machine），P 是逻辑处理器（Processor）。P 的数量等于 GOMAXPROCS（默认 CPU 核心数），每个 P 持有一个本地 Goroutine 队列（最多 256 个）。M 必须绑定 P 才能执行 G。<br>
+            为什么需要 P：如果只有 GM 模型（Go 早期），所有 Goroutine 放在全局队列中，每次调度都需要加全局锁，竞争激烈。引入 P 后，每个 P 有本地队列，大部分调度在本地完成（无锁），只在本地队列空时才从全局队列或其他 P 偷取（Work Stealing），大幅减少锁竞争。<br>
+            <strong>追问：G 阻塞时怎么办？</strong> 如果是系统调用阻塞（如文件 IO），M 阻塞，P 会与 M 解绑并绑定其他空闲 M 继续执行其他 G。如果是 channel/mutex 阻塞，G 被放入等待队列，M 不阻塞，继续执行 P 的其他 G。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">无缓冲 Channel 和有缓冲 Channel 有什么区别？底层怎么实现的？</div>
+          <div class="a">
+            <strong>参考：</strong>无缓冲 Channel（make(chan T)）是同步的：发送方阻塞直到有接收方就绪，接收方阻塞直到有发送方就绪。适合协程间同步协调。有缓冲 Channel（make(chan T, n)）是异步的：缓冲区未满时发送不阻塞，缓冲区非空时接收不阻塞。适合生产者-消费者解耦。<br>
+            底层结构 hchan：包含环形数组缓冲区（buf）、发送/接收索引（sendx/recvx）、发送/接收等待队列（sendq/recvq，存放阻塞的 G）、互斥锁。发送时：先检查是否有等待的接收者（直接传递），再检查缓冲区是否有空间（放入缓冲区），否则挂起当前 G。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Go 的 GC 是怎么工作的？如何调优？</div>
+          <div class="a">
+            <strong>参考：</strong>Go 使用三色标记 + 混合写屏障的并发 GC。标记阶段从 GC Root 出发，将对象标记为白/灰/黑三色，白色为垃圾。写屏障保证并发标记期间不会漏标。GC 大部分与用户代码并发执行，只有极短的 STW（< 1ms）。<br>
+            触发条件：堆内存增长达到 GOGC 阈值（默认 100%，即增长 100% 触发）。调优方式：1）调低 GOGC（如 GOGC=50）使 GC 更频繁、内存更低；2）GOMEMLIMIT（Go 1.19+）设置内存上限；3）减少堆分配（sync.Pool 复用、预分配容量、值传递代替指针）；4）减少指针数量（减少 GC 扫描范围）。<br>
+            <strong>追问：STW 在哪些阶段？</strong> Mark Setup（开启写屏障）和 Mark Termination（关闭写屏障），两者都极短（微秒到毫秒级）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Go 的 interface 底层是怎么实现的？类型断言的性能如何？</div>
+          <div class="a">
+            <strong>参考：</strong>Go 的 interface 底层有两种结构。空接口（interface{} / any）使用 eface 结构体（类型指针 + 数据指针）。非空接口使用 iface 结构体（itab + 数据指针），其中 itab 包含接口类型、动态类型和方法地址表。<br>
+            类型断言的性能：直接断言 <code>i.(T)</code> 会比较 eface 的 _type 或 iface 的 itab._type，O(1) 操作。类型 switch 底层也是类型比较。安全断言（comma-ok）比直接断言略慢（需要返回 ok 值），但避免了 panic 的开销。<br>
+            <strong>追问：interface 的零值是什么？</strong> nil interface 的 _type 和 data 都为 nil。注意：将一个非 nil 的值赋给 interface 后，即使值本身为 nil，interface 也不等于 nil（因为 _type 不为 nil）。这是 Go 的常见坑。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">sync.Map 和普通 map+Mutex 有什么区别？什么时候用哪个？</div>
+          <div class="a">
+            <strong>参考：</strong>sync.Map 内部使用两个 map（read 和 dirty），读操作大部分不需要加锁（read 是只读的 atomic），写操作需要加锁。读多写少时性能优于 map+RWMutex。<br>
+            使用场景：1）sync.Map 适合读多写少、key 集合稳定的场景（如缓存、配置）；2）map+Mutex/RWMutex 适合写多、key 频繁变化的场景；3）map+RWMutex 适合读多写少但需要遍历的场景。<br>
+            sync.Map 的缺点：1）没有 len() 方法获取大小（需要 Range 遍历计数）；2）类型不安全（使用 interface{}）；3）频繁写入时性能较差（dirty -> read 晋升开销）。<br>
+            <strong>追问：sync.Map 的 Load 和 Store 是原子的吗？</strong> 单个操作是并发安全的，但 Load+Modify+Store 不是原子的（组合操作需要额外加锁）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">defer 的执行顺序是怎样的？defer 中 recover 有什么限制？</div>
+          <div class="a">
+            <strong>参考：</strong>defer 执行顺序是 LIFO（后进先出），即后声明的 defer 先执行。defer 的参数在声明时立即求值（不是执行时求值）。<br>
+            recover 的限制：1）只能在 defer 函数中调用才有效（非 defer 中调用返回 nil）；2）只能捕获当前 goroutine 的 panic（子 goroutine 的 panic 无法被父 goroutine 捕获）；3）嵌套 panic 时需要多次 recover。<br>
+            <strong>追问：defer 的性能开销大吗？</strong> 每个 defer 会在堆上分配一个 _defer 结构体（Go 1.14+ 优化了开放编码 defer，简单场景可内联，接近零开销）。高频循环中的 defer 可能有累积开销，必要时可改用显式调用。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Go 的 Channel 和其他语言的锁/条件变量相比有什么优势？</div>
+          <div class="a">
+            <strong>参考：</strong>Go 推荐 "Don't communicate by sharing memory; share memory by communicating"（通过通信共享内存，而非通过共享内存通信）。Channel 是 CSP（Communicating Sequential Processes）模型的核心。<br>
+            Channel 的优势：1）天然支持生产者-消费者模式，代码更清晰；2）内置超时控制（select + time.After）；3）方向限制（chan<- / <-chan）在编译期防止误用；4）自动同步（无缓冲 Channel）；5）方便实现 Pipeline、Fan-Out/Fan-In 等并发模式。<br>
+            Channel 适用场景：goroutine 间传递数据、信号通知、任务分发。Mutex 适用场景：保护共享状态（如缓存、计数器）。实际项目中两者常配合使用。<br>
+            <strong>追问：Channel 和 Mutex 会死锁吗？</strong> 都会。Channel 死锁：所有 goroutine 都在等待 Channel 操作。Mutex 死锁：多个 goroutine 互相等待锁。Go 运行时能检测到 Channel 死锁（all goroutines are asleep），但不能检测到所有 Mutex 死锁。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Go · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

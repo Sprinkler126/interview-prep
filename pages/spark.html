@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spark - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
+  <div class="container">
+    <h1>⚡ Apache Spark</h1>
+    <p class="subtitle">RDD · DataFrame · Structured Streaming · MLlib · 批流一体</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#p1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#p1-1">整体架构</a></li>
+          <li class="sub"><a href="#p1-2">RDD 五大特性</a></li>
+          <li class="sub"><a href="#p1-3">RDD 血统与容错</a></li>
+          <li class="sub"><a href="#p1-4">DataFrame vs Dataset vs RDD</a></li>
+          <li class="sub"><a href="#p1-5">Spark SQL</a></li>
+          <li class="sub"><a href="#p1-6">Structured Streaming</a></li>
+          <li class="sub"><a href="#p1-7">Shuffle 机制</a></li>
+          <li class="sub"><a href="#p1-8">内存管理</a></li>
+          <li><a href="#p2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#p2-1">离线数仓 ETL</a></li>
+          <li class="sub"><a href="#p2-2">实时数据处理</a></li>
+          <li class="sub"><a href="#p2-3">机器学习</a></li>
+          <li class="sub"><a href="#p2-4">与 Flink 对比</a></li>
+          <li class="sub"><a href="#p2-5">性能调优</a></li>
+          <li class="sub"><a href="#p2-6">Spark on K8s</a></li>
+          <li class="sub"><a href="#p2-7">常见问题排查</a></li>
+          <li><a href="#p3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ================= PART 1 ================= -->
+        <h2 id="p1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="p1-1">1. 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">Spark 运行架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Driver Program</strong>
+                <div class="arch-label">用户 main() 入口<br>创建 SparkContext<br>DAGScheduler + TaskScheduler</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 提交 Job → 划分 Stage → 分发 Task</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Cluster Manager</strong>
+                <div class="arch-label">资源调度器<br>Standalone / YARN / K8s / Mesos<br>分配 Executor 资源</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 分配资源</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Executor 1</strong>
+                <div class="arch-label">Task 执行单元<br>内存 + 磁盘缓存<br>多个 Task 并行执行</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Executor 2</strong>
+                <div class="arch-label">Task 执行单元<br>内存 + 磁盘缓存<br>多个 Task 并行执行</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>Executor N</strong>
+                <div class="arch-label">Task 执行单元<br>内存 + 磁盘缓存<br>多个 Task 并行执行</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>核心组件</h4>
+          <ul>
+            <li><strong>Driver</strong>：运行用户 main() 函数，创建 SparkContext，将用户程序转化为 Job，划分 Stage，调度 Task 到 Executor 执行。Driver 还负责维护 DAG、Stage 划分、Task 分发和结果收集。</li>
+            <li><strong>Executor</strong>：Worker 节点上的 JVM 进程，负责执行 Task。每个 Executor 有多个线程槽（cores），可并行执行多个 Task。Executor 还负责将数据缓存在内存/磁盘中。</li>
+            <li><strong>Cluster Manager</strong>：集群资源管理器，负责资源分配和调度。支持 Standalone（Spark 自带）、YARN（Hadoop）、Kubernetes、Mesos 等。</li>
+            <li><strong>DAGScheduler</strong>：将 RDD 的依赖关系转化为 DAG，按 Shuffle 边界划分 Stage。</li>
+            <li><strong>TaskScheduler</strong>：将 Stage 中的 Task 分发到 Executor 执行，处理失败重试。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Job → Stage → Task 层次</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">User Code</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Job（Action 触发）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Stage（Shuffle 边界划分）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Task（每个 Partition 一个）</div>
+          </div>
+          <ul>
+            <li><strong>Job</strong>：每个 Action 操作（如 collect、save）触发一个 Job</li>
+            <li><strong>Stage</strong>：按 Shuffle 依赖划分，窄依赖在一个 Stage 内，宽依赖是 Stage 边界</li>
+            <li><strong>Task</strong>：Stage 内每个 Partition 对应一个 Task，Task 是最小执行单元</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-2">2. RDD 五大特性</h3>
+        <div class="diagram">
+          <div class="diagram-title">RDD (Resilient Distributed Dataset) 核心特性</div>
+          <div class="layer-stack">
+            <div class="layer" style="border-color:var(--accent);background:rgba(56,189,248,0.08)"><strong>① 一组 Partition</strong> — 数据的最小分片，每个 Partition 对应一个 Task</div>
+            <div class="layer" style="border-color:var(--accent2);background:rgba(129,140,248,0.08)"><strong>② 一个计算函数</strong> — 对每个 Partition 执行的 compute() 函数，惰性求值</div>
+            <div class="layer" style="border-color:var(--accent3);background:rgba(52,211,153,0.08)"><strong>③ RDD 间的依赖关系</strong> — 窄依赖（OneToOneDependency）或宽依赖（ShuffleDependency）</div>
+            <div class="layer" style="border-color:var(--accent4);background:rgba(251,146,60,0.08)"><strong>④ 一个 Partitioner</strong> — 分区器（HashPartitioner / RangePartitioner），决定 KV 类型 RDD 的分区策略</div>
+            <div class="layer" style="border-color:var(--accent5);background:rgba(244,114,182,0.08)"><strong>⑤ 一组首选位置</strong> — 数据本地性偏好（Preferred Location），调度 Task 时优先在数据所在节点执行</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>窄依赖 vs 宽依赖</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">窄依赖（NarrowDependency）</h4>
+              <ul>
+                <li>父 RDD 的一个 Partition 只被子 RDD 的一个 Partition 依赖</li>
+                <li>如：map、filter、union</li>
+                <li>可以在同一个 Stage 内流水线执行</li>
+                <li>无需 Shuffle</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">宽依赖（ShuffleDependency）</h4>
+              <ul>
+                <li>父 RDD 的一个 Partition 被子 RDD 的多个 Partition 依赖</li>
+                <li>如：groupByKey、reduceByKey、join</li>
+                <li>需要 Shuffle，是 Stage 的边界</li>
+                <li>涉及磁盘 IO 和网络传输</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="p1-3">3. RDD 血统（Lineage）与容错</h3>
+        <div class="card">
+          <h4>Lineage 机制</h4>
+          <p>RDD 不存储实际数据，只记录数据的<strong>血统信息</strong>（即从数据源到当前 RDD 的一系列变换操作）。当某个 Partition 数据丢失时，Spark 根据 Lineage 信息重新计算该 Partition，而非全量重算。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">HDFS 文件</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">map()</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">filter()</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">reduceByKey()</div>
+          </div>
+          <p>如果 reduceByKey 阶段某个 Partition 丢失，Spark 只需从 HDFS 重新读取对应的 Partition 并重算 map → filter → reduceByKey，而非重算所有 Partition。</p>
+        </div>
+        <div class="card">
+          <h4>Checkpoint 机制</h4>
+          <p>Lineage 过长时（如迭代算法），容错重算代价很大。Checkpoint 将 RDD 数据持久化到 HDFS，截断 Lineage。</p>
+          <ul>
+            <li><strong>Reliable Checkpoint</strong>：数据写入 HDFS，可靠存储</li>
+            <li><strong>Local Checkpoint</strong>：数据写入本地磁盘，适合迭代算法中间结果</li>
+            <li>使用前需调用 <code>sc.setCheckpointDir("hdfs://...")</code></li>
+          </ul>
+        </div>
+
+        <h3 id="p1-4">4. DataFrame vs Dataset vs RDD</h3>
+        <div class="diagram">
+          <div class="diagram-title">三种抽象对比</div>
+          <table>
+            <thead><tr><th>特性</th><th>RDD</th><th>DataFrame</th><th>Dataset</th></tr></thead>
+            <tbody>
+              <tr><td><strong>类型安全</strong></td><td>编译时检查</td><td>运行时检查</td><td>编译时检查</td></tr>
+              <tr><td><strong>序列化</strong></td><td>Java 序列化</td><td>Tungsten 二进制</td><td>Tungsten 二进制</td></tr>
+              <tr><td><strong>优化</strong></td><td>无 Catalyst 优化</td><td>Catalyst 优化器</td><td>Catalyst 优化器</td></tr>
+              <tr><td><strong>API</strong></td><td>函数式（map/filter）</td><td>SQL + DSL</td><td>SQL + DSL + 函数式</td></tr>
+              <tr><td><strong>语言支持</strong></td><td>Scala/Java/Python</td><td>Scala/Java/Python/R</td><td>Scala/Java</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>底层控制、非结构化数据</td><td>结构化数据分析</td><td>类型安全的结构化数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>演进关系</h4>
+          <ul>
+            <li><strong>RDD（1.0）</strong>：最基础的抽象，类型安全但无优化</li>
+            <li><strong>DataFrame（1.3）</strong>：带 Schema 的 RDD（Row 对象），引入 Catalyst 优化器，性能大幅提升</li>
+            <li><strong>Dataset（1.6）</strong>：DataFrame = Dataset[Row]，结合了 RDD 的类型安全和 DataFrame 的优化能力</li>
+            <li><strong>Spark 2.0+</strong>：统一 API，DataFrame 成为 Dataset[Row] 的别名</li>
+          </ul>
+          <p class="tip">实际开发中优先使用 DataFrame/Dataset（有 Catalyst 优化），只在需要底层控制时使用 RDD。</p>
+        </div>
+
+        <h3 id="p1-5">5. Spark SQL：Catalyst 优化器与 Tungsten</h3>
+        <div class="diagram">
+          <div class="diagram-title">Catalyst 优化器工作流程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">SQL / DataFrame API</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Unresolved Logical Plan</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Analyzed Logical Plan</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Optimized Logical Plan</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Physical Plan</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">Code Generation</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Catalyst 四阶段优化</h4>
+          <ul>
+            <li><strong>1. 解析（Parse）</strong>：SQL 文本 → Unresolved Logical Plan（未绑定 Schema）</li>
+            <li><strong>2. 分析（Analyze）</strong>：绑定 Schema → Analyzed Logical Plan（解析表名、列名、函数）</li>
+            <li><strong>3. 优化（Optimize）</strong>：应用优化规则 → Optimized Logical Plan（谓词下推、列裁剪、常量折叠、Join 重排序）</li>
+            <li><strong>4. 物理计划（Physical Plan）</strong>：选择具体执行策略 → 生成 Java 字节码（Whole-Stage Code Generation）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Catalyst 关键优化</h4>
+          <table>
+            <thead><tr><th>优化</th><th>说明</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><strong>谓词下推</strong></td><td>将 filter 推到数据源层执行</td><td>减少数据读取量</td></tr>
+              <tr><td><strong>列裁剪</strong></td><td>只读取需要的列</td><td>减少 IO 和内存</td></tr>
+              <tr><td><strong>常量折叠</strong></td><td>编译期计算常量表达式</td><td>减少运行时计算</td></tr>
+              <tr><td><strong>Join 重排序</strong></td><td>优化多表 Join 顺序</td><td>减少中间结果</td></tr>
+              <tr><td><strong>Code Generation</strong></td><td>Whole-Stage 代码生成</td><td>减少虚函数调用，提升 5~10 倍</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Tungsten 执行引擎</h4>
+          <ul>
+            <li><strong>内存管理</strong>：Off-Heap 内存管理，绕过 JVM GC，使用 Sun.misc.Unsafe 直接操作内存</li>
+            <li><strong>缓存友好</strong>：数据以二进制格式存储（UnsafeRow），紧凑排列，提高 CPU Cache 命中率</li>
+            <li><strong>代码生成</strong>：Whole-Stage Code Generation，将多个操作合并为一个函数，消除虚函数调用</li>
+            <li><strong>序列化</strong>：自定义二进制序列化，比 Java 序列化快 10 倍以上</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-6">6. Structured Streaming</h3>
+        <div class="diagram">
+          <div class="diagram-title">Structured Streaming 核心模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Input Source</strong>
+                <div class="arch-label">Kafka / 文件 / Socket<br>Rate（测试用）</div>
+              </div>
+              <div class="flow-arrow" style="font-size:1.5rem">→</div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Query</strong>
+                <div class="arch-label">DataFrame 操作<br>select / filter / groupBy<br>窗口函数 / Join</div>
+              </div>
+              <div class="flow-arrow" style="font-size:1.5rem">→</div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>Output Sink</strong>
+                <div class="arch-label">Kafka / 文件 / 控制台<br>Foreach / ForeachBatch</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>核心思想：无限表</h4>
+          <p>Structured Streaming 将流数据视为一张<strong>不断追加的无限表</strong>。每个触发间隔（Trigger Interval）处理新到达的数据行，就像对一张表执行增量查询。</p>
+        </div>
+        <div class="card">
+          <h4>输出模式</h4>
+          <table>
+            <thead><tr><th>模式</th><th>说明</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Append</strong></td><td>只输出新增行</td><td>无聚合操作、有水印的窗口聚合</td></tr>
+              <tr><td><strong>Complete</strong></td><td>输出完整结果表</td><td>聚合查询（groupBy）</td></tr>
+              <tr><td><strong>Update</strong></td><td>只输出有变化的行</td><td>聚合查询（增量更新）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>水印（Watermark）机制</h4>
+          <p>处理乱序数据的核心机制。水印定义了"最大允许延迟"：超过水印的迟到数据会被丢弃。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">事件时间 - 最大延迟 = 水印</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">水印之前的数据窗口关闭</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-red">超过水印的迟到数据丢弃</div>
+          </div>
+          <p>代码示例：<code>df.withWatermark("eventTime", "10 minutes")</code> 表示允许最大 10 分钟的乱序延迟。</p>
+        </div>
+        <div class="card">
+          <h4>微批处理 vs 连续处理</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">微批处理（默认）</h4>
+              <ul>
+                <li>按 Trigger Interval 切分批次</li>
+                <li>每个批次是一次完整的批处理</li>
+                <li>延迟：秒级（通常 100ms~数秒）</li>
+                <li>Exactly-Once 语义</li>
+                <li>所有操作都支持</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">连续处理（实验性）</h4>
+              <ul>
+                <li>持续处理数据，低延迟</li>
+                <li>延迟：毫秒级</li>
+                <li>At-Least-Once 语义</li>
+                <li>只支持部分操作</li>
+                <li>目前仍为实验性功能</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="p1-7">7. Shuffle 机制</h3>
+        <div class="diagram">
+          <div class="diagram-title">Shuffle 演进：Hash Shuffle → Sort Shuffle</div>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">Hash Shuffle（已废弃）</h4>
+              <ul>
+                <li>每个 Map Task 为每个 Reduce Task 创建一个文件</li>
+                <li>文件数 = Map Tasks × Reduce Tasks</li>
+                <li>大量小文件，随机 IO 严重</li>
+                <li>内存开销大</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Sort Shuffle（默认）</h4>
+              <ul>
+                <li>每个 Map Task 只输出一个文件</li>
+                <li>先在内存中排序，再 spill 到磁盘</li>
+                <li>最后合并为一个有序文件 + 索引</li>
+                <li>大幅减少文件数和随机 IO</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Shuffle Write / Read 流程</h4>
+          <ul>
+            <li><strong>Shuffle Write</strong>：Map 端将结果按 Reduce 端分区排序，写入 Shuffle 文件（一个 Map Task 一个文件），同时生成索引文件记录每个分区的偏移量</li>
+            <li><strong>Shuffle Read</strong>：Reduce 端从所有 Map Task 的 Shuffle 文件中拉取自己对应分区的数据，进行归并排序</li>
+            <li><strong>Shuffle Manager</strong>：Spark 3.0 引入 External Shuffle Service，Shuffle 数据写入外部服务而非 Executor，Executor 可以独立扩缩容</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Shuffle 优化</h4>
+          <ul>
+            <li><strong>减少 Shuffle</strong>：用 reduceByKey 替代 groupByKey（Map 端预聚合）</li>
+            <li><strong>Broadcast Join</strong>：小表广播，避免 Shuffle</li>
+            <li><strong>AQE（Adaptive Query Execution）</strong>：Spark 3.0+，运行时动态调整 Shuffle 分区数</li>
+            <li><strong>Shuffle 数据压缩</strong>：<code>spark.shuffle.compress=true</code>（默认开启）</li>
+          </ul>
+        </div>
+
+        <h3 id="p1-8">8. 内存管理</h3>
+        <div class="diagram">
+          <div class="diagram-title">Spark 统一内存管理模型（1.6+）</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Spark 内存 = 60%（可配置）</strong>
+                <div class="arch-label">
+                  <div style="display:flex;gap:1rem;justify-content:center;margin-top:0.5rem">
+                    <div style="flex:1;border:1px solid var(--accent3);padding:0.5rem;border-radius:4px">
+                      <strong>Storage 内存（50%）</strong><br>缓存 RDD / DataFrame<br>broadcast 变量
+                    </div>
+                    <div style="flex:1;border:1px solid var(--accent2);padding:0.5rem;border-radius:4px">
+                      <strong>Execution 内存（50%）</strong><br>Shuffle / Join / Sort<br>聚合操作
+                    </div>
+                  </div>
+                  <div style="margin-top:0.3rem;font-size:0.7rem">两者可互相借用，但 Execution 优先级更高</div>
+                </div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>用户内存 = 40%</strong>
+                <div class="arch-label">用户数据结构、Spark 内部元数据</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>内存管理要点</h4>
+          <ul>
+            <li><strong>统一内存管理</strong>（1.6+）：Storage 和 Execution 共享一块内存，可互相借用</li>
+            <li><strong>优先级</strong>：Execution 优先级高于 Storage。Execution 需要内存时可以驱逐 Storage 缓存</li>
+            <li><strong>Storage 缓存</strong>：调用 <code>persist()</code> 或 <code>cache()</code> 时使用 Storage 内存</li>
+            <li><strong>Off-Heap</strong>：Spark 3.0+ 支持 Off-Heap 内存，绕过 JVM GC，使用 <code>sun.misc.Unsafe</code></li>
+          </ul>
+        </div>
+
+        <!-- ================= PART 2 ================= -->
+        <h2 id="p2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="p2-1">2.1 离线数仓 ETL</h3>
+        <div class="card">
+          <h4>典型 ETL 流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">ODS（原始数据层）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">DWD（明细数据层）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">DWS（汇总数据层）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">ADS（应用数据层）</div>
+          </div>
+          <ul>
+            <li><strong>ODS</strong>：原始数据入湖，Spark 读取 Kafka/HDFS/数据库，写入数据湖（Hudi/Iceberg/Delta Lake）</li>
+            <li><strong>DWD</strong>：清洗、去重、标准化、维度关联</li>
+            <li><strong>DWS</strong>：按主题聚合（用户维度、商品维度等）</li>
+            <li><strong>ADS</strong>：面向应用的宽表、指标表</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-2">2.2 实时数据处理</h3>
+        <div class="card">
+          <h4>Structured Streaming 实时场景</h4>
+          <ul>
+            <li><strong>实时 ETL</strong>：从 Kafka 读取数据，清洗转换后写入 Hudi/Iceberg</li>
+            <li><strong>实时聚合</strong>：按窗口统计 PV/UV、GMV 等指标</li>
+            <li><strong>实时 Join</strong>：流与流 Join、流与维表 Join</li>
+            <li><strong>CDC 同步</strong>：读取 Debezium CDC 流，实时同步到数据湖</li>
+          </ul>
+          <p class="tip">Structured Streaming 的优势是与 Spark SQL 深度集成，同一套代码可以同时用于批处理和流处理（批流一体）。</p>
+        </div>
+
+        <h3 id="p2-3">2.3 机器学习</h3>
+        <div class="card">
+          <h4>MLlib 生态</h4>
+          <ul>
+            <li><strong>ML Pipeline</strong>：Transformer → Estimator → Pipeline，标准化的机器学习流水线</li>
+            <li><strong>特征工程</strong>：VectorAssembler、StandardScaler、OneHotEncoder、Tokenizer</li>
+            <li><strong>算法库</strong>：分类（LR、SVM、Random Forest）、回归、聚类（K-Means）、推荐（ALS）、频繁项集（FP-Growth）</li>
+            <li><strong>调参</strong>：CrossValidator、TrainValidationSplit</li>
+            <li><strong>深度学习</strong>：TensorFlowOnSpark、PyTorch（通过 Spark 分发数据）</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-4">2.4 与 Flink 对比</h3>
+        <div class="diagram">
+          <div class="diagram-title">Spark vs Flink 深度对比</div>
+          <table>
+            <thead><tr><th>维度</th><th>Spark</th><th>Flink</th></tr></thead>
+            <tbody>
+              <tr><td><strong>流模型</strong></td><td>微批处理（Micro-Batch）</td><td>真正的流处理（逐条处理）</td></tr>
+              <tr><td><strong>延迟</strong></td><td>秒级</td><td>毫秒级</td></tr>
+              <tr><td><strong>吞吐</strong></td><td>批处理吞吐更高</td><td>流处理吞吐高</td></tr>
+              <tr><td><strong>状态管理</strong></td><td>有限（mapGroupsWithState）</td><td>丰富（KeyedState、OperatorState、RocksDB）</td></tr>
+              <tr><td><strong>窗口</strong></td><td>基于事件时间的窗口</td><td>丰富的窗口类型（滚动、滑动、会话、自定义）</td></tr>
+              <tr><td><strong>语义保证</strong></td><td>Exactly-Once（微批）</td><td>Exactly-Once（Checkpoint）</td></tr>
+              <tr><td><strong>CEP</strong></td><td>不原生支持</td><td>原生 CEP 库</td></tr>
+              <tr><td><strong>SQL</strong></td><td>Spark SQL（成熟）</td><td>Flink SQL（快速发展）</td></tr>
+              <tr><td><strong>批处理</strong></td><td>批处理是核心优势</td><td>流批一体（Blink 引擎）</td></tr>
+              <tr><td><strong>生态</strong></td><td>MLlib、GraphX</td><td>Table API、CEP</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>选型建议</h4>
+          <ul>
+            <li><strong>选 Spark</strong>：以批处理为主、离线数仓 ETL、机器学习、SQL 分析、延迟要求不高的流处理</li>
+            <li><strong>选 Flink</strong>：低延迟流处理、复杂事件处理（CEP）、精确的状态管理、实时风控/监控</li>
+            <li><strong>趋势</strong>：Spark 向流处理靠拢（Structured Streaming 连续处理），Flink 向批处理靠拢（流批一体）</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-5">2.5 性能调优</h3>
+        <div class="card">
+          <h4>关键调优参数</h4>
+          <table>
+            <thead><tr><th>参数</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr><td><code>spark.executor.memory</code></td><td>根据数据量设置，建议 4~16GB</td></tr>
+              <tr><td><code>spark.executor.cores</code></td><td>2~5 个（过多会导致 GC 问题）</td></tr>
+              <tr><td><code>spark.sql.shuffle.partitions</code></td><td>默认 200，根据数据量调整</td></tr>
+              <tr><td><code>spark.default.parallelism</code></td><td>通常设为 executor cores × executor 数量 × 2~3</td></tr>
+              <tr><td><code>spark.sql.adaptive.enabled</code></td><td>true（AQE，Spark 3.0+）</td></tr>
+              <tr><td><code>spark.serializer</code></td><td>KryoSerializer（比默认 Java 序列化快 10 倍）</td></tr>
+              <tr><td><code>spark.memory.fraction</code></td><td>0.6（默认），可根据情况调整</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>常见调优手段</h4>
+          <ul>
+            <li><strong>数据倾斜</strong>：加盐打散、Broadcast Join、AQE 自动处理</li>
+            <li><strong>缓存</strong>：对重复使用的 DataFrame 调用 <code>cache()</code> 或 <code>persist()</code></li>
+            <li><strong>分区优化</strong>：合理设置 Shuffle 分区数，使用 coalesce 减少小文件</li>
+            <li><strong>广播变量</strong>：小数据广播到 Executor，避免 Shuffle</li>
+            <li><strong>谓词下推</strong>：尽早 filter，减少数据量</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-6">2.6 Spark on K8s</h3>
+        <div class="card">
+          <h4>K8s 部署模式</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Cluster 模式</h4>
+              <ul>
+                <li>Driver 运行在 K8s Pod 中</li>
+                <li>适合生产环境</li>
+                <li>Driver 挂了 K8s 自动重启</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">Client 模式</h4>
+              <ul>
+                <li>Driver 运行在客户端</li>
+                <li>适合调试和开发</li>
+                <li>Driver 挂了任务失败</li>
+              </ul>
+            </div>
+          </div>
+          <ul>
+            <li><strong>优势</strong>：资源隔离、弹性伸缩、统一资源管理、支持 GPU</li>
+            <li><strong>镜像</strong>：使用 Spark 官方镜像或自定义镜像（包含依赖 JAR 和 Python 包）</li>
+            <li><strong>存储</strong>：支持 S3、HDFS、Ceph 等外部存储</li>
+            <li><strong>Operator</strong>：使用 Spark Operator 管理 Spark 作业生命周期</li>
+          </ul>
+        </div>
+
+        <h3 id="p2-7">2.7 常见问题排查</h3>
+        <div class="card">
+          <h4>数据倾斜</h4>
+          <p><strong>表现</strong>：个别 Task 执行时间远超其他 Task。</p>
+          <p><strong>排查</strong>：Spark UI 查看各 Stage 的 Task 执行时间分布。</p>
+          <p><strong>解决</strong>：</p>
+          <ul>
+            <li>加盐打散：给倾斜 Key 加随机前缀，分散到多个 Task</li>
+            <li>两阶段聚合：先局部聚合再全局聚合</li>
+            <li>Broadcast Join：小表广播避免 Shuffle</li>
+            <li>AQE：Spark 3.0+ 自动拆分倾斜分区</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>OOM 问题</h4>
+          <ul>
+            <li><strong>Driver OOM</strong>：collect() 收集过多数据到 Driver，增大 <code>spark.driver.memory</code> 或避免 collect</li>
+            <li><strong>Executor OOM</strong>：增大 <code>spark.executor.memory</code>、减少 <code>spark.executor.cores</code>、增加 Shuffle 分区数</li>
+            <li><strong>GC 问题</strong>：使用 Kryo 序列化、减少缓存、增大 Off-Heap 内存</li>
+          </ul>
+        </div>
+
+        <!-- ================= PART 3 ================= -->
+        <h2 id="p3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa"><div class="q">Spark 的整体架构是什么？</div><div class="a">三层架构——<strong>Driver</strong>（运行用户 main()，创建 SparkContext，DAGScheduler 划分 Stage，TaskScheduler 分发 Task）；<strong>Cluster Manager</strong>（资源调度器，Standalone/YARN/K8s/Mesos）；<strong>Executor</strong>（Worker 节点的 JVM 进程，执行 Task，缓存数据）。Job 由 Action 触发，按 Shuffle 边界划分 Stage，每个 Partition 一个 Task。</div></div>
+
+        <div class="qa"><div class="q">RDD 的五大特性是什么？</div><div class="a">① <strong>一组 Partition</strong>（数据分片，每个 Partition 对应一个 Task）；② <strong>一个计算函数</strong>（对每个 Partition 的 compute()，惰性求值）；③ <strong>RDD 间的依赖关系</strong>（窄依赖不需 Shuffle，宽依赖是 Stage 边界）；④ <strong>一个 Partitioner</strong>（Hash/Range 分区器，决定 KV RDD 的分区策略）；⑤ <strong>一组首选位置</strong>（数据本地性，优先在数据所在节点调度 Task）。</div></div>
+
+        <div class="qa"><div class="q">Spark 如何实现容错？</div><div class="a">通过 <strong>Lineage（血统）</strong>：RDD 不存储实际数据，只记录从数据源到当前 RDD 的变换操作链。Partition 丢失时，根据 Lineage 只重算该 Partition，而非全量重算。对于迭代算法（Lineage 过长），使用 <strong>Checkpoint</strong> 将 RDD 持久化到 HDFS，截断 Lineage，降低重算代价。</div></div>
+
+        <div class="qa"><div class="q">DataFrame、Dataset 和 RDD 的区别？</div><div class="a"><strong>RDD</strong>：最基础，类型安全，无 Catalyst 优化，Java 序列化，适合非结构化数据。<strong>DataFrame</strong>：带 Schema 的 Dataset[Row]，有 Catalyst 优化器和 Tungsten 引擎，SQL + DSL API。<strong>Dataset</strong>：编译时类型安全 + Catalyst 优化，Scala/Java 专属。优先使用 DataFrame/Dataset（有优化），只在需要底层控制时用 RDD。</div></div>
+
+        <div class="qa"><div class="q">Spark SQL 的 Catalyst 优化器做了什么？</div><div class="a">四阶段优化——① <strong>Parse</strong>：SQL → Unresolved Logical Plan；② <strong>Analyze</strong>：绑定 Schema；③ <strong>Optimize</strong>：谓词下推（filter 推到数据源）、列裁剪（只读需要的列）、常量折叠、Join 重排序；④ <strong>Physical Plan</strong>：选择执行策略 + Whole-Stage Code Generation（合并操作，生成 Java 字节码，消除虚函数调用，提升 5~10 倍）。</div></div>
+
+        <div class="qa"><div class="q">Structured Streaming 的水印机制？</div><div class="a">水印（Watermark）处理乱序数据。定义"最大允许延迟"：<code>水印 = max event time - 允许延迟</code>。窗口只有在水印超过窗口结束时间后才会关闭并输出结果。超过水印的迟到数据被丢弃。例如 <code>withWatermark("eventTime", "10 minutes")</code> 表示允许 10 分钟乱序。配合输出模式：Append 模式需要水印才能输出窗口聚合结果。</div></div>
+
+        <div class="qa"><div class="q">Spark 的 Shuffle 机制？</div><div class="a">Sort Shuffle（默认）：每个 Map Task 输出一个文件（先内存排序，spill 到磁盘，最后合并为有序文件 + 索引）。Reduce 端拉取所有 Map 的对应分区数据，归并排序。优化：① 减少 Shuffle（reduceByKey 替代 groupByKey，Map 端预聚合）；② Broadcast Join（小表广播）；③ AQE（运行时动态调整分区数）；④ Shuffle 数据压缩。</div></div>
+
+        <div class="qa"><div class="q">Spark 和 Flink 怎么选？</div><div class="a"><strong>选 Spark</strong>：批处理为主、离线数仓、机器学习、SQL 分析、延迟要求不高（秒级可接受）的流处理。<strong>选 Flink</strong>：低延迟流处理（毫秒级）、复杂事件处理 CEP、精确状态管理、实时风控/监控。趋势：Spark 向流靠拢（连续处理），Flink 向批靠拢（流批一体），两者差距在缩小。</div></div>
+
+        <div class="qa"><div class="q">Spark 的内存管理模型？</div><div class="a">统一内存管理（1.6+）：Spark 内存（60%）= Storage（50%）+ Execution（50%），两者可互相借用，Execution 优先级更高。Storage 用于缓存 RDD/DataFrame，Execution 用于 Shuffle/Join/Sort。用户内存（40%）用于用户数据结构。Spark 3.0+ 支持 Off-Heap 内存，绕过 JVM GC。</div></div>
+
+        <div class="qa"><div class="q">Spark on K8s 的优势？</div><div class="a">① <strong>资源隔离</strong>：每个 Spark 作业运行在独立 Pod 中；② <strong>弹性伸缩</strong>：K8s 自动调度 Executor Pod；③ <strong>统一资源管理</strong>：K8s 管理所有计算任务（Spark、Flink、TensorFlow）；④ <strong>GPU 支持</strong>：原生支持 GPU 资源调度。Cluster 模式（Driver 在 K8s 中）适合生产，Client 模式（Driver 在客户端）适合调试。</div></div>
+
+        <div class="qa"><div class="q">如何排查 Spark 数据倾斜？</div><div class="a">排查：Spark UI 查看各 Stage Task 执行时间分布，个别 Task 远超其他即为倾斜。解决：① <strong>加盐打散</strong>：给倾斜 Key 加随机前缀；② <strong>两阶段聚合</strong>：先局部聚合再全局聚合；③ <strong>Broadcast Join</strong>：小表广播避免 Shuffle；④ <strong>AQE</strong>（Spark 3.0+）：自动拆分倾斜分区。</div></div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Apache Spark · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u},{passive:true});u()})();
+  </script>
+</body>
+</html>

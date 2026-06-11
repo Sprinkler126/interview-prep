@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seata - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔄 Seata</h1>
+    <p class="subtitle">AT · TCC · Saga · 分布式事务 · 全局事务</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">AT 模式</a></li>
+          <li class="sub"><a href="#s1-3">TCC 模式</a></li>
+          <li class="sub"><a href="#s1-4">Saga 模式</a></li>
+          <li class="sub"><a href="#s1-5">四种模式对比</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">全局事务流程</a></li>
+          <li class="sub"><a href="#s2-2">Spring Cloud 集成</a></li>
+          <li class="sub"><a href="#s2-3">AT 脏读问题</a></li>
+          <li class="sub"><a href="#s2-4">高可用</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Seata 整体架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">TM<br><small>事务管理器</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">RM<br><small>资源管理器</small></div>
+            </div>
+            <div class="arch-connector">↓ 注册/报告 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">TC（Transaction Coordinator）<br><small>事务协调者 · 全局事务状态管理</small></div>
+            </div>
+            <div class="arch-connector">↓ 指令 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">RM (DB 1)<br><small>分支事务 1</small></div>
+              <div class="arch-box" style="margin-left:1rem">RM (DB 2)<br><small>分支事务 2</small></div>
+              <div class="arch-box" style="margin-left:1rem">RM (DB 3)<br><small>分支事务 3</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>三大核心角色</h4>
+          <table>
+            <thead>
+              <tr><th>角色</th><th>职责</th><th>所在位置</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>TM（Transaction Manager）</strong></td><td>开启/提交/回滚全局事务</td><td>发起全局事务的服务</td></tr>
+              <tr><td><strong>RM（Resource Manager）</strong></td><td>管理分支事务资源，向 TC 注册/报告</td><td>每个参与事务的服务</td></tr>
+              <tr><td><strong>TC（Transaction Coordinator）</strong></td><td>维护全局事务状态，协调提交/回滚</td><td>Seata Server（独立部署）</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">TC 是独立的 Server 进程，TM 和 RM 是嵌入业务应用的 SDK。TM 和 RM 通过 Netty 与 TC 通信。</div>
+        </div>
+
+        <!-- 1-2 AT 模式 -->
+        <h3 id="s1-2">AT 模式</h3>
+
+        <div class="card">
+          <h4>AT 模式原理（自动补偿）</h4>
+          <p>AT（Automatic Transaction）模式是 Seata 的默认模式，通过<strong>全局锁 + undo_log + 两阶段提交</strong>自动实现分布式事务：</p>
+          <div class="diagram">
+            <div class="diagram-title">AT 模式两阶段提交</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:var(--blue)">Phase 1：执行阶段</div>
+              </div>
+              <div class="arch-connector">
+                1. 解析 SQL，获取操作前数据快照（before image）<br>
+                2. 执行业务 SQL<br>
+                3. 获取操作后数据快照（after image）<br>
+                4. 生成 undo_log 写入数据库（与业务 SQL 同一本地事务）<br>
+                5. 向 TC 注册分支事务，申请全局锁
+              </div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:var(--green)">Phase 2 - 提交：异步删除 undo_log，释放全局锁</div>
+              </div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="background:var(--red)">Phase 2 - 回滚：用 undo_log 中的 before image 反向补偿，释放全局锁</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>undo_log 表结构</h4>
+          <pre><code>-- undo_log 表（每个参与事务的数据库都需要）
+CREATE TABLE undo_log (
+    id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
+    branch_id     BIGINT(20)   NOT NULL,  -- 分支事务 ID
+    xid           VARCHAR(100) NOT NULL,   -- 全局事务 ID
+    context       VARCHAR(128) NOT NULL,   -- 上文（序列化信息）
+    rollback_info LONGBLOB     NOT NULL,   -- 回滚信息（before/after image）
+    log_status    INT(11)      NOT NULL,   -- 0=正常, 1=已完成, 2=已删除
+    log_created   DATETIME     NOT NULL,
+    log_modified  DATETIME     NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY ux_undo_log (branch_id, xid)
+);
+
+-- rollback_info 结构：
+{
+    "beforeImage": {     // 操作前快照
+        "rows": [{"id":1, "balance":1000}]
+    },
+    "afterImage": {      // 操作后快照
+        "rows": [{"id":1, "balance":900}]
+    },
+    "sqlType": "UPDATE", // SQL 类型
+    "tableName": "account"
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>全局锁机制</h4>
+          <ul>
+            <li>AT 模式使用<strong>全局行锁</strong>保证分布式事务的隔离性</li>
+            <li>分支事务在 Phase 1 执行后申请全局锁，TC 记录锁信息</li>
+            <li>其他事务（包括非 Seata 管理的本地事务）修改同一行时，需要先获取全局锁</li>
+            <li>获取全局锁失败会重试（默认重试 30 次，间隔 10ms）</li>
+            <li>全局锁在 Phase 2 提交后释放</li>
+          </ul>
+          <div class="warn">全局锁是 AT 模式保证隔离性的关键，但也带来了性能开销。高并发写同一行的场景下，全局锁竞争会严重影响性能。</div>
+        </div>
+
+        <!-- 1-3 TCC 模式 -->
+        <h3 id="s1-3">TCC 模式</h3>
+
+        <div class="card">
+          <h4>TCC 三阶段</h4>
+          <div class="diagram">
+            <div class="diagram-title">TCC 模式流程</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">Try<br><small>资源预留/检查</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">Confirm<br><small>确认提交（全部成功）</small></div>
+              <div class="flow-arrow"> 或 </div>
+              <div class="flow-box flow-orange">Cancel<br><small>回滚释放（部分失败）</small></div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>职责</th><th>示例（扣款）</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Try</strong></td><td>资源检查和预留</td><td>检查余额 >= 扣款金额，冻结金额</td></tr>
+              <tr><td><strong>Confirm</strong></td><td>确认提交</td><td>扣减冻结金额，更新余额</td></tr>
+              <tr><td><strong>Cancel</strong></td><td>取消回滚</td><td>释放冻结金额</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// TCC 接口定义
+@LocalTCC
+public interface AccountTCC {
+    @TwoPhaseBusinessAction(
+        name = "deduct",
+        commitMethod = "confirm",
+        rollbackMethod = "cancel"
+    )
+    boolean tryDeduct(
+        @BusinessActionContextParameter(paramName = "userId") String userId,
+        @BusinessActionContextParameter(paramName = "amount") BigDecimal amount
+    );
+
+    boolean confirm(BusinessActionContext context);
+    boolean cancel(BusinessActionContext context);
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>TCC 三大问题</h4>
+          <table>
+            <thead>
+              <tr><th>问题</th><th>描述</th><th>解决方案</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">空回滚</span></td><td>Try 未执行就收到 Cancel</td><td>记录事务状态，Cancel 时检查 Try 是否执行过</td></tr>
+              <tr><td><span class="badge badge-orange">幂等</span></td><td>Confirm/Cancel 重复执行</td><td>使用全局事务 ID 做幂等键，记录执行状态</td></tr>
+              <tr><td><span class="badge badge-purple">悬挂</span></td><td>Cancel 先于 Try 到达</td><td>Try 执行前检查是否已 Cancel，已 Cancel 则拒绝执行</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">TCC 的三大问题是面试高频考点。核心解决思路：引入一张事务状态控制表，记录每个分支事务的状态（Try/Confirm/Cancel 的执行情况），基于状态判断是否需要执行。</div>
+        </div>
+
+        <!-- 1-4 Saga 模式 -->
+        <h3 id="s1-4">Saga 模式</h3>
+
+        <div class="card">
+          <h4>Saga 模式原理</h4>
+          <ul>
+            <li>Saga 将长事务拆分为多个本地事务，每个本地事务有对应的<strong>补偿事务</strong></li>
+            <li>正向顺序执行本地事务 T1 → T2 → T3</li>
+            <li>如果某个事务失败，反向执行补偿事务 C2 → C1</li>
+            <li>Seata 的 Saga 通过<strong>状态机</strong>驱动（JSON DSL 定义流程）</li>
+            <li>Saga 不保证隔离性，适合长事务和遗留系统</li>
+          </ul>
+          <pre><code>// Saga 状态机定义（JSON DSL）
+{
+    "Name": "purchase",
+    "States": {
+        "CreateOrder": {
+            "Type": "ServiceTask",
+            "ServiceName": "orderService",
+            "ServiceMethod": "create",
+            "CompensateState": "CancelOrder",
+            "Next": "DeductInventory"
+        },
+        "DeductInventory": {
+            "Type": "ServiceTask",
+            "ServiceName": "inventoryService",
+            "ServiceMethod": "deduct",
+            "CompensateState": "ReturnInventory",
+            "Next": "DeductBalance"
+        },
+        "DeductBalance": {
+            "Type": "ServiceTask",
+            "ServiceName": "accountService",
+            "ServiceMethod": "deduct",
+            "CompensateState": "ReturnBalance",
+            "Next": "End"
+        }
+    }
+}</code></pre>
+        </div>
+
+        <!-- 1-5 四种模式对比 -->
+        <h3 id="s1-5">四种模式对比</h3>
+
+        <div class="card">
+          <h4>Seata 四种事务模式对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>AT</th><th>TCC</th><th>Saga</th><th>XA</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>侵入性</td><td>✅ 无侵入</td><td>❌ 高（需实现 3 个接口）</td><td>⚠️ 中（需补偿方法）</td><td>✅ 无侵入</td></tr>
+              <tr><td>隔离性</td><td>全局锁</td><td>业务保证</td><td>❌ 无保证</td><td>✅ 强隔离</td></tr>
+              <tr><td>性能</td><td>⭐⭐⭐</td><td>⭐⭐⭐⭐</td><td>⭐⭐⭐⭐</td><td>⭐⭐</td></tr>
+              <tr><td>适用场景</td><td>微服务、中低并发</td><td>高并发、资金类</td><td>长事务、遗留系统</td><td>强一致性要求</td></tr>
+              <tr><td>实现复杂度</td><td>低</td><td>高</td><td>中</td><td>低</td></tr>
+              <tr><td>回滚方式</td><td>undo_log 自动</td><td>手动实现 Cancel</td><td>补偿事务反向</td><td>数据库原生支持</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">选型建议：大多数场景用 AT（简单无侵入）；高并发资金场景用 TCC（性能好、可精确控制）；长事务和遗留系统用 Saga；强一致性要求用 XA。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 全局事务流程 -->
+        <h3 id="s2-1">全局事务流程</h3>
+
+        <div class="card">
+          <h4>全局事务完整流程</h4>
+          <div class="diagram">
+            <div class="diagram-title">Seata 全局事务流程（AT 模式）</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">TM: @GlobalTransactional<br><small>开启全局事务</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">RM 1: 执行 SQL<br><small>写 undo_log + 注册分支</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">RM 2: 执行 SQL<br><small>写 undo_log + 注册分支</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">TM: 全局提交/回滚</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">TC: 通知所有 RM</div>
+            </div>
+          </div>
+          <pre><code>// 完整流程（AT 模式）：
+// 1. TM 调用 @GlobalTransactional 标记的方法
+//    → 向 TC 发起 BeginGlobalTransaction，获取 XID
+
+// 2. 业务代码调用服务 A（RM 1）
+//    → RM 1 的 DataSourceProxy 拦截 SQL
+//    → 解析 SQL，获取 before image
+//    → 执行业务 SQL
+//    → 获取 after image
+//    → 生成 undo_log，与业务 SQL 同一个本地事务提交
+//    → 向 TC 注册分支事务，申请全局锁
+
+// 3. 业务代码调用服务 B（RM 2）
+//    → 流程同上，XID 通过 RPC 上下文传播
+
+// 4a. 如果全部成功：
+//    → TM 向 TC 发起 GlobalCommit
+//    → TC 异步通知所有 RM 提交
+//    → RM 删除 undo_log，释放全局锁
+
+// 4b. 如果有失败：
+//    → TM 向 TC 发起 GlobalRollback
+//    → TC 通知所有 RM 回滚
+//    → RM 读取 undo_log 中的 before image
+//    → 执行反向 SQL 恢复数据
+//    → 删除 undo_log，释放全局锁</code></pre>
+        </div>
+
+        <!-- 2-2 Spring Cloud 集成 -->
+        <h3 id="s2-2">Spring Cloud 集成</h3>
+
+        <div class="card">
+          <h4>@GlobalTransactional 使用</h4>
+          <pre><code>// 1. 引入依赖
+// spring-cloud-starter-alibaba-seata
+
+// 2. 配置
+seata:
+  enabled: true
+  application-id: order-service
+  tx-service-group: my_tx_group           # 事务分组
+  service:
+    vgroup-mapping:
+      my_tx_group: default                # 映射到 TC 集群
+  registry:
+    type: nacos
+    nacos:
+      server-addr: localhost:8848
+
+// 3. 业务代码
+@Service
+public class OrderService {
+
+    @GlobalTransactional(name = "create-order", timeoutMills = 60000)
+    public void createOrder(OrderDTO dto) {
+        // 1. 创建订单（本地事务）
+        orderMapper.insert(order);
+
+        // 2. 扣减库存（远程调用，分支事务）
+        inventoryService.deduct(dto.getProductId(), dto.getCount());
+
+        // 3. 扣减余额（远程调用，分支事务）
+        accountService.deduct(dto.getUserId(), dto.getTotalAmount());
+
+        // 任何一步失败都会全局回滚
+    }
+}
+
+// 4. 非 AT 模式需配置数据源代理
+@Bean
+public DataSource dataSource(DataSource original) {
+    return new DataSourceProxy(original);
+}</code></pre>
+        </div>
+
+        <!-- 2-3 AT 脏读问题 -->
+        <h3 id="s2-3">AT 脏读问题</h3>
+
+        <div class="card">
+          <h4>AT 模式的脏读问题</h4>
+          <p>AT 模式 Phase 1 提交本地事务（包括业务 SQL + undo_log），但全局事务尚未提交。此时其他事务（非 Seata 管理的本地事务）可以读到"中间状态"数据：</p>
+          <pre><code>// 脏读场景：
+// 1. 全局事务 G1：扣减 A 账户余额 100（Phase 1 提交）
+//    A.balance = 1000 → 900（本地已提交）
+// 2. 此时 G1 还未全局提交/回滚
+// 3. 普通事务 T：读取 A.balance = 900（读到中间状态）
+// 4. G1 最终回滚，A.balance 恢复为 1000
+// → T 基于错误数据做了业务决策（脏读）
+
+// 解决方案：
+// 方案一：SELECT FOR UPDATE（加全局锁）
+//   → 读操作也会尝试获取全局锁，阻塞直到 G1 完成
+// 方案二：使用 @GlobalLock + SELECT FOR UPDATE
+//   → 不开启全局事务，但会检查全局锁是否存在
+@GlobalLock
+@Transactional
+public BigDecimal getBalance(String userId) {
+    // 会检查全局锁，如果存在则等待
+    return accountMapper.selectBalanceForUpdate(userId);
+}
+// 方案三：使用 AT 的读隔离（Seata 1.2+）
+//   → SELECT 语句自动加入全局锁检查</code></pre>
+          <div class="warn">脏读是 AT 模式面试必问问题。核心是理解 AT 模式 Phase 1 已提交本地事务但全局事务未完成这个时间窗口。</div>
+        </div>
+
+        <!-- 2-4 高可用 -->
+        <h3 id="s2-4">高可用</h3>
+
+        <div class="card">
+          <h4>TC 高可用方案</h4>
+          <ul>
+            <li><strong>集群部署：</strong>多个 TC 实例组成集群，通过注册中心（Nacos）注册</li>
+            <li><strong>DB 存储模式：</strong>全局事务和锁信息存储在数据库，所有 TC 共享</li>
+            <li><strong>Session 存储：</strong>file 模式（单机）/ db 模式（集群）/ redis 模式（高性能）</li>
+          </ul>
+          <pre><code># TC 集群配置（application.yml）
+store:
+  mode: db            # 存储模式：file / db / redis
+  db:
+    datasource: druid
+    db-type: mysql
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql:3306/seata
+    user: root
+    password: root
+
+# 注册中心配置
+registry:
+  type: nacos
+  nacos:
+    application: seata-server
+    server-addr: localhost:8848
+    group: SEATA_GROUP</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请介绍 Seata 的三大角色（TM、RM、TC）以及它们之间的交互流程。</div>
+          <div class="a">
+            <strong>参考：</strong>TM（事务管理器）是全局事务的发起者，负责开启、提交和回滚全局事务；RM（资源管理器）管理分支事务资源，每个参与分布式事务的服务都是一个 RM，负责向 TC 注册分支事务和报告执行状态；TC（事务协调者）是独立部署的 Server，维护全局事务和分支事务的状态，协调各 RM 的提交或回滚。交互流程：TM 向 TC 发起全局事务开启请求获取 XID；业务调用链中 XID 通过 RPC 上下文传播；每个 RM 执行本地事务后向 TC 注册分支事务；全部成功后 TM 通知 TC 全局提交，TC 异步通知所有 RM 提交；有失败则全局回滚，TC 通知所有 RM 回滚。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">AT 模式的原理是什么？undo_log 是如何工作的？</div>
+          <div class="a">
+            <strong>参考：</strong>AT 模式通过全局锁 + undo_log + 两阶段提交自动实现分布式事务。Phase 1：Seata 的 DataSourceProxy 拦截 SQL，解析得到 before image（操作前数据快照），执行业务 SQL，获取 after image（操作后快照），将两者序列化为 rollback_info 写入 undo_log 表，与业务 SQL 在同一个本地事务中提交，同时向 TC 注册分支事务申请全局锁。Phase 2 提交：异步删除 undo_log，释放全局锁。Phase 2 回滚：读取 undo_log 中的 before image，生成反向 SQL（如 UPDATE 的反向是用 before image 的值覆盖当前值）执行回滚，然后删除 undo_log 释放全局锁。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TCC 模式的空回滚、幂等和悬挂问题是什么？如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>空回滚：Try 未执行（如超时）就收到了 Cancel，Cancel 需要正确处理这种情况。解决：引入事务状态控制表，Cancel 执行前检查 Try 是否执行过，未执行则标记已 Cancel 直接返回成功。幂等：Confirm/Cancel 可能因为 TC 重试而重复执行。解决：用全局事务 ID + 分支事务 ID 作为幂等键，记录执行状态，重复执行直接返回成功。悬挂：Cancel 先于 Try 到达并执行后，Try 才到达执行。解决：Try 执行前检查事务状态表，如果已 Cancel 则拒绝执行。核心思路：都需要一张事务状态控制表来记录和判断事务执行状态。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">AT 模式的脏读问题是什么？如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>AT 模式 Phase 1 已提交本地事务（业务 SQL + undo_log），但全局事务尚未完成。此时非 Seata 管理的本地事务可以读到"中间状态"数据，如果全局事务最终回滚，则读到的数据是错误的。解决方案：1）使用 @GlobalLock + SELECT FOR UPDATE — @GlobalLock 不开启全局事务但会检查全局锁，如果有其他全局事务持有该行的锁则阻塞等待；2）SELECT FOR UPDATE — AT 模式下 SELECT FOR UPDATE 会自动申请全局锁；3）使用 AT 模式的读隔离特性（Seata 1.2+），SELECT 语句自动加入全局锁检查。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Seata 的四种事务模式如何选型？</div>
+          <div class="a">
+            <strong>参考：</strong>选型考虑因素：1）AT 模式 — 无侵入、自动补偿，适合大多数微服务场景，但有全局锁性能开销和脏读问题；2）TCC 模式 — 需要手动实现 Try/Confirm/Cancel，侵入性高但性能好，适合高并发、资金类场景（如支付、转账）；3）Saga 模式 — 长事务、无隔离性保证，适合跨多系统的长流程和遗留系统改造；4）XA 模式 — 数据库原生支持，强一致性但性能最差，适合对一致性要求极高的场景。一般建议：先用 AT 快速实现，遇到性能瓶颈再优化为 TCC。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Seata 的全局锁是什么？它解决了什么问题？</div>
+          <div class="a">
+            <strong>参考：</strong>全局锁是 AT 模式保证分布式事务隔离性的机制。Phase 1 提交后，分支事务向 TC 申请全局锁，TC 在内存中记录行锁信息（XID + branchId + resourceId + 行键）。当其他事务（包括非 Seata 管理的本地事务）要修改同一行时，需要先向 TC 检查是否存在全局锁，如果存在则阻塞等待（默认重试 30 次，间隔 10ms）。全局锁解决的问题是防止其他事务在全局事务未完成时修改同一行数据，避免回滚时数据冲突。全局锁在 Phase 2 提交或回滚后释放。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Seata TC 如何实现高可用？</div>
+          <div class="a">
+            <strong>参考：</strong>TC 高可用方案：1）集群部署 — 多个 TC 实例注册到 Nacos，TM/RM 通过注册中心发现 TC 集群；2）DB 存储模式 — 全局事务信息和全局锁信息存储在共享数据库（MySQL），所有 TC 实例共享同一数据库，任何一个 TC 故障不影响整体可用性；3）Session 存储 — 支持 file（单机）/ db（集群）/ redis（高性能）三种模式；4）负载均衡 — TM/RM 通过注册中心的负载均衡机制连接 TC 集群中的某个实例。生产环境建议至少 2 个 TC 实例 + DB 存储模式。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Seata · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>编译原理 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🔨 编译原理</h1>
+    <p class="subtitle">词法分析 · AST · JIT · 类加载 · 字节码</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">编译流程</a></li>
+          <li class="sub"><a href="#s1-2">词法分析</a></li>
+          <li class="sub"><a href="#s1-3">语法分析与 AST</a></li>
+          <li class="sub"><a href="#s1-4">Java 字节码</a></li>
+          <li class="sub"><a href="#s1-5">字节码指令</a></li>
+          <li class="sub"><a href="#s1-6">JIT 编译</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">AOT vs JIT</a></li>
+          <li class="sub"><a href="#s2-2">类加载机制</a></li>
+          <li class="sub"><a href="#s2-3">双亲委派模型</a></li>
+          <li class="sub"><a href="#s2-4">字节码增强</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 编译流程</h3>
+        <div class="card">
+          <h4>编译器前端 → 中端 → 后端</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">源代码</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">词法分析（Lexical）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">语法分析（Syntax）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">语义分析（Semantic）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">中间代码（IR）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">目标代码</div>
+          </div>
+          <table>
+            <thead><tr><th>阶段</th><th>输入</th><th>输出</th><th>核心任务</th></tr></thead>
+            <tbody>
+              <tr><td><strong>词法分析</strong></td><td>字符流</td><td>Token 流</td><td>识别关键字、标识符、运算符、字面量</td></tr>
+              <tr><td><strong>语法分析</strong></td><td>Token 流</td><td>AST（抽象语法树）</td><td>根据语法规则构建语法树</td></tr>
+              <tr><td><strong>语义分析</strong></td><td>AST</td><td>标注后的 AST</td><td>类型检查、作用域检查、类型推导</td></tr>
+              <tr><td><strong>中间代码</strong></td><td>AST</td><td>IR（三地址码等）</td><td>平台无关的中间表示，便于优化</td></tr>
+              <tr><td><strong>代码优化</strong></td><td>IR</td><td>优化后的 IR</td><td>死代码消除、常量折叠、循环优化</td></tr>
+              <tr><td><strong>目标代码</strong></td><td>IR</td><td>机器码/字节码</td><td>寄存器分配、指令选择、指令调度</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Java 编译器（javac）是前端，将 .java 编译为 .class（字节码）。JVM 的 JIT 编译器是后端，将字节码编译为本地机器码。</div>
+        </div>
+
+        <h3 id="s1-2">1.2 词法分析</h3>
+        <div class="card">
+          <h4>Token 与词法规则</h4>
+          <ul>
+            <li><strong>Token</strong>：词法单元，由 类型 + 值 组成（如 <code>&lt;KEYWORD, "if"&gt;</code>、<code>&lt;ID, "count"&gt;</code>、<code>&lt;NUM, 42&gt;</code>）</li>
+            <li><strong>正则表达式</strong>：描述词法规则（如标识符：<code>[a-zA-Z_][a-zA-Z0-9_]*</code>）</li>
+            <li><strong>NFA（非确定有限自动机）</strong>：正则表达式 → NFA（Thompson 构造法）</li>
+            <li><strong>DFA（确定有限自动机）</strong>：NFA → DFA（子集构造法）→ 最小化 DFA</li>
+            <li><strong>词法分析器</strong>：基于 DFA 逐字符扫描，识别 Token</li>
+          </ul>
+          <div class="flow" style="margin-top:0.8rem">
+            <div class="flow-box flow-blue">正则表达式</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">NFA</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">DFA</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">最小化 DFA</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">词法分析器</div>
+          </div>
+        </div>
+
+        <h3 id="s1-3">1.3 语法分析与 AST</h3>
+        <div class="card">
+          <h4>语法分析方法</h4>
+          <table>
+            <thead><tr><th>方法</th><th>类型</th><th>特点</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td><strong>递归下降</strong></td><td>自顶向下</td><td>每个非终结符对应一个函数，直观易写</td><td>手写编译器常用</td></tr>
+              <tr><td><strong>LL(k)</strong></td><td>自顶向下</td><td>向前看 k 个 Token，左递归需消除</td><td>ANTLR</td></tr>
+              <tr><td><strong>LR(k)</strong></td><td>自底向上</td><td>更强大，能处理左递归</td><td>Yacc/Bison</td></tr>
+              <tr><td><strong>SLR/LALR</strong></td><td>自底向上</td><td>LR 的简化版本，状态数更少</td><td>大多数编程语言</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>AST（抽象语法树）</strong>：语法分析的输出，树形结构表示程序的语法结构。每个节点表示一个语法结构（如 IfStatement、BinaryExpression、MethodCall）。AST 是后续语义分析、代码生成的基础。</div>
+        </div>
+
+        <h3 id="s1-4">1.4 Java 字节码</h3>
+        <div class="card">
+          <h4>.class 文件结构</h4>
+          <table>
+            <thead><tr><th>组成部分</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>魔数</strong></td><td><code>0xCAFEBABE</code>，标识 class 文件</td></tr>
+              <tr><td><strong>版本号</strong></td><td>次版本号 + 主版本号（如 52 = Java 8）</td></tr>
+              <tr><td><strong>常量池</strong></td><td>字面量 + 符号引用（类名、方法名、字段名、描述符）</td></tr>
+              <tr><td><strong>访问标志</strong></td><td>public、abstract、interface、enum 等</td></tr>
+              <tr><td><strong>类索引/父类索引/接口索引</strong></td><td>this_class、super_class、interfaces</td></tr>
+              <tr><td><strong>字段表</strong></td><td>字段的名称、描述符、属性（如 static final）</td></tr>
+              <tr><td><strong>方法表</strong></td><td>方法的名称、描述符、属性（Code 属性包含字节码）</td></tr>
+              <tr><td><strong>属性表</strong></td><td>附加信息（SourceFile、LineNumberTable、LocalVariableTable）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-5">1.5 字节码指令</h3>
+        <div class="card">
+          <h4>常见字节码指令分类</h4>
+          <table>
+            <thead><tr><th>类别</th><th>指令</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>加载/存储</strong></td><td>iload / lload / aload / istore / lstore / astore</td><td>局部变量表与操作数栈之间的数据传输</td></tr>
+              <tr><td><strong>运算</strong></td><td>iadd / isub / imul / idiv / irem</td><td>整数算术运算</td></tr>
+              <tr><td><strong>比较</strong></td><td>if_icmpeq / if_icmpne / lcmp</td><td>比较并跳转</td></tr>
+              <tr><td><strong>栈操作</strong></td><td>dup / pop / swap</td><td>操作数栈操作</td></tr>
+              <tr><td><strong>方法调用</strong></td><td>invokevirtual / invokeinterface / invokespecial / invokestatic / invokedynamic</td><td>不同类型的方法调用</td></tr>
+              <tr><td><strong>对象创建</strong></td><td>new / newarray / anewarray / getfield / putfield</td><td>对象和数组操作</td></tr>
+              <tr><td><strong>控制流</strong></td><td>goto / return / areturn / ireturn</td><td>跳转和返回</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>方法调用指令区别</strong>：<br>
+          <code>invokevirtual</code>：普通实例方法（虚方法分派）<br>
+          <code>invokeinterface</code>：接口方法<br>
+          <code>invokespecial</code>：构造方法、private 方法、super 方法（静态绑定）<br>
+          <code>invokestatic</code>：静态方法（静态绑定）<br>
+          <code>invokedynamic</code>：动态方法（Lambda、方法引用的实现基础）</div>
+        </div>
+
+        <h3 id="s1-6">1.6 JIT 编译</h3>
+        <div class="card">
+          <h4>C1 / C2 编译器</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">C1（Client Compiler）</h4>
+              <ul>
+                <li>快速编译，较少优化</li>
+                <li>适合客户端应用（启动快）</li>
+                <li>简单的方法内联、空值检查消除</li>
+                <li>编译阈值较低（1500 次调用）</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">C2（Server Compiler）</h4>
+              <ul>
+                <li>深度优化，编译较慢</li>
+                <li>适合服务端应用（运行性能高）</li>
+                <li>逃逸分析、标量替换、循环展开</li>
+                <li>编译阈值较高（10000 次调用）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip">JDK 8 的分层编译（Tiered Compilation）：Level 0 解释执行 → Level 1 C1 编译（无 profiling）→ Level 2 C1 编译（有限 profiling）→ Level 3 C1 编译（完整 profiling）→ Level 4 C2 编译。先用 C1 快速编译收集性能数据，再用 C2 深度优化。</div>
+        </div>
+
+        <div class="card">
+          <h4>JIT 优化技术</h4>
+          <table>
+            <thead><tr><th>优化</th><th>原理</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><strong>方法内联</strong></td><td>将被调用方法的代码直接嵌入调用处</td><td>消除方法调用开销，为其他优化创造条件</td></tr>
+              <tr><td><strong>逃逸分析</strong></td><td>分析对象是否逃出方法/线程</td><td>不逃逸的对象可以栈上分配或标量替换</td></tr>
+              <tr><td><strong>标量替换</strong></td><td>将对象拆分为基本类型变量</td><td>避免对象创建，减少 GC 压力</td></tr>
+              <tr><td><strong>栈上分配</strong></td><td>不逃逸的对象在栈上分配</td><td>方法结束自动释放，无需 GC</td></tr>
+              <tr><td><strong>循环展开</strong></td><td>减少循环次数，增加每次迭代的工作量</td><td>减少循环控制开销</td></tr>
+              <tr><td><strong>死代码消除</strong></td><td>删除永远不会执行的代码</td><td>减少代码体积</td></tr>
+              <tr><td><strong>常量折叠</strong></td><td>编译期计算常量表达式</td><td>减少运行时计算</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 AOT vs JIT</h3>
+        <div class="card">
+          <h4>AOT 与 JIT 对比</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">AOT（Ahead-of-Time）</h4>
+              <ul>
+                <li>编译发生在运行前</li>
+                <li>直接生成本地机器码</li>
+                <li>启动快（无需预热）</li>
+                <li>无运行时优化</li>
+                <li>代表：GraalVM Native Image、Go 编译器</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">JIT（Just-in-Time）</h4>
+              <ul>
+                <li>编译发生在运行时</li>
+                <li>根据运行时信息优化</li>
+                <li>需要预热（热点代码才编译）</li>
+                <li>可做深度优化（逃逸分析等）</li>
+                <li>代表：HotSpot JVM、V8</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip">GraalVM 的 SubstrateVM 实现了 AOT 编译 Java 为本地可执行文件，启动时间从秒级降到毫秒级，但峰值性能可能不如 JIT（缺乏运行时 profiling 数据）。</div>
+        </div>
+
+        <h3 id="s2-2">2.2 类加载机制</h3>
+        <div class="card">
+          <h4>类加载过程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">加载（Loading）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">验证（Verification）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">准备（Preparation）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">解析（Resolution）</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">初始化（Initialization）</div>
+          </div>
+          <table>
+            <thead><tr><th>阶段</th><th>核心任务</th></tr></thead>
+            <tbody>
+              <tr><td><strong>加载</strong></td><td>通过全限定名获取字节流 → 转为方法区的运行时数据结构 → 生成 Class 对象</td></tr>
+              <tr><td><strong>验证</strong></td><td>文件格式验证（魔数、版本）→ 元数据验证 → 字节码验证 → 符号引用验证</td></tr>
+              <tr><td><strong>准备</strong></td><td>为<strong>类变量</strong>（static）分配内存并设置<strong>零值</strong>（不是初始值，final 除外）</td></tr>
+              <tr><td><strong>解析</strong></td><td>将常量池中的<strong>符号引用</strong>替换为<strong>直接引用</strong>（内存地址）</td></tr>
+              <tr><td><strong>初始化</strong></td><td>执行类构造器 <code>&lt;clinit&gt;</code>（static 变量赋值 + static 代码块）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>触发初始化的时机</h4>
+          <ul>
+            <li><strong>new 实例</strong>：new 对象时</li>
+            <li><strong>读写 static 字段</strong>（final 常量除外）</li>
+            <li><strong>调用静态方法</strong></li>
+            <li><strong>反射调用</strong>：<code>Class.forName()</code></li>
+            <li><strong>子类初始化</strong>：会先触发父类初始化</li>
+            <li><strong>主类</strong>：包含 main() 的类</li>
+          </ul>
+          <div class="tip">不会触发初始化的情况：① 子类引用父类的静态字段（只初始化父类）；② 数组定义 <code>new MyClass[10]</code>；③ 引用 final 常量（编译期已放入常量池）。</div>
+        </div>
+
+        <h3 id="s2-3">2.3 双亲委派模型</h3>
+        <div class="card">
+          <h4>类加载器层次</h4>
+          <div class="diagram">
+            <div class="diagram-title">双亲委派模型</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                  <strong>Bootstrap ClassLoader（启动类加载器）</strong>
+                  <div class="arch-label">C++ 实现，加载 JAVA_HOME/lib（rt.jar 等核心类库）</div>
+                </div>
+              </div>
+              <div class="arch-connector">⬆️ 委派</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(129,140,248,0.06);">
+                  <strong>Extension ClassLoader（扩展类加载器）</strong>
+                  <div class="arch-label">Java 实现，加载 JAVA_HOME/lib/ext（扩展类库）</div>
+                </div>
+              </div>
+              <div class="arch-connector">⬆️ 委派</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                  <strong>Application ClassLoader（应用类加载器）</strong>
+                  <div class="arch-label">Java 实现，加载 classpath（应用代码和第三方 jar）</div>
+                </div>
+              </div>
+              <div class="arch-connector">⬆️ 委派</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06);">
+                  <strong>Custom ClassLoader（自定义类加载器）</strong>
+                  <div class="arch-label">用户自定义，继承 ClassLoader，重写 findClass()</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>双亲委派</strong>：收到加载请求时，先委派给父加载器，父加载器无法完成时才自己加载</li>
+            <li><strong>优点</strong>：① 避免类的重复加载；② 保护核心类库不被篡改（如自定义 java.lang.String 不会被加载）</li>
+            <li><strong>核心方法</strong>：<code>loadClass()</code>（委派逻辑）、<code>findClass()</code>（子类重写，实现加载逻辑）、<code>defineClass()</code>（字节转 Class 对象）</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>打破双亲委派</h4>
+          <table>
+            <thead><tr><th>场景</th><th>方式</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td><strong>SPI（Service Provider Interface）</strong></td><td>线程上下文类加载器（Thread Context ClassLoader）</td><td>JDBC Driver 由 Bootstrap 加载的 DriverManager 需要加载 classpath 上的实现类</td></tr>
+              <tr><td><strong>Tomcat</strong></td><td>每个 Web 应用有独立的 WebAppClassLoader</td><td>不同应用可以使用不同版本的同名类</td></tr>
+              <tr><td><strong>OSGi</strong></td><td>网状类加载器结构</td><td>模块化热部署，模块间依赖管理</td></tr>
+              <tr><td><strong>热部署</strong></td><td>每次创建新的类加载器加载修改后的类</td><td>不重启 JVM 更新代码</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-4">2.4 字节码增强</h3>
+        <div class="card">
+          <h4>字节码操作框架</h4>
+          <table>
+            <thead><tr><th>框架</th><th>层次</th><th>特点</th><th>典型应用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>ASM</strong></td><td>底层（字节码指令级）</td><td>性能最好，API 复杂</td><td>CGLIB、Spring、Gradle</td></tr>
+              <tr><td><strong>Javassist</strong></td><td>中层（源码字符串）</td><td>使用简单，可写 Java 代码片段</td><td>Hibernate、Dubbo</td></tr>
+              <tr><td><strong>Byte Buddy</strong></td><td>中层（流式 API）</td><td>API 友好，功能强大</td><td>Mockito、SkyWalking、Spring</td></tr>
+              <tr><td><strong>CGLIB</strong></td><td>中层（基于 ASM）</td><td>专注于生成子类（代理）</td><td>Spring AOP、Hibernate</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>应用场景</strong>：AOP 代理、ORM 字段映射、Mock 框架、APM 链路追踪（字节码注入）、热部署。</div>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Java 从源码到执行经历了哪些过程？</div>
+          <div class="a">
+            <strong>参考</strong>：① <strong>编译期</strong>：javac 编译器将 .java 文件编译为 .class 字节码文件（词法分析→语法分析→语义分析→字节码生成）；② <strong>类加载</strong>：JVM 通过类加载器将 .class 文件加载到方法区（加载→验证→准备→解析→初始化）；③ <strong>执行</strong>：解释器逐条解释执行字节码，热点代码由 JIT 编译器编译为本地机器码。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是双亲委派模型？为什么要使用它？如何打破？</div>
+          <div class="a">
+            <strong>参考</strong>：双亲委派是类加载器的工作模式：收到加载请求先委派给父加载器，父加载器无法完成才自己加载。目的：① 避免重复加载；② 保护核心类安全。
+            <br><strong>打破方式</strong>：① SPI 用线程上下文类加载器（Bootstrap 加载的类要反向委托给应用类加载器）；② Tomcat 每个 Web 应用用独立的 WebAppClassLoader；③ 热部署场景每次新建类加载器。
+            <br><strong>追问</strong>：重写 loadClass() 可以打破双亲委派（改变委派逻辑），重写 findClass() 则不会打破（只是自定义加载逻辑）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">JIT 编译器有哪些优化？方法内联的条件是什么？</div>
+          <div class="a">
+            <strong>参考</strong>：JIT 优化包括方法内联、逃逸分析、标量替换、栈上分配、循环展开、死代码消除、常量折叠等。
+            <br><strong>方法内联条件</strong>：① 方法体足够小（&lt; 35 字节码，可通过 <code>-XX:MaxInlineSize</code> 调整）；② 被调用次数足够多（热点方法，阈值通过 <code>-XX:FreqInlineSize</code> 调整）；③ 非虚方法（invokestatic/invokespecial 直接内联，虚方法需要类型分析或通过 Inline Cache 内联）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">类的初始化时机是什么？哪些情况不会触发初始化？</div>
+          <div class="a">
+            <strong>参考</strong>：触发初始化：new 实例、读写非 final 的 static 字段、调用静态方法、反射（Class.forName）、子类初始化时先触发父类。
+            <br><strong>不触发</strong>：① 子类引用父类的 static 字段（只触发父类）；② 数组定义 <code>new MyClass[10]</code>（不会初始化 MyClass）；③ 引用编译期常量（final static，已内联到常量池）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">invokevirtual、invokeinterface、invokespecial、invokestatic 有什么区别？</div>
+          <div class="a">
+            <strong>参考</strong>：<code>invokevirtual</code> 调用实例方法（虚方法表分派，支持多态）；<code>invokeinterface</code> 调用接口方法（接口方法表分派）；<code>invokespecial</code> 调用构造方法、private 方法、super 方法（编译期确定，静态绑定）；<code>invokestatic</code> 调用静态方法（编译期确定）；<code>invokedynamic</code> 动态绑定（Lambda 和方法引用的基础，运行时由引导方法决定目标方法）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是逃逸分析？它能带来哪些优化？</div>
+          <div class="a">
+            <strong>参考</strong>：逃逸分析是 JIT 编译器分析对象是否逃出方法或线程的作用域。三种逃逸状态：① 不逃逸（方法内使用）；② 方法逃逸（作为参数或返回值传出）；③ 线程逃逸（被其他线程访问）。
+            <br><strong>优化</strong>：① <strong>栈上分配</strong>：不逃逸的对象在栈上分配，方法结束自动释放，减少 GC；② <strong>标量替换</strong>：将对象拆分为基本类型变量；③ <strong>锁消除</strong>：线程不逃逸的同步锁可以消除。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ASM 和 Javassist 有什么区别？什么时候用哪个？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>ASM</strong> 是底层字节码操作框架，直接操作字节码指令，性能最好但 API 复杂，适合需要精细控制字节码的场景（如 Spring、CGLIB 底层）。<strong>Javassist</strong> 允许用 Java 源码字符串修改类，使用简单但性能稍差，适合快速开发（如 Hibernate、Dubbo）。
+            <br><strong>选择</strong>：追求性能和精细控制用 ASM；追求开发效率用 Javassist 或 Byte Buddy。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">AOT 和 JIT 各自的优缺点？GraalVM 解决了什么问题？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>AOT</strong>：启动快、内存占用小，但无法做运行时优化（缺少 profiling 数据），峰值性能可能不如 JIT。<strong>JIT</strong>：需要预热，但可以根据运行时信息做深度优化（逃逸分析、内联等），长期运行性能更好。
+            <br><strong>GraalVM</strong>：通过 Native Image 实现 AOT 编译 Java 为本地可执行文件，将启动时间从秒级降到毫秒级，非常适合 Serverless 和容器化场景。但它限制了反射、动态代理等功能的使用，需要额外配置。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          编译原理 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

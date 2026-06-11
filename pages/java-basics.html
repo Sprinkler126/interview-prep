@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java 基础 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>☕ Java 基础</h1>
+    <p class="subtitle">集合框架 · IO/NIO · 泛型 · 反射 · Lambda · 异常处理</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">集合框架总览</a></li>
+          <li class="sub"><a href="#s1-2">List 实现对比</a></li>
+          <li class="sub"><a href="#s1-3">Map 体系</a></li>
+          <li class="sub"><a href="#s1-4">Set 体系</a></li>
+          <li class="sub"><a href="#s1-5">IO 与 NIO</a></li>
+          <li class="sub"><a href="#s1-6">泛型</a></li>
+          <li class="sub"><a href="#s1-7">反射机制</a></li>
+          <li class="sub"><a href="#s1-8">Lambda 与函数式编程</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">集合选型指南</a></li>
+          <li class="sub"><a href="#s2-2">NIO 文件处理</a></li>
+          <li class="sub"><a href="#s2-3">反射实战</a></li>
+          <li class="sub"><a href="#s2-4">Java 8~21 新特性</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 集合框架总览 -->
+        <h3 id="s1-1">集合框架总览</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Java 集合框架体系</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">Iterable</div>
+            </div>
+            <div class="arch-connector">↓ implements ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Collection<br><small>单列集合</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">Map<br><small>双列集合</small></div>
+            </div>
+            <div class="arch-connector">↓ 继承 ↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓ 实现 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">List<br><small>有序可重复</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Set<br><small>无序不可重复</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Queue<br><small>队列</small></div>
+              <div class="arch-box" style="margin-left:1.5rem">HashMap</div>
+              <div class="arch-box" style="margin-left:0.5rem">TreeMap</div>
+            </div>
+            <div class="arch-connector">↓ 常见实现 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">ArrayList<br><small>数组</small></div>
+              <div class="arch-box" style="margin-left:0.3rem">LinkedList<br><small>双向链表</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">HashSet<br><small>HashMap</small></div>
+              <div class="arch-box" style="margin-left:0.3rem">TreeSet<br><small>红黑树</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">PriorityQueue<br><small>堆</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Collection 与 Map 核心区别</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Collection</th><th>Map</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>存储方式</td><td>单列元素</td><td>Key-Value 键值对</td></tr>
+              <tr><td>是否继承 Iterable</td><td>是，可使用 for-each</td><td>否，需通过 entrySet/keySet/values 遍历</td></tr>
+              <tr><td>核心方法</td><td>add / remove / contains / iterator</td><td>put / get / remove / containsKey</td></tr>
+              <tr><td>Null 值</td><td>允许（List）或不允许（TreeSet）</td><td>允许一个 null Key（HashMap），TreeMap 不允许 null Key</td></tr>
+              <tr><td>典型实现</td><td>ArrayList, HashSet, LinkedList</td><td>HashMap, TreeMap, LinkedHashMap</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>fail-fast 与 fail-safe 机制</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>fail-fast（快速失败）</h4>
+              <p><span class="badge badge-red">非线程安全</span></p>
+              <ul>
+                <li>ArrayList / HashMap / HashSet 等</li>
+                <li>迭代时检测到结构性修改（modCount 变化）立即抛出 <code>ConcurrentModificationException</code></li>
+                <li>内部维护 <code>modCount</code> 计数器</li>
+                <li>适用于单线程场景</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>fail-safe（安全失败）</h4>
+              <p><span class="badge badge-green">线程安全</span></p>
+              <ul>
+                <li>CopyOnWriteArrayList / ConcurrentHashMap 等</li>
+                <li>迭代时基于原集合的快照，不会抛出异常</li>
+                <li>CopyOnWrite：写时复制整个数组</li>
+                <li>ConcurrentHashMap：弱一致性迭代器</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-2 List 实现对比 -->
+        <h3 id="s1-2">List 实现对比</h3>
+
+        <div class="card">
+          <h4>ArrayList vs LinkedList 全面对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>ArrayList</th><th>LinkedList</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>底层结构</td><td>Object[] 数组</td><td>双向链表（Node）</td></tr>
+              <tr><td>随机访问（get/set）</td><td><span class="badge badge-green">O(1)</span> 实现 RandomAccess</td><td><span class="badge badge-red">O(n)</span> 需遍历</td></tr>
+              <tr><td>头部插入（addFirst）</td><td><span class="badge badge-red">O(n)</span> 数组拷贝</td><td><span class="badge badge-green">O(1)</span></td></tr>
+              <tr><td>尾部插入（add）</td><td><span class="badge badge-green">O(1) 均摊</span> 扩容时 O(n)</td><td><span class="badge badge-green">O(1)</span></td></tr>
+              <tr><td>中间插入（add(index)）</td><td><span class="badge badge-red">O(n)</span> 移动元素</td><td><span class="badge badge-orange">O(n)</span> 遍历 + 插入</td></tr>
+              <tr><td>删除（remove）</td><td><span class="badge badge-red">O(n)</span> 移动元素</td><td><span class="badge badge-green">O(1)</span> 已知节点时</td></tr>
+              <tr><td>内存占用</td><td>较少（数组紧凑存储）</td><td>较多（每个节点额外 prev + next 指针）</td></tr>
+              <tr><td>缓存友好性</td><td><span class="badge badge-green">好</span> 连续内存</td><td><span class="badge badge-red">差</span> 内存不连续</td></tr>
+              <tr><td>适用场景</td><td>频繁随机访问、尾部增删</td><td>频繁头部/中间插入删除、队列/双端队列</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>ArrayList 扩容机制</h4>
+          <pre><code>// 默认初始容量
+private static final int DEFAULT_CAPACITY = 10;
+
+// 扩容核心逻辑
+private void grow(int minCapacity) {
+    int oldCapacity = elementData.length;
+    int newCapacity = oldCapacity + (oldCapacity >> 1); // 1.5 倍
+    if (newCapacity - minCapacity < 0)
+        newCapacity = minCapacity;
+    elementData = Arrays.copyOf(elementData, newCapacity);
+}
+
+// 关键要点：
+// 1. 默认初始容量 10（懒初始化，首次 add 时创建）
+// 2. 每次扩容为原来的 1.5 倍（oldCapacity + oldCapacity/2）
+// 3. 扩容通过 Arrays.copyOf() 实现数组拷贝（System.arraycopy）
+// 4. 指定初始容量可减少扩容次数，提升性能</code></pre>
+          <div class="tip">面试加分点：大容量 ArrayList 预设初始容量可避免多次扩容和数组拷贝。如确定存放 1000 个元素，直接 <code>new ArrayList&lt;&gt;(1000)</code>。</div>
+        </div>
+
+        <div class="card">
+          <h4>LinkedList 底层结构</h4>
+          <pre><code>// LinkedList 同时实现了 List 和 Deque 接口
+public class LinkedList&lt;E&gt; extends AbstractSequentialList&lt;E&gt;
+    implements List&lt;E&gt;, Deque&lt;E&gt;, Cloneable, java.io.Serializable {
+
+    transient int size = 0;
+    transient Node&lt;E&gt; first; // 头节点
+    transient Node&lt;E&gt; last;  // 尾节点
+
+    // 内部节点类：双向链表
+    private static class Node&lt;E&gt; {
+        E item;
+        Node&lt;E&gt; next;
+        Node&lt;E&gt; prev;
+        Node(Node&lt;E&gt; prev, E element, Node&lt;E&gt; next) {
+            this.item = element;
+            this.next = next;
+            this.prev = prev;
+        }
+    }
+}
+
+// 关键要点：
+// 1. 双向链表，持有 first 和 last 引用
+// 2. 实现 Deque 接口，可作为双端队列使用
+// 3. add(index, element) 会先判断 index 位置再决定从头或尾遍历
+// 4. 不支持高效随机访问，get(index) 需遍历到 index 位置</code></pre>
+        </div>
+
+        <!-- 1-3 Map 体系 -->
+        <h3 id="s1-3">Map 体系</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Map 体系实现对比</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">HashMap<br><small>数组+链表+红黑树</small><br><small>O(1) 查找</small></div>
+              <div class="arch-box" style="margin-left:1rem">LinkedHashMap<br><small>HashMap+双向链表</small><br><small>保持插入顺序</small></div>
+              <div class="arch-box" style="margin-left:1rem">TreeMap<br><small>红黑树</small><br><small>有序 O(log n)</small></div>
+              <div class="arch-box" style="margin-left:1rem">ConcurrentHashMap<br><small>线程安全</small><br><small>CAS+synchronized</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>HashMap 底层原理（JDK 1.8）</h4>
+          <div class="diagram">
+            <div class="diagram-title">HashMap 数据结构：数组 + 链表 + 红黑树</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">Key.hashCode()<br><small>计算哈希值</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">hash 扰动<br><small>(h ^ h>>>16) &amp; (n-1)</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">定位数组下标<br><small>index = hash % n</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">放入对应桶位<br><small>链表 or 红黑树</small></div>
+            </div>
+          </div>
+          <pre><code>// 核心参数
+static final int DEFAULT_INITIAL_CAPACITY = 1 &lt;&lt; 4; // 16
+static final float DEFAULT_LOAD_FACTOR = 0.75f;
+static final int TREEIFY_THRESHOLD = 8;   // 链表转红黑树阈值
+static final int UNTREEIFY_THRESHOLD = 6; // 红黑树退化为链表阈值
+static final int MIN_TREEIFY_CAPACITY = 64; // 树化最小数组容量
+
+// hash 计算：高 16 位异或低 16 位（扰动函数）
+static final int hash(Object key) {
+    int h;
+    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+}
+
+// put 流程：
+// 1. 计算 key 的 hash 值
+// 2. 如果 table 为空或长度为 0，执行 resize() 初始化
+// 3. 根据 (n-1) & hash 定位桶位置
+// 4. 桶为空：直接放入新 Node
+// 5. 桶不为空：
+//    a. 首节点 key 相同（equals）：覆盖 value
+//    b. 首节点是 TreeNode：调用 putTreeVal 红黑树插入
+//    c. 链表遍历：尾插法插入，链表长度>=8 且数组>=64 则树化
+// 6. 超过 threshold（capacity * loadFactor）则 resize 扩容</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>HashMap 扩容机制</h4>
+          <pre><code>// resize 核心逻辑
+final Node&lt;K,V&gt;[] resize() {
+    Node&lt;K,V&gt;[] oldTab = table;
+    int oldCap = (oldTab == null) ? 0 : oldTab.length;
+    int oldThr = threshold;
+    int newCap, newThr = 0;
+
+    if (oldCap > 0) {
+        newCap = oldCap &lt;&lt; 1; // 容量翻倍
+        newThr = threshold &lt;&lt; 1; // 阈值翻倍
+    }
+    // ... 创建新数组，重新 hash 分配
+    // JDK 1.8 优化：通过 hash & oldCap 判断元素在新数组的位置
+    // 结果为 0：位置不变（原位置）
+    // 结果非 0：位置 = 原位置 + oldCap
+}</code></pre>
+          <div class="tip">JDK 1.8 扩容优化：不需要重新计算 hash，只需判断新增的那一位 bit 是 0 还是 1。0 则位置不变，1 则位置 = 原位置 + 旧容量。这避免了 JDK 1.7 中扩容时的 rehash 开销。</div>
+        </div>
+
+        <div class="card">
+          <h4>HashMap 线程不安全问题</h4>
+          <div class="warn">
+            <p><strong>JDK 1.7 死循环问题：</strong>扩容时采用头插法，并发扩容可能导致链表成环（A→B→A），后续 get 操作死循环。JDK 1.8 改用尾插法解决了此问题。</p>
+            <p><strong>JDK 1.8 数据丢失：</strong>并发 put 时可能出现数据覆盖（两个线程同时写入同一个桶位的空位置），size 不准确（非原子操作）。</p>
+            <p><strong>解决方案：</strong>使用 <code>Collections.synchronizedMap()</code>、<code>ConcurrentHashMap</code> 或 <code>Collections.unmodifiableMap()</code>。</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>ConcurrentHashMap：JDK 1.7 vs 1.8</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>JDK 1.7：分段锁（Segment）</h4>
+              <p><span class="badge badge-blue">Segment + ReentrantLock</span></p>
+              <ul>
+                <li>数据结构：Segment[] + HashEntry[]</li>
+                <li>默认 16 个 Segment（concurrencyLevel）</li>
+                <li>每个 Segment 维护一个 HashEntry 数组</li>
+                <li>锁粒度：Segment 级别（不同 Segment 可并发写）</li>
+                <li>并发度 = Segment 数量（默认 16）</li>
+                <li>不支持 ConcurrentHashMap 扩容时并发</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>JDK 1.8：CAS + synchronized</h4>
+              <p><span class="badge badge-green">Node 数组 + 链表/红黑树</span></p>
+              <ul>
+                <li>数据结构：Node[] + 链表/红黑树（同 HashMap）</li>
+                <li>无 Segment，直接对桶头节点加 synchronized</li>
+                <li>锁粒度：桶级别（Node 级别，更细粒度）</li>
+                <li>空桶使用 CAS 插入（无锁竞争）</li>
+                <li>非空桶使用 synchronized 锁头节点</li>
+                <li>支持并发扩容（多线程协作 transfer）</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code>// JDK 1.8 ConcurrentHashMap.put 核心逻辑
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    // 1. 计算 hash
+    int hash = spread(key.hashCode());
+    for (Node&lt;K,V&gt;[] tab = table;;) {
+        Node&lt;K,V&gt; f; int n, i, fh;
+        if (tab == null || (n = tab.length) == 0)
+            tab = initTable(); // CAS 初始化
+        else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+            // 2. 空桶：CAS 插入（无锁）
+            if (casTabAt(tab, i, null, new Node&lt;K,V&gt;(hash, key, value)))
+                break;
+        } else if ((fh = f.hash) == MOVED)
+            // 3. 正在扩容：协助扩容
+            tab = helpTransfer(tab, f);
+        else {
+            // 4. 非空桶：synchronized 锁头节点
+            synchronized (f) {
+                if (tabAt(tab, i) == f) {
+                    // 链表 or 红黑树插入
+                }
+            }
+        }
+    }
+    addCount(1L, binCount); // 更新 size（CounterCell 数组）
+    return null;
+}</code></pre>
+        </div>
+
+        <!-- 1-4 Set 体系 -->
+        <h3 id="s1-4">Set 体系</h3>
+
+        <div class="card">
+          <h4>Set 实现类对比</h4>
+          <table>
+            <thead>
+              <tr><th>实现类</th><th>底层结构</th><th>有序性</th><th>Null 值</th><th>线程安全</th><th>时间复杂度</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HashSet</td><td>HashMap</td><td>无序</td><td>允许 1 个</td><td>否</td><td>O(1)</td></tr>
+              <tr><td>LinkedHashSet</td><td>LinkedHashMap</td><td>插入有序</td><td>允许 1 个</td><td>否</td><td>O(1)</td></tr>
+              <tr><td>TreeSet</td><td>红黑树（TreeMap）</td><td>自然排序/自定义</td><td>不允许</td><td>否</td><td>O(log n)</td></tr>
+              <tr><td>CopyOnWriteArraySet</td><td>CopyOnWriteArrayList</td><td>插入有序</td><td>允许</td><td>是</td><td>O(n)</td></tr>
+              <tr><td>ConcurrentSkipListSet</td><td>跳表</td><td>有序</td><td>不允许</td><td>是</td><td>O(log n)</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">HashSet 底层就是 HashMap，元素作为 Key 存储，Value 统一使用一个 static final 的 Object 对象（PRESENT）。</div>
+        </div>
+
+        <div class="card">
+          <h4>equals() 与 hashCode() 契约</h4>
+          <pre><code>// 核心契约（Contract）：
+// 1. 如果 a.equals(b) == true，则 a.hashCode() == b.hashCode()
+// 2. 如果 a.hashCode() == b.hashCode()，a.equals(b) 不一定为 true
+// 3. 重写 equals 必须重写 hashCode
+
+// HashMap 中的判断逻辑：
+// 先比较 hashCode 定位桶，再比较 equals 确认是否同一个 Key
+if (e.hash == hash &&
+    (e.key == key || (key != null && key.equals(e.key)))) {
+    // 找到相同的 key
+}
+
+// 典型错误：只重写 equals 不重写 hashCode
+// 导致 equals 相等的两个对象被分配到不同的桶，HashMap 中出现"重复" Key</code></pre>
+        </div>
+
+        <!-- 1-5 IO 与 NIO -->
+        <h3 id="s1-5">IO 与 NIO</h3>
+
+        <div class="card">
+          <h4>IO 模型对比：BIO / NIO / AIO</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>BIO（同步阻塞）</th><th>NIO（同步非阻塞）</th><th>AIO（异步非阻塞）</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>模型</td><td>一请求一线程</td><td>多路复用（Selector）</td><td>异步回调（CompletionHandler）</td></tr>
+              <tr><td>阻塞方式</td><td>read/write 阻塞</td><td>非阻塞，Selector 轮询就绪事件</td><td>非阻塞，OS 完成后回调通知</td></tr>
+              <tr><td>线程模型</td><td>1:1（连接:线程）</td><td>N:1（连接:Selector 线程）</td><td>0:N（无线程等待）</td></tr>
+              <tr><td>适用场景</td><td>连接数少、每个连接数据量大</td><td>连接数多、每个连接数据量少</td><td>连接数多、IO 操作重</td></tr>
+              <tr><td>典型应用</td><td>传统 Tomcat（BIO 模式）</td><td>Netty、Nginx、Redis</td><td>Linux epoll、文件 IO</td></tr>
+              <tr><td>Java API</td><td>java.io.*</td><td>java.nio.*（Channel/Buffer/Selector）</td><td>java.nio.channels.AsynchronousChannel</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="diagram">
+          <div class="diagram-title">NIO 核心组件</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">Selector（多路复用器）<br><small>单线程监控多个 Channel 的 IO 事件</small></div>
+            </div>
+            <div class="arch-connector">↓ 注册 Channel + 关注事件 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Channel<br><small>ServerSocketChannel</small></div>
+              <div class="arch-box" style="margin-left:1rem">Channel<br><small>SocketChannel</small></div>
+              <div class="arch-box" style="margin-left:1rem">Channel<br><small>FileChannel</small></div>
+            </div>
+            <div class="arch-connector">↓ 读写数据 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide">Buffer（缓冲区）<br><small>ByteBuffer / CharBuffer / IntBuffer ...</small><br><small>position / limit / capacity</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>NIO Buffer 核心操作</h4>
+          <pre><code>// Buffer 使用流程：写入 → flip() → 读取 → clear()/compact()
+ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+// 写入数据
+channel.read(buffer);  // 或 buffer.put(data)
+
+// 切换为读模式
+buffer.flip();  // position=0, limit=写入位置
+
+// 读取数据
+while (buffer.hasRemaining()) {
+    byte b = buffer.get();
+}
+
+// 清空缓冲区
+buffer.clear();     // position=0, limit=capacity（完全重置）
+buffer.compact();   // 保留未读数据，移到头部
+
+// 核心属性：
+// position：当前读/写位置
+// limit：读模式下=可读数据量，写模式下=capacity
+// capacity：缓冲区总容量
+// mark：标记位置，可通过 reset() 回到标记处</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>传统 IO 与 NIO 对比</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>传统 IO（Stream）</h4>
+              <ul>
+                <li>面向流（Stream）：单向，输入流/输出流</li>
+                <li>阻塞 IO：read/write 阻塞等待</li>
+                <li>缓冲区由底层实现，不直接操作</li>
+                <li>适合少量连接、大量数据传输</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>NIO（Channel + Buffer）</h4>
+              <ul>
+                <li>面向缓冲区（Buffer）：双向，可读可写</li>
+                <li>非阻塞 IO：Selector 多路复用</li>
+                <li>直接操作 Buffer，控制读写位置</li>
+                <li>适合大量连接、少量数据传输</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-6 泛型 -->
+        <h3 id="s1-6">泛型</h3>
+
+        <div class="card">
+          <h4>泛型类型擦除</h4>
+          <pre><code>// Java 泛型是编译期特性，运行时类型信息被擦除
+// 编译前：
+List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add("hello");
+String s = list.get(0);
+
+// 编译后（类型擦除后）：
+List list = new ArrayList();
+list.add("hello");
+String s = (String) list.get(0); // 编译器自动插入强转
+
+// 类型擦除规则：
+// - T → Object（无界类型参数）
+// - T extends Comparable → Comparable（有界类型参数）
+// - 运行时无法获取泛型实际类型参数</code></pre>
+          <div class="warn">类型擦除导致的限制：1）不能 new T()、new T[]；2）不能 instanceof 泛型类型；3）不能创建泛型数组 new List&lt;String&gt;[10]；4）静态成员不能引用类的类型参数。</div>
+        </div>
+
+        <div class="card">
+          <h4>通配符：? extends T / ? super T</h4>
+          <div class="diagram">
+            <div class="diagram-title">PECS 原则：Producer Extends, Consumer Super</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">? extends T<br><small>上界通配符</small><br><small>Producer（读取）</small></div>
+              <div class="flow-arrow">←</div>
+              <div class="flow-box flow-green">PECS<br><small>Producer Extends</small><br><small>Consumer Super</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">? super T<br><small>下界通配符</small><br><small>Consumer（写入）</small></div>
+            </div>
+          </div>
+          <pre><code>// ? extends T（上界通配符）：只能读，不能写
+// 可以接受 T 或 T 的子类
+public void read(List&lt;? extends Number&gt; list) {
+    Number n = list.get(0);  // OK：读取为 Number
+    // list.add(1);          // 编译错误：无法写入
+}
+
+// ? super T（下界通配符）：可以写，读取受限
+// 可以接受 T 或 T 的父类
+public void write(List&lt;? super Integer&gt; list) {
+    list.add(1);             // OK：写入 Integer
+    Object o = list.get(0); // 只能读为 Object
+}
+
+// 经典用法：Collections.copy
+public static &lt;T&gt; void copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src) {
+    // src 是 Producer（extends），dest 是 Consumer（super）
+}</code></pre>
+        </div>
+
+        <!-- 1-7 反射机制 -->
+        <h3 id="s1-7">反射机制</h3>
+
+        <div class="card">
+          <h4>获取 Class 对象的三种方式</h4>
+          <pre><code>// 方式 1：类名.class（编译时确定）
+Class&lt;String&gt; clazz1 = String.class;
+
+// 方式 2：对象.getClass()（运行时获取）
+String str = "hello";
+Class&lt;?&gt; clazz2 = str.getClass();
+
+// 方式 3：Class.forName()（最灵活，常用于框架）
+Class&lt;?&gt; clazz3 = Class.forName("java.lang.String");
+
+// 三种方式获取的 Class 对象是同一个
+System.out.println(clazz1 == clazz2); // true
+System.out.println(clazz2 == clazz3); // true</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>反射核心 API</h4>
+          <pre><code>Class&lt;?&gt; clazz = Class.forName("com.example.User");
+
+// 获取构造方法
+Constructor&lt;?&gt; constructor = clazz.getDeclaredConstructor(String.class, int.class);
+constructor.setAccessible(true); // 暴力反射，可访问 private 构造器
+Object user = constructor.newInstance("张三", 25);
+
+// 获取字段
+Field nameField = clazz.getDeclaredField("name");
+nameField.setAccessible(true);
+String name = (String) nameField.get(user);    // 读取字段值
+nameField.set(user, "李四");                     // 设置字段值
+
+// 获取方法
+Method method = clazz.getDeclaredMethod("getName");
+method.setAccessible(true);
+String result = (String) method.invoke(user);  // 调用方法
+
+// 获取所有方法/字段
+Method[] methods = clazz.getDeclaredMethods();
+Field[] fields = clazz.getDeclaredFields();</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>反射性能开销与优化</h4>
+          <table>
+            <thead>
+              <tr><th>操作</th><th>耗时（相对值）</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>直接方法调用</td><td>1x</td><td>编译时绑定，JIT 可内联优化</td></tr>
+              <tr><td>缓存 Method 对象 + invoke</td><td>3~5x</td><td>避免重复查找 Method</td></tr>
+              <tr><td>每次 getMethod + invoke</td><td>10~20x</td><td>每次都查找 Method 对象</td></tr>
+              <tr><td>setAccessible(true)</td><td>可减少 ~20%</td><td>跳过安全检查</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">优化策略：1）缓存 Constructor/Method/Field 对象；2）调用 setAccessible(true) 跳过访问检查；3）高频场景考虑使用 MethodHandle（JDK 7+）或字节码生成（ASM/CGLIB）。</div>
+        </div>
+
+        <!-- 1-8 Lambda 与函数式编程 -->
+        <h3 id="s1-8">Lambda 与函数式编程</h3>
+
+        <div class="card">
+          <h4>函数式接口（@FunctionalInterface）</h4>
+          <table>
+            <thead>
+              <tr><th>接口</th><th>方法</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Predicate&lt;T&gt;</td><td>boolean test(T t)</td><td>判断条件</td><td>s -&gt; s.isEmpty()</td></tr>
+              <tr><td>Function&lt;T,R&gt;</td><td>R apply(T t)</td><td>转换映射</td><td>s -&gt; s.length()</td></tr>
+              <tr><td>Consumer&lt;T&gt;</td><td>void accept(T t)</td><td>消费数据</td><td>s -&gt; System.out.println(s)</td></tr>
+              <tr><td>Supplier&lt;T&gt;</td><td>T get()</td><td>生产数据</td><td>() -&gt; new User()</td></tr>
+              <tr><td>UnaryOperator&lt;T&gt;</td><td>T apply(T t)</td><td>一元运算</td><td>s -&gt; s.toUpperCase()</td></tr>
+              <tr><td>BiFunction&lt;T,U,R&gt;</td><td>R apply(T t, U u)</td><td>双参数转换</td><td>(a, b) -&gt; a + b</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 自定义函数式接口
+@FunctionalInterface
+public interface MyFunction&lt;T, R&gt; {
+    R apply(T t);
+    // 可以有多个 default 方法，但只能有一个抽象方法
+    default void print() {
+        System.out.println("default method");
+    }
+}
+
+// Lambda 表达式本质：匿名内部类的简写
+// 编译后通过 invokedynamic 指令动态生成实现类
+MyFunction&lt;String, Integer&gt; func = String::length; // 方法引用
+int len = func.apply("hello"); // 5</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Stream API</h4>
+          <pre><code>List&lt;String&gt; names = Arrays.asList("Alice", "Bob", "Charlie", "David", "Eve");
+
+// Stream 操作分为中间操作（惰性）和终端操作（触发执行）
+List&lt;String&gt; result = names.stream()
+    .filter(name -> name.length() > 3)     // 中间操作：过滤
+    .map(String::toUpperCase)              // 中间操作：转换
+    .sorted()                              // 中间操作：排序
+    .collect(Collectors.toList());         // 终端操作：收集
+
+// 常用中间操作
+// filter(Predicate)    - 过滤
+// map(Function)        - 映射转换
+// flatMap(Function)    - 扁平化映射（一对多）
+// distinct()           - 去重（基于 equals）
+// sorted()             - 排序
+// limit(n) / skip(n)   - 截取/跳过
+// peek(Consumer)       - 查看元素（调试用）
+
+// 常用终端操作
+// collect(Collector)   - 收集为集合
+// forEach(Consumer)    - 遍历
+// reduce(BinaryOperator) - 归约
+// count() / sum()      - 聚合
+// findFirst() / findAny() - 查找
+// anyMatch / allMatch / noneMatch - 匹配
+
+// 并行流
+List&lt;Integer&gt; parallelResult = IntStream.rangeClosed(1, 100000)
+    .parallel()
+    .filter(i -> i % 2 == 0)
+    .boxed()
+    .collect(Collectors.toList());
+
+// Collectors 工厂方法
+Map&lt;String, List&lt;User&gt;&gt; groupByDept = users.stream()
+    .collect(Collectors.groupingBy(User::getDept));
+
+Map&lt;String, Long&gt; countByDept = users.stream()
+    .collect(Collectors.groupingBy(User::getDept, Collectors.counting()));
+
+String joined = names.stream()
+    .collect(Collectors.joining(", ", "[", "]"));
+// 结果："[Alice, Bob, Charlie, David, Eve]"</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>方法引用四种形式</h4>
+          <pre><code>// 1. 静态方法引用：ClassName::staticMethod
+Function&lt;String, Integer&gt; parseInt = Integer::parseInt;
+// 等价于 s -> Integer.parseInt(s)
+
+// 2. 实例方法引用（对象）：instance::method
+String str = "hello";
+Supplier&lt;Integer&gt; len = str::length;
+// 等价于 () -> str.length()
+
+// 3. 实例方法引用（类）：ClassName::method
+Function&lt;String, Integer&gt; toLength = String::length;
+// 等价于 s -> s.length()
+
+// 4. 构造方法引用：ClassName::new
+Supplier&lt;ArrayList&gt; listFactory = ArrayList::new;
+// 等价于 () -> new ArrayList()</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>String 不可变性与对比</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>String 不可变性</h4>
+              <ul>
+                <li>final char[] value（JDK 9+ 改为 byte[]）</li>
+                <li>final class，不可被继承</li>
+                <li>字符串常量池复用</li>
+                <li>线程安全（不可变天然安全）</li>
+                <li>hashCode 缓存（hash 字段）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>String / StringBuilder / StringBuffer</h4>
+              <ul>
+                <li><strong>String：</strong>不可变，每次修改创建新对象</li>
+                <li><strong>StringBuilder：</strong>可变，非线程安全，性能最优</li>
+                <li><strong>StringBuffer：</strong>可变，线程安全（方法加 synchronized）</li>
+                <li>单线程拼接优先 StringBuilder</li>
+                <li>多线程拼接使用 StringBuffer</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>异常体系</h4>
+          <div class="diagram">
+            <div class="diagram-title">Java 异常体系</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box-wide">Throwable</div>
+              </div>
+              <div class="arch-connector">↓ 两个子类 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box">Error<br><small>不可恢复</small><br><small>OutOfMemoryError</small><br><small>StackOverflowError</small></div>
+                <div class="arch-box" style="margin-left:2rem">Exception<br><small>可处理</small></div>
+              </div>
+              <div class="arch-connector">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ 两个分支 ↓</div>
+              <div class="arch-row">
+                <div class="arch-box">Checked Exception<br><small>编译期检查</small><br><small>IOException / SQLException</small><br><small>必须 try-catch 或 throws</small></div>
+                <div class="arch-box" style="margin-left:1rem">Unchecked Exception<br><small>RuntimeException</small><br><small>NullPointerException</small><br><small>ArrayIndexOutOfBounds</small></div>
+              </div>
+            </div>
+          </div>
+          <pre><code>// try-with-resources（JDK 7+）
+// 自动关闭实现了 AutoCloseable / Closeable 的资源
+try (FileInputStream fis = new FileInputStream("file.txt");
+     BufferedReader br = new BufferedReader(new InputStreamReader(fis))) {
+    String line;
+    while ((line = br.readLine()) != null) {
+        System.out.println(line);
+    }
+} catch (IOException e) {
+    e.printStackTrace();
+}
+// 编译后自动在 finally 中调用 close()，且 close 异常被 suppressed
+
+// 自定义异常
+public class BizException extends RuntimeException {
+    private final int code;
+    public BizException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
+}
+
+// try-with-resources 也可以声明多个资源
+// 资源按声明的逆序关闭（后声明的先关闭）</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 集合选型指南 -->
+        <h3 id="s2-1">集合选型指南</h3>
+
+        <div class="card">
+          <h4>集合选型决策树</h4>
+          <div class="diagram">
+            <div class="diagram-title">集合选型流程</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">需要键值对？<br><small>Yes → Map 体系</small><br><small>No → Collection 体系</small></div>
+              <div class="flow-arrow">↓</div>
+              <div class="flow-box flow-purple">Map：需要排序？<br><small>Yes → TreeMap</small><br><small>No → 需要线程安全？</small></div>
+              <div class="flow-arrow">↓</div>
+              <div class="flow-box flow-green">线程安全？<br><small>Yes → ConcurrentHashMap</small><br><small>No → HashMap</small></div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>需求</th><th>推荐方案</th><th>理由</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>快速查找键值对</td><td>HashMap</td><td>O(1) 查找，最常用</td></tr>
+              <tr><td>有序键值对</td><td>TreeMap / LinkedHashMap</td><td>TreeMap 按 Key 排序，LinkedHashMap 按插入顺序</td></tr>
+              <tr><td>线程安全 Map</td><td>ConcurrentHashMap</td><td>分段锁/CAS，高并发首选</td></tr>
+              <tr><td>频繁随机访问 List</td><td>ArrayList</td><td>O(1) 随机访问，缓存友好</td></tr>
+              <tr><td>频繁头部增删</td><td>LinkedList / ArrayDeque</td><td>O(1) 头尾操作</td></tr>
+              <tr><td>去重集合</td><td>HashSet</td><td>基于 HashMap，O(1) 去重</td></tr>
+              <tr><td>排序去重</td><td>TreeSet</td><td>红黑树，自然排序</td></tr>
+              <tr><td>线程安全 List</td><td>CopyOnWriteArrayList</td><td>读多写少场景</td></tr>
+              <tr><td>高并发队列</td><td>ConcurrentLinkedQueue</td><td>CAS 无锁队列</td></tr>
+              <tr><td>阻塞队列</td><td>ArrayBlockingQueue / LinkedBlockingQueue</td><td>生产者-消费者模型</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-2 NIO 文件处理 -->
+        <h3 id="s2-2">NIO 文件处理</h3>
+
+        <div class="card">
+          <h4>Files 工具类常用操作</h4>
+          <pre><code>// JDK 7+ Files 工具类（基于 NIO）
+Path path = Paths.get("/data/test.txt");
+
+// 读写文件
+List&lt;String&gt; lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+byte[] bytes = Files.readAllBytes(path);
+Files.write(path, "content".getBytes(), StandardOpenOption.CREATE);
+
+// 文件操作
+Files.createDirectories(Paths.get("/data/sub1/sub2"));
+Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+Files.deleteIfExists(path);
+
+// 文件属性
+boolean exists = Files.exists(path);
+long size = Files.size(path);
+boolean isDir = Files.isDirectory(path);
+
+// 遍历目录
+try (DirectoryStream&lt;Path&gt; stream = Files.newDirectoryStream(dir, "*.java")) {
+    for (Path entry : stream) {
+        System.out.println(entry.getFileName());
+    }
+}
+
+// 递归遍历（FileVisitor 模式）
+Files.walkFileTree(dir, new SimpleFileVisitor&lt;Path&gt;() {
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+        System.out.println(file);
+        return FileVisitResult.CONTINUE;
+    }
+});</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>FileChannel 零拷贝</h4>
+          <pre><code>// FileChannel.transferTo() - 零拷贝（底层使用 sendfile 系统调用）
+try (FileChannel srcChannel = FileChannel.open(source, StandardOpenOption.READ)) {
+    // 数据直接从文件描述符传输到 Socket 缓冲区，不经过用户空间
+    srcChannel.transferTo(0, srcChannel.size(), destSocketChannel);
+}
+
+// MappedByteBuffer - 内存映射文件
+try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+    MappedByteBuffer mbb = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+    // 直接操作内存映射，适合大文件随机读取
+    byte b = mbb.get(100); // 直接读取偏移 100 的字节
+}
+
+// 零拷贝在 Kafka、Netty 中广泛应用
+// 减少用户态和内核态之间的数据拷贝次数</code></pre>
+        </div>
+
+        <!-- 2-3 反射实战 -->
+        <h3 id="s2-3">反射实战</h3>
+
+        <div class="card">
+          <h4>简易 ORM 框架（注解 + 反射）</h4>
+          <pre><code>// 自定义注解
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface Table {
+    String value(); // 表名
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+public @interface Column {
+    String value(); // 列名
+}
+
+// 实体类
+@Table("t_user")
+public class User {
+    @Column("user_name")
+    private String name;
+    @Column("user_age")
+    private int age;
+}
+
+// 利用反射自动生成 SQL
+public static String generateInsertSql(Class&lt;?&gt; clazz) {
+    Table table = clazz.getAnnotation(Table.class);
+    StringBuilder sql = new StringBuilder("INSERT INTO " + table.value() + " (");
+    StringBuilder values = new StringBuilder("VALUES (");
+
+    Field[] fields = clazz.getDeclaredFields();
+    for (int i = 0; i &lt; fields.length; i++) {
+        Column column = fields[i].getAnnotation(Column.class);
+        if (column != null) {
+            if (i > 0) { sql.append(", "); values.append(", "); }
+            sql.append(column.value());
+            values.append("?");
+        }
+    }
+    sql.append(") ").append(values).append(")");
+    return sql.toString();
+}
+// 生成：INSERT INTO t_user (user_name, user_age) VALUES (?, ?)</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>反射与依赖注入模拟</h4>
+          <pre><code>// 简易 IoC 容器
+public class SimpleContainer {
+    private Map&lt;Class&lt;?&gt;, Object&gt; beans = new HashMap&lt;&gt;();
+
+    public &lt;T&gt; T getBean(Class&lt;T&gt; clazz) throws Exception {
+        // 1. 检查缓存
+        if (beans.containsKey(clazz)) return clazz.cast(beans.get(clazz));
+
+        // 2. 创建实例
+        Constructor&lt;T&gt; constructor = clazz.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        T instance = constructor.newInstance();
+
+        // 3. 依赖注入（字段注入）
+        for (Field field : clazz.getDeclaredFields()) {
+            Inject inject = field.getAnnotation(Inject.class);
+            if (inject != null) {
+                field.setAccessible(true);
+                Object dependency = getBean(field.getType()); // 递归注入
+                field.set(instance, dependency);
+            }
+        }
+
+        // 4. 缓存并返回
+        beans.put(clazz, instance);
+        return instance;
+    }
+}</code></pre>
+        </div>
+
+        <!-- 2-4 Java 8~21 新特性 -->
+        <h3 id="s2-4">Java 8~21 新特性</h3>
+
+        <div class="card">
+          <h4>Java 版本新特性速览</h4>
+          <table>
+            <thead>
+              <tr><th>版本</th><th>核心特性</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Java 8</span></td><td>Lambda / Stream / Optional / 新日期 API</td><td>函数式编程、流式处理</td></tr>
+              <tr><td><span class="badge badge-green">Java 9</span></td><td>模块化（Jigsaw）/ 接口私有方法 / 集合工厂方法</td><td>List.of() / Set.of() / Map.of()</td></tr>
+              <tr><td><span class="badge badge-orange">Java 11</span></td><td>var 局部变量 / String 增强 / HTTP Client</td><td>LTS 版本，HttpClient 正式发布</td></tr>
+              <tr><td><span class="badge badge-purple">Java 17</span></td><td>密封类（sealed）/ 模式匹配 / Text Block</td><td>LTS 版本，record 类正式</td></tr>
+              <tr><td><span class="badge badge-red">Java 21</span></td><td>虚拟线程 / switch 模式匹配 / 序列化集合</td><td>LTS，虚拟线程正式发布</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>核心新特性详解</h4>
+          <pre><code>// --- Optional ---
+Optional&lt;String&gt; opt = Optional.ofNullable(getName());
+String result = opt
+    .filter(name -> !name.isEmpty())
+    .map(String::toUpperCase)
+    .orElse("DEFAULT");
+
+// --- Record（Java 14+ / 正式 Java 16+）---
+public record User(String name, int age) {
+    // 自动生成：构造器、getter (name() / age())、equals、hashCode、toString
+    // 不可变类，所有字段 final
+}
+
+// --- Sealed Classes（Java 17+）---
+public sealed interface Shape permits Circle, Rectangle, Triangle {}
+public record Circle(double radius) implements Shape {}
+public record Rectangle(double w, double h) implements Shape {}
+
+// --- Pattern Matching（Java 17+ / 21+）---
+// switch 模式匹配
+String describe(Object obj) {
+    return switch (obj) {
+        case Integer i when i > 0 -> "正整数: " + i;
+        case Integer i            -> "非正整数: " + i;
+        case String s             -> "字符串: " + s;
+        case null                 -> "null";
+        default                   -> "其他: " + obj;
+    };
+}
+
+// --- Virtual Threads（Java 21+）---
+Thread.startVirtualThread(() -> {
+    System.out.println("Hello from virtual thread!");
+});
+
+// try-with-resources 改进（Java 9+）
+var fis = new FileInputStream("file.txt"); // 外部创建
+try (fis) { // 可以在 try 外部声明
+    // ...
+}
+
+// Text Block（Java 15+）
+String json = """
+    {
+        "name": "张三",
+        "age": 25
+    }
+    """;</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">HashMap 的底层数据结构是什么？JDK 1.8 做了哪些优化？</div>
+          <div class="a">
+            <strong>参考：</strong>JDK 1.8 中 HashMap 底层是数组 + 链表 + 红黑树。数组默认容量 16，负载因子 0.75。通过 key 的 hashCode 经过扰动函数（高 16 位异或低 16 位）计算 hash，再与 (n-1) 与运算定位桶位。哈希冲突时使用链表存储，当链表长度 >= 8 且数组长度 >= 64 时，链表转为红黑树（O(n) → O(log n)）。当红黑树节点 <= 6 时退化为链表。<br>
+            <strong>JDK 1.8 优化：</strong>1）数据结构从数组+链表改为数组+链表+红黑树；2）插入方式从头插法改为尾插法，解决扩容并发死循环问题；3）扩容时通过 hash & oldCap 判断新位置，避免 rehash；4）插入时先插后判断是否扩容（1.7 先判断再插入）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">HashMap 为什么线程不安全？ConcurrentHashMap 如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>HashMap 线程不安全体现在：1）JDK 1.7 并发扩容头插法导致链表成环，get 死循环；2）JDK 1.8 并发 put 可能数据覆盖（两个线程同时写入空桶位）；3）size 非原子操作，并发下不准确。<br>
+            <strong>ConcurrentHashMap 解决方案（JDK 1.8）：</strong>1）空桶使用 CAS 插入（无锁）；2）非空桶使用 synchronized 锁头节点（比 1.7 的 Segment 锁粒度更细）；3）size 使用 CounterCell 数组分散竞争（类似 LongAdder）；4）支持多线程协作扩容（transfer）。<br>
+            <strong>追问：为什么不用 Collections.synchronizedMap？</strong> synchronizedMap 对所有操作加同一把锁（synchronized(mutex)），并发度低。ConcurrentHashMap 锁粒度到桶级别，不同桶可并发读写，吞吐量高很多。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ArrayList 和 LinkedList 怎么选？实际开发中 ArrayList 为什么用得更多？</div>
+          <div class="a">
+            <strong>参考：</strong>ArrayList 底层数组，O(1) 随机访问，尾部 O(1) 增删（均摊），中间增删 O(n)（数组拷贝）。LinkedList 底层双向链表，O(n) 随机访问，头尾 O(1) 增删，但内存不连续导致缓存命中率低。<br>
+            实际开发中 ArrayList 用得更多：1）大多数场景是随机访问或尾部增删，ArrayList 更优；2）CPU 缓存友好，连续内存局部性好；3）内存占用少（无额外指针开销）；4）即使中间插入，O(n) 的数组拷贝利用 System.arraycopy（native 方法），实际性能不一定比 LinkedList 差。LinkedList 只在频繁头部插入删除（如实现 Deque）时才有优势。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Java 泛型的类型擦除会带来什么问题？如何在运行时获取泛型类型？</div>
+          <div class="a">
+            <strong>参考：</strong>类型擦除导致：1）不能 new T()（编译器不知道 T 的具体类型）；2）不能 instanceof 泛型类型；3）不能创建泛型数组；4）泛型类型的静态变量共享（所有实例共用同一份）。<br>
+            运行时获取泛型的方式：1）通过反射获取父类的 ParameterizedType：<code>((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0]</code>（如 Guava 的 TypeToken）；2）通过匿名子类保留泛型信息；3）Spring 的 ResolvableType 工具类。<br>
+            <strong>追问：为什么 Java 选择类型擦除而非真泛型？</strong> 为了向后兼容 JDK 1.5 之前的代码，擦除后泛型代码和非泛型代码可互操作。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">BIO、NIO、AIO 的区别？什么场景用 NIO？</div>
+          <div class="a">
+            <strong>参考：</strong>BIO 是同步阻塞，一个连接一个线程，read/write 阻塞等待。NIO 是同步非阻塞，通过 Selector 多路复用，一个线程管理多个 Channel，Channel 非阻塞读写 Buffer。AIO 是异步非阻塞，OS 完成 IO 后回调通知应用。<br>
+            NIO 适用场景：大量连接（万级）、每个连接数据量少（如聊天、推送）。典型应用是 Netty 框架（基于 NIO），以及 Nginx、Redis 的 IO 多路复用模型。BIO 适合连接数少、每个连接数据量大的场景（如文件传输）。<br>
+            <strong>追问：Netty 为什么用 NIO 而不用 AIO？</strong> Linux 下 AIO 基于 epoll 模拟实现，性能提升不明显且编程模型复杂。NIO + 多线程 Reactor 模型已经足够高效。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Lambda 表达式的本质是什么？函数式接口有什么要求？</div>
+          <div class="a">
+            <strong>参考：</strong>Lambda 表达式本质是函数式接口的匿名实现类的简写。编译后通过 invokedynamic 字节码指令在运行时动态生成实现类（首次调用时通过 LambdaMetafactory 生成，后续调用复用）。相比匿名内部类，Lambda 不会生成额外的 .class 文件。<br>
+            函数式接口要求：1）有且只有一个抽象方法（SAM：Single Abstract Method）；2）可以有多个 default 方法和 static 方法；3）可以用 @FunctionalInterface 注解标记（编译期检查）。<br>
+            <strong>追问：Lambda 中访问外部局部变量有什么限制？</strong> 局部变量必须是 effectively final（事实上的 final），即初始化后不再修改。这是因为 Lambda 捕获的是变量的副本（值传递），如果变量可变会导致语义混乱。成员变量无此限制（因为通过 this 引用访问）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">try-with-resources 的原理是什么？多个资源关闭顺序是怎样的？</div>
+          <div class="a">
+            <strong>参考：</strong>try-with-resources 是 JDK 7 引入的语法糖，自动关闭实现了 AutoCloseable 接口的资源。编译器会在 finally 块中自动生成 close() 调用。如果 try 块和 close() 都抛出异常，close 的异常会被 suppressed（可通过 getSuppressed() 获取）。<br>
+            多个资源按声明的逆序关闭。即先声明的后关闭，后声明的先关闭。例如 try (A a = ...; B b = ...) 先关闭 B 再关闭 A，因为 B 可能依赖 A。<br>
+            <strong>追问：close() 抛异常怎么办？</strong> close 异常会被添加到 suppressed exceptions 数组中，不会覆盖主异常。可以通过 e.getSuppressed() 获取被压制的异常列表。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Stream 的中间操作和终端操作有什么区别？parallelStream 有什么注意事项？</div>
+          <div class="a">
+            <strong>参考：</strong>中间操作（filter/map/sorted 等）是惰性的，返回新的 Stream，不触发实际计算。终端操作（collect/forEach/reduce 等）触发整个流水线执行，执行后 Stream 不可复用。<br>
+            parallelStream 注意事项：1）底层使用 ForkJoinPool.commonPool()，共享线程池可能影响其他并行任务；2）不适合 IO 密集型操作（线程会阻塞）；3）数据量小时并行开销大于收益（线程调度、拆分合并开销）；4）forEach 顺序不确定，如需有序用 forEachOrdered；5）有状态操作（如 sorted/distinct）在并行流中需要额外同步开销。<br>
+            <strong>追问：什么时候不该用 parallelStream？</strong> 数据量小（< 10000）、操作涉及 IO/锁/共享可变状态、需要保证顺序时。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">反射的性能开销来自哪里？Spring 大量使用反射为什么性能还行？</div>
+          <div class="a">
+            <strong>参考：</strong>反射性能开销来自：1）方法查找（getMethod/getDeclaredMethod 遍历方法数组）；2）安全检查（每次 invoke 检查访问权限）；3）参数装箱（基本类型自动包装为对象）；4）JIT 无法内联优化（方法调用目标不确定）。<br>
+            Spring 优化策略：1）启动时缓存所有反射元数据（AnnotatedElementMetadata、BeanDefinition），运行时直接查缓存；2）大量使用 CGLIB 字节码生成（FastClass），避免反射调用；3）AOP 使用动态代理（JDK Proxy 或 CGLIB），将反射调用转为直接调用；4）Spring 6 / Spring Boot 3 引入 AOT 编译，运行时代替编译期生成代码。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Java 基础 · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

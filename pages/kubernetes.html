@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kubernetes - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>☸️ Kubernetes</h1>
+    <p class="subtitle">Pod · Service · Ingress · HPA · 调度 · 存储</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">Pod 生命周期</a></li>
+          <li class="sub"><a href="#s1-3">控制器</a></li>
+          <li class="sub"><a href="#s1-4">Service 类型</a></li>
+          <li class="sub"><a href="#s1-5">Ingress</a></li>
+          <li class="sub"><a href="#s1-6">HPA 自动扩缩容</a></li>
+          <li class="sub"><a href="#s1-7">存储</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">ConfigMap 和 Secret</a></li>
+          <li class="sub"><a href="#s2-2">RBAC 权限控制</a></li>
+          <li class="sub"><a href="#s2-3">网络模型</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Kubernetes 架构总览</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>Master 节点（控制平面）</strong>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 内部组件 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">API Server<br><small>集群入口 · RESTful API</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">etcd<br><small>分布式 KV 存储</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Scheduler<br><small>Pod 调度</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Controller Manager<br><small>控制器管理</small></div>
+            </div>
+            <div class="arch-connector">↓ 通过 API Server 通信 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                <strong>Node 节点（工作节点）</strong>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 组件 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">kubelet<br><small>节点代理 · 管理 Pod</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">kube-proxy<br><small>网络代理 · Service 实现</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Container Runtime<br><small>containerd / CRI-O</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心组件详解</h4>
+          <table>
+            <thead>
+              <tr><th>组件</th><th>位置</th><th>职责</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>API Server</strong></td><td>Master</td><td>集群的统一入口，所有组件通过它通信。提供 RESTful API，支持认证、授权、准入控制</td></tr>
+              <tr><td><strong>etcd</strong></td><td>Master</td><td>分布式 KV 存储，保存集群所有状态数据（Pod、Service、Config 等）。基于 Raft 一致性协议</td></tr>
+              <tr><td><strong>Scheduler</strong></td><td>Master</td><td>监听未调度的 Pod，根据资源需求、亲和性、污点等策略选择最优 Node</td></tr>
+              <tr><td><strong>Controller Manager</strong></td><td>Master</td><td>运行各种控制器（Deployment、ReplicaSet、Node 等），确保实际状态趋向期望状态</td></tr>
+              <tr><td><strong>kubelet</strong></td><td>Node</td><td>节点上的代理，负责 Pod 的生命周期管理（创建、销毁、健康检查）</td></tr>
+              <tr><td><strong>kube-proxy</strong></td><td>Node</td><td>实现 Service 的网络代理，维护 iptables/IPVS 规则，实现负载均衡</td></tr>
+              <tr><td><strong>Container Runtime</strong></td><td>Node</td><td>容器运行时（containerd、CRI-O），负责拉取镜像、运行容器</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-2 Pod 生命周期 -->
+        <h3 id="s1-2">Pod 生命周期</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Pod 生命周期阶段</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Pending<br><small>调度中 / 拉取镜像</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Running<br><small>至少一个容器运行中</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Succeeded / Failed<br><small>所有容器退出</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Init Container（初始化容器）</h4>
+          <ul>
+            <li>在主容器<strong>之前</strong>启动并运行到完成，用于初始化工作</li>
+            <li>多个 Init Container <strong>按顺序串行</strong>执行，每个必须成功后才启动下一个</li>
+            <li>不支持 Readiness Probe，因为它们必须在主容器之前完成</li>
+            <li>典型用途：等待依赖服务就绪、数据库迁移、配置初始化</li>
+          </ul>
+          <pre><code>apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  initContainers:
+    - name: wait-for-db
+      image: busybox:1.36
+      command: ['sh', '-c', 'until nslookup mysql-service; do echo waiting; sleep 2; done']
+    - name: init-schema
+      image: myapp-migrator:1.0
+      command: ['migrate', '--up']
+  containers:
+    - name: myapp
+      image: myapp:1.0</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>三种探针（Probe）</h4>
+          <table>
+            <thead>
+              <tr><th>探针</th><th>作用</th><th>失败后果</th><th>典型配置</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-green">Liveness Probe</span></td>
+                <td>检测容器是否存活</td>
+                <td><strong>重启容器</strong>（Restart Policy）</td>
+                <td>HTTP GET /healthz，每 10s</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">Readiness Probe</span></td>
+                <td>检测容器是否就绪接收流量</td>
+                <td>从 Service Endpoints <strong>移除</strong></td>
+                <td>HTTP GET /ready，每 5s</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">Startup Probe</span></td>
+                <td>检测容器是否启动完成</td>
+                <td>启动期间暂停 Liveness/Readiness</td>
+                <td>HTTP GET /startup，每 10s，失败 30 次</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code># 探针支持的检测方式
+livenessProbe:
+  httpGet:           # HTTP GET 请求
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10   # 初始延迟
+  periodSeconds: 10         # 检测间隔
+  failureThreshold: 3       # 连续失败次数
+
+readinessProbe:
+  tcpSocket:         # TCP 端口检测
+    port: 3306
+
+startupProbe:
+  exec:              # 执行命令
+    command: ["cat", "/tmp/ready"]
+  failureThreshold: 30
+  periodSeconds: 10</code></pre>
+          <div class="tip">Startup Probe 用于启动慢的应用（如 Java 应用）。在 Startup Probe 成功之前，Liveness 和 Readiness Probe 不会执行，避免应用还在启动就被误杀。</div>
+        </div>
+
+        <!-- 1-3 控制器 -->
+        <h3 id="s1-3">控制器</h3>
+
+        <div class="card">
+          <h4>控制器类型对比</h4>
+          <table>
+            <thead>
+              <tr><th>控制器</th><th>用途</th><th>Pod 关系</th><th>典型场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">Deployment</span></td>
+                <td>无状态应用部署</td>
+                <td>通过 ReplicaSet 管理 Pod，Pod 可互换</td>
+                <td>Web 服务、API 网关</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">StatefulSet</span></td>
+                <td>有状态应用部署</td>
+                <td>Pod 有稳定网络标识和持久存储，有序部署</td>
+                <td>MySQL、Redis、Zookeeper</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">DaemonSet</span></td>
+                <td>每个节点运行一个 Pod</td>
+                <td>自动在每个 Node 上部署一个 Pod 副本</td>
+                <td>日志采集、监控 Agent、网络插件</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">Job</span></td>
+                <td>一次性任务</td>
+                <td>Pod 运行完成后不再重启</td>
+                <td>数据迁移、批处理</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-pink">CronJob</span></td>
+                <td>定时任务</td>
+                <td>按 Cron 表达式周期性创建 Job</td>
+                <td>定时备份、报表生成</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Deployment 滚动更新</h4>
+          <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # 更新时最多多出 1 个 Pod
+      maxUnavailable: 0   # 更新时不允许不可用
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80</code></pre>
+          <ul>
+            <li><strong>maxSurge：</strong>更新过程中可以超出期望副本数的最大值（绝对数或百分比）</li>
+            <li><strong>maxUnavailable：</strong>更新过程中允许不可用的最大 Pod 数</li>
+            <li>滚动更新通过 ReplicaSet 实现：创建新 RS → 逐步扩容新 RS → 逐步缩容旧 RS</li>
+            <li>支持回滚：<code>kubectl rollout undo deployment/nginx-deployment</code></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>StatefulSet 特点</h4>
+          <ul>
+            <li><strong>稳定网络标识：</strong>Pod 名称格式为 <code>{StatefulSet名称}-{序号}</code>（如 mysql-0, mysql-1, mysql-2）</li>
+            <li><strong>稳定存储：</strong>每个 Pod 绑定固定的 PVC，Pod 重建后仍使用同一存储</li>
+            <li><strong>有序部署：</strong>按序号顺序创建（0→1→2），逆序删除（2→1→0）</li>
+            <li><strong>有序更新：</strong>按序号逆序更新（先更新最后一个 Pod）</li>
+            <li>需要配合 <strong>Headless Service</strong>（<code>clusterIP: None</code>）实现 DNS 解析</li>
+          </ul>
+        </div>
+
+        <!-- 1-4 Service 类型 -->
+        <h3 id="s1-4">Service 类型</h3>
+
+        <div class="card">
+          <h4>四种 Service 类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>访问方式</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">ClusterIP</span>（默认）</td>
+                <td>分配集群内部虚拟 IP</td>
+                <td>仅集群内部访问</td>
+                <td>服务间内部通信</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">NodePort</span></td>
+                <td>在 ClusterIP 基础上，在每个节点开放端口（30000-32767）</td>
+                <td>NodeIP:NodePort</td>
+                <td>开发测试、简单外部访问</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">LoadBalancer</span></td>
+                <td>使用云厂商负载均衡器</td>
+                <td>云 LB 的外部 IP</td>
+                <td>生产环境外部访问（云环境）</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">ExternalName</span></td>
+                <td>将 Service 映射到外部域名（CNAME）</td>
+                <td>通过 DNS 解析到外部</td>
+                <td>访问集群外部服务</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code>apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  type: ClusterIP          # ClusterIP / NodePort / LoadBalancer
+  selector:
+    app: myapp
+  ports:
+    - protocol: TCP
+      port: 80              # Service 端口
+      targetPort: 8080      # Pod 端口</code></pre>
+        </div>
+
+        <!-- 1-5 Ingress -->
+        <h3 id="s1-5">Ingress 与 Ingress Controller</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Ingress 流量路径</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">外部请求<br><small>HTTP/HTTPS</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Ingress Controller<br><small>Nginx / Traefik</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Ingress 规则<br><small>域名 + Path 路由</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Service<br><small>ClusterIP</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Pod</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Ingress 资源定义</h4>
+          <pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - example.com
+      secretName: tls-secret    # HTTPS 证书
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+          - path: /web
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80</code></pre>
+          <ul>
+            <li><strong>Ingress 资源：</strong>定义路由规则（域名、路径 → Service 的映射）</li>
+            <li><strong>Ingress Controller：</strong>实际执行规则的组件（Nginx Ingress、Traefik、Istio Gateway）</li>
+            <li>Ingress 是 Service 的"前端"，提供 L7（HTTP/HTTPS）路由、TLS 终止、域名分流</li>
+          </ul>
+        </div>
+
+        <!-- 1-6 HPA -->
+        <h3 id="s1-6">HPA 自动扩缩容</h3>
+
+        <div class="card">
+          <h4>HPA 工作原理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Metrics Server<br><small>采集 Pod 指标</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">HPA Controller<br><small>计算期望副本数</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">调整 ReplicaSet<br><small>扩容 / 缩容</small></div>
+          </div>
+          <pre><code># 期望副本数 = ceil(当前副本数 * (当前指标值 / 期望指标值))
+# 例：3 * (80% / 50%) = 3 * 1.6 = 5</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>HPA 配置示例</h4>
+          <pre><code>apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: myapp-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: myapp
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60    # CPU 使用率目标 60%
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70    # 内存使用率目标 70%
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300   # 缩容稳定窗口 5 分钟
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60             # 每分钟最多缩容 10%</code></pre>
+          <ul>
+            <li><strong>CPU/Memory：</strong>基于资源使用率的自动扩缩容</li>
+            <li><strong>Custom Metrics：</strong>基于自定义指标（如 QPS、队列长度）</li>
+            <li><strong>External Metrics：</strong>基于外部系统指标（如 Kafka 消费延迟）</li>
+            <li><code>behavior</code> 字段控制扩缩容的速度和稳定性</li>
+          </ul>
+        </div>
+
+        <!-- 1-7 存储 -->
+        <h3 id="s1-7">存储（PV / PVC / StorageClass）</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Kubernetes 存储模型</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">管理员创建<br><small>PV（PersistentVolume）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">用户申请<br><small>PVC（PersistentVolumeClaim）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">自动绑定<br><small>PV ↔ PVC</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Pod 挂载<br><small>volumeMounts</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>PV 和 PVC</h4>
+          <pre><code># PV - 管理员定义存储资源
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce        # 单节点读写
+  storageClassName: standard
+  hostPath:
+    path: /data/pv
+
+---
+# PVC - 用户申请存储
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>StorageClass 动态供应</h4>
+          <ul>
+            <li>手动创建 PV 太繁琐，StorageClass 支持<strong>动态供应</strong></li>
+            <li>用户创建 PVC 时指定 StorageClass，系统自动创建 PV</li>
+            <li>不同 StorageClass 对应不同的存储后端（AWS EBS、Ceph、NFS 等）</li>
+            <li>可设置 <code>default</code> StorageClass，未指定时自动使用</li>
+          </ul>
+          <pre><code>apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iopsPerGB: "10"
+reclaimPolicy: Retain       # Delete / Retain
+volumeBindingMode: WaitForFirstConsumer</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 ConfigMap 和 Secret -->
+        <h3 id="s2-1">ConfigMap 和 Secret</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>ConfigMap</h4>
+            <ul>
+              <li>存储<strong>非敏感</strong>配置数据</li>
+              <li>数据以<strong>明文</strong>存储</li>
+              <li>可挂载为文件或环境变量</li>
+              <li>支持热更新（挂载方式）</li>
+              <li>大小限制 1MB</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>Secret</h4>
+            <ul>
+              <li>存储<strong>敏感</strong>数据（密码、Token）</li>
+              <li>数据以 <strong>Base64 编码</strong>存储（非加密）</li>
+              <li>可挂载为文件或环境变量</li>
+              <li>支持加密存储（需配置 EncryptionConfiguration）</li>
+              <li>大小限制 1MB</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>使用方式</h4>
+          <pre><code># 创建 ConfigMap
+kubectl create configmap my-config --from-literal=key1=value1
+
+# 创建 Secret
+kubectl create secret generic my-secret --from-literal=password=abc123
+
+# Pod 中使用（环境变量方式）
+env:
+  - name: CONFIG_KEY
+    valueFrom:
+      configMapKeyRef:
+        name: my-config
+        key: key1
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: my-secret
+        key: password
+
+# Pod 中使用（挂载文件方式）
+volumes:
+  - name: config-vol
+    configMap:
+      name: my-config
+volumeMounts:
+  - name: config-vol
+    mountPath: /etc/config</code></pre>
+          <div class="warn">Secret 默认只做 Base64 编码，不是加密！必须配合 EncryptionConfiguration 或外部密钥管理（Vault）才能保证安全性。Base64 编码可以轻松解码。</div>
+        </div>
+
+        <!-- 2-2 RBAC -->
+        <h3 id="s2-2">RBAC 权限控制</h3>
+
+        <div class="card">
+          <h4>RBAC 四个核心资源</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Role / ClusterRole<br><small>定义权限（能做什么）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">RoleBinding / ClusterRoleBinding<br><small>绑定角色给谁</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Subject<br><small>User / Group / ServiceAccount</small></div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>资源</th><th>范围</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Role</td><td>Namespace 级别</td><td>定义某个命名空间内的权限</td></tr>
+              <tr><td>ClusterRole</td><td>集群级别</td><td>定义整个集群的权限</td></tr>
+              <tr><td>RoleBinding</td><td>Namespace 级别</td><td>将 Role/ClusterRole 绑定到某个命名空间的用户</td></tr>
+              <tr><td>ClusterRoleBinding</td><td>集群级别</td><td>将 ClusterRole 绑定到集群级别的用户</td></tr>
+            </tbody>
+          </table>
+          <pre><code># Role：允许管理 default 命名空间的 Pod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-manager
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+---
+# RoleBinding：绑定给用户
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-manager-binding
+  namespace: default
+subjects:
+  - kind: User
+    name: developer
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-manager
+  apiGroup: rbac.authorization.k8s.io</code></pre>
+        </div>
+
+        <!-- 2-3 网络模型 -->
+        <h3 id="s2-3">网络模型</h3>
+
+        <div class="card">
+          <h4>Kubernetes 网络三大原则</h4>
+          <ul>
+            <li>每个 Pod 拥有独立 IP 地址</li>
+            <li>所有 Pod 可以不经过 NAT 直接互相通信</li>
+            <li>节点上的代理（如 kube-proxy）可以与该节点上所有 Pod 通信</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>CNI（容器网络接口）</h4>
+          <table>
+            <thead>
+              <tr><th>CNI 插件</th><th>特点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Calico</strong></td><td>BGP 路由、NetworkPolicy 支持好</td><td>生产首选，大规模集群</td></tr>
+              <tr><td><strong>Flannel</strong></td><td>简单、Overlay 网络（VXLAN）</td><td>小规模集群、快速上手</td></tr>
+              <tr><td><strong>Cilium</strong></td><td>eBPF 技术、高性能、安全策略</td><td>高性能需求、可观测性</td></tr>
+              <tr><td><strong>Weave</strong></td><td>多播、加密</td><td>简单部署、小集群</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Service 实现：iptables vs IPVS</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>iptables 模式（默认）</h4>
+              <ul>
+                <li>kube-proxy 维护 iptables 规则</li>
+                <li>Service 数量多时规则线性增长</li>
+                <li>性能一般，适合中小规模集群</li>
+                <li>随机负载均衡（等概率选择后端）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>IPVS 模式</h4>
+              <ul>
+                <li>使用 Linux 内核 IPVS 模块</li>
+                <li>哈希表查找，性能优于 iptables</li>
+                <li>支持多种负载均衡算法（rr / lc / sh）</li>
+                <li>适合大规模集群（数千 Service）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Kubernetes 的架构是怎样的？Master 和 Node 各有哪些组件？</div>
+          <div class="a">
+            <strong>参考：</strong>Master 节点包含：API Server（集群入口，提供 RESTful API）、etcd（分布式 KV 存储，保存集群状态）、Scheduler（为 Pod 选择最优 Node）、Controller Manager（运行各种控制器确保实际状态趋向期望状态）。Node 节点包含：kubelet（节点代理，管理 Pod 生命周期）、kube-proxy（网络代理，实现 Service 负载均衡）、Container Runtime（容器运行时，如 containerd）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Pod 的三种探针分别是什么？各有什么作用？</div>
+          <div class="a">
+            <strong>参考：</strong>Liveness Probe 检测容器是否存活，失败则重启容器。Readiness Probe 检测容器是否就绪接收流量，失败则从 Service Endpoints 中移除。Startup Probe 检测容器是否启动完成，用于启动慢的应用（如 Java），在它成功之前 Liveness 和 Readiness 不会生效。三种探针都支持 HTTP GET、TCP Socket、Exec 命令三种检测方式。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Deployment 和 StatefulSet 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Deployment 用于无状态应用，Pod 无固定标识和存储，可随意替换和扩展。StatefulSet 用于有状态应用，Pod 有稳定的网络标识（mysql-0、mysql-1）和持久存储（每个 Pod 绑定固定 PVC），支持有序部署和删除。StatefulSet 需要配合 Headless Service 实现 DNS 解析。数据库、Zookeeper 等需要有状态身份的应用用 StatefulSet。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Service 的四种类型分别是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>ClusterIP（默认）分配集群内部虚拟 IP，仅集群内可访问。NodePort 在每个节点开放 30000-32767 端口，外部可通过 NodeIP:NodePort 访问。LoadBalancer 使用云厂商负载均衡器，适合云环境生产。ExternalName 将 Service 映射到外部域名（CNAME），用于访问集群外部服务。Ingress 在 Service 之上提供 L7 路由、TLS 终止和域名分流。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 HPA？它是如何工作的？</div>
+          <div class="a">
+            <strong>参考：</strong>HPA（Horizontal Pod Autoscaler）根据指标自动调整 Pod 副本数。工作流程：Metrics Server 采集 Pod 的资源指标，HPA Controller 定期（默认 15 秒）检查指标，计算期望副本数（当前副本数 x 当前指标/目标指标），调整 ReplicaSet 的副本数。支持 CPU、Memory 和自定义指标。通过 behavior 字段可控制扩缩容的速度和稳定性窗口。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Kubernetes 的 PV、PVC 和 StorageClass 分别是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>PV（PersistentVolume）是管理员定义的存储资源，描述存储的容量、访问模式、后端类型。PVC（PersistentVolumeClaim）是用户对存储的申请，声明需要多大容量和什么访问模式。Kubernetes 自动将匹配的 PV 绑定到 PVC。StorageClass 实现动态供应：定义存储的"类别"（如 SSD、HDD），用户创建 PVC 时指定 StorageClass，系统自动创建 PV，无需管理员手动干预。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>RBAC 是如何工作的？Role 和 ClusterRole 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>RBAC（基于角色的访问控制）通过 Role/ClusterRole 定义权限（对哪些资源可以执行哪些操作），通过 RoleBinding/ClusterRoleBinding 将角色绑定到用户/组/ServiceAccount。Role 和 RoleBinding 是 Namespace 级别的，只在特定命名空间内生效。ClusterRole 和 ClusterRoleBinding 是集群级别的，对整个集群生效。典型场景：为 CI/CD 的 ServiceAccount 绑定特定命名空间的部署权限。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Kubernetes 的 Service 是如何实现的？iptables 和 IPVS 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>kube-proxy 监听 API Server 的 Service 和 Endpoints 变化，在节点上维护网络规则。iptables 模式：为每个 Service 创建 iptables 规则，随机选择后端 Pod，Service 多时规则线性增长影响性能。IPVS 模式：使用 Linux 内核 IPVS 模块，哈希表查找性能更好，支持多种负载均衡算法（轮询、最少连接、源地址哈希），适合大规模集群。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Kubernetes · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

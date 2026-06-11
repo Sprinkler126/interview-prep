@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elasticsearch - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🔍 Elasticsearch</h1>
+    <p class="subtitle">倒排索引 · 分词 · 查询 DSL · 聚合 · 集群架构</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">倒排索引原理</a></li>
+          <li class="sub"><a href="#s1-2">分词器</a></li>
+          <li class="sub"><a href="#s1-3">文档写入流程</a></li>
+          <li class="sub"><a href="#s1-4">相关性评分 BM25</a></li>
+          <li class="sub"><a href="#s1-5">近实时搜索原理</a></li>
+          <li class="sub"><a href="#s1-6">段合并策略</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">查询 DSL</a></li>
+          <li class="sub"><a href="#s2-2">聚合分析</a></li>
+          <li class="sub"><a href="#s2-3">集群架构</a></li>
+          <li class="sub"><a href="#s2-4">ELK Stack</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 倒排索引原理</h3>
+        <div class="diagram">
+          <div class="diagram-title">正排索引 vs 倒排索引</div>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">正排索引 (Forward Index)</h4>
+              <p>文档 → 包含的词</p>
+              <pre><code>Doc1 → ["Java", "Spring", "Redis"]
+Doc2 → ["Java", "MySQL", "Redis"]
+Doc3 → ["Python", "Redis"]</code></pre>
+              <p>搜索 "Redis" 需遍历所有文档</p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">倒排索引 (Inverted Index)</h4>
+              <p>词 → 包含该词的文档列表</p>
+              <pre><code>"Java"   → [Doc1, Doc2]
+"Redis"  → [Doc1, Doc2, Doc3]
+"MySQL"  → [Doc2]
+"Python" → [Doc3]</code></pre>
+              <p>搜索 "Redis" 直接定位 [Doc1, Doc2, Doc3]</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>倒排索引三层结构</h4>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Term Dictionary（词典）</strong>
+                <div class="arch-label">所有去重后的词项，按字典序排列，支持二分查找</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 每个 Term 指向</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Posting List（倒排列表）</strong>
+                <div class="arch-label">DocID + Term Frequency + Position + Offset</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 加速查找</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>FST (Finite State Transducer)</strong>
+                <div class="arch-label">前缀树压缩结构，Term Dictionary 的内存索引，前缀共享，极省内存</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Posting List 压缩技术</h4>
+          <ul>
+            <li><strong>Frame of Reference (FOR)</strong>：差值编码 + 位压缩，如 [73, 300, 302, 332] → [73, 227, 2, 30] 再位压缩</li>
+            <li><strong>Roaring Bitmap</strong>：大数值范围使用分块 bitmap，小范围使用有序数组，ES 5.0+ 使用</li>
+            <li><strong>跳表加速</strong>：Posting List 之上构建跳表，加速合并（AND/OR）操作</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-2">1.2 分词器 (Analyzer)</h3>
+        <div class="diagram">
+          <div class="diagram-title">分词器组成</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Character Filter<br><span style="font-size:0.7rem">字符过滤（去HTML、转义）</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Tokenizer<br><span style="font-size:0.7rem">分词器（核心）</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Token Filter<br><span style="font-size:0.7rem">词项过滤（小写、去停用词、同义词）</span></div>
+          </div>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">常用分词器对比</div>
+          <table>
+            <thead><tr><th>分词器</th><th>特点</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Standard</span></td><td>按 Unicode 文本分割，去标点，转小写</td><td>英文默认，中文逐字切分（效果差）</td></tr>
+              <tr><td><span class="badge badge-green">IK Smart</span></td><td>粗粒度分词，"中华人民共和国" 一个词</td><td>搜索时使用</td></tr>
+              <tr><td><span class="badge badge-orange">IK Max Word</span></td><td>细粒度分词，穷尽所有可能组合</td><td>索引时使用（召回率高）</td></tr>
+              <tr><td><span class="badge badge-purple">jieba</span></td><td>HMM 模型，支持新词发现</td><td>中文分词</td></tr>
+              <tr><td><span class="badge badge-red">自定义</span></td><td>基于 Standard + 自定义词典 + 同义词</td><td>业务专业术语</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>索引时 vs 搜索时分词</h4>
+          <ul>
+            <li><strong>索引时</strong>：使用细粒度分词（IK Max Word），增加召回率</li>
+            <li><strong>搜索时</strong>：使用粗粒度分词（IK Smart），提高精确度</li>
+            <li><strong>索引和搜索分词器必须一致</strong>，否则无法匹配</li>
+          </ul>
+          <pre><code>// 创建索引时指定分词器
+PUT /my_index
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "my_analyzer": {
+          "type": "custom",
+          "tokenizer": "ik_max_word",
+          "filter": ["lowercase", "synonym"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "analyzer": "my_analyzer",
+        "search_analyzer": "ik_smart"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <h3 id="s1-3">1.3 文档写入流程</h3>
+        <div class="diagram">
+          <div class="diagram-title">文档写入全链路</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端写入请求</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">协调节点路由<br><span style="font-size:0.7rem">hash(doc_id) → shard</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Primary Shard<br><span style="font-size:0.7rem">写入处理</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Primary Shard 写入流程</h4>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>① 写入内存 Buffer</strong>
+                <div class="arch-label">文档进入 In-Memory Buffer</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>② 写入 Translog</strong>
+                <div class="arch-label">预写日志，防止宕机丢数据</div>
+              </div>
+            </div>
+            <div class="arch-connector">每 1 秒 Refresh ⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>③ Refresh → 生成 Segment</strong>
+                <div class="arch-label">Buffer → 内存中的 Segment（此时可搜索，近实时 NRT）</div>
+              </div>
+            </div>
+            <div class="arch-connector">Translog 达到阈值（512MB / 30min）⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>④ Flush → Segment 持久化到磁盘</strong>
+                <div class="arch-label">fsync Segment 到磁盘 + 清空 Translog</div>
+              </div>
+            </div>
+            <div class="arch-connector">同步副本 ⬇️</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>⑤ Replica Shard 同步</strong>
+                <div class="arch-label">并发同步到所有副本，全部成功后返回客户端确认</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 id="s1-4">1.4 相关性评分 BM25</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">TF-IDF (旧版默认)</h4>
+            <ul>
+              <li><strong>TF</strong> (词频)：词在文档中出现的次数越多，越相关</li>
+              <li><strong>IDF</strong> (逆文档频率)：词在越少文档中出现，区分度越高</li>
+              <li><strong>问题</strong>：TF 无限增长，长文档天然 TF 高</li>
+            </ul>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">BM25 (ES 5.0+ 默认)</h4>
+            <ul>
+              <li>TF 有<strong>饱和机制</strong>：词频增长到一定值后贡献不再增加</li>
+              <li>考虑<strong>文档长度</strong>：长文档归一化，避免长文档天然高分</li>
+              <li>参数 k1（词频饱和度）和 b（文档长度影响）可调</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <h4>BM25 公式核心思路</h4>
+          <pre><code>Score(D, Q) = Σ IDF(qi) * ( f(qi, D) * (k1 + 1) ) / ( f(qi, D) + k1 * (1 - b + b * |D|/avgdl) )
+
+f(qi, D) = 词 qi 在文档 D 中的词频
+|D| = 文档长度
+avgdl = 平均文档长度
+k1 = 1.2 (默认), b = 0.75 (默认)</code></pre>
+          <p>BM25 本质上是：IDF 加权 × TF 饱和函数 × 文档长度归一化</p>
+        </div>
+
+        <h3 id="s1-5">1.5 近实时搜索 (NRT) 原理</h3>
+        <div class="card">
+          <h4>为什么不是实时搜索？</h4>
+          <ul>
+            <li>文档写入后先进入 Buffer，此时<strong>不可搜索</strong></li>
+            <li><strong>Refresh</strong>（默认 1 秒）将 Buffer 生成新的 Segment，此后<strong>可搜索</strong></li>
+            <li>这个 1 秒延迟就是 "近实时" 的由来</li>
+            <li>Refresh 不会触发 fsync，数据在内存中的 Segment，进程崩溃可能丢失</li>
+            <li>Flush（fsync + 清空 Translog）才将数据持久化到磁盘</li>
+          </ul>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Segment 不可变性</div>
+          <ul>
+            <li>Segment 一旦生成就<strong>不可修改</strong>（Immutable）</li>
+            <li>删除操作：在 <code>.del</code> 文件中标记删除，查询时过滤</li>
+            <li>更新操作：先标记旧文档删除，再写入新文档到新 Segment</li>
+            <li>不可变的好处：天然支持并发读，无需加锁</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-6">1.6 段合并 (Merge) 策略</h3>
+        <div class="card">
+          <h4>为什么需要段合并？</h4>
+          <p>每次 Refresh 产生新 Segment，Segment 过多会导致：① 文件句柄过多；② 搜索需要遍历所有 Segment；③ 删除标记占用空间。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">段合并过程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Seg1 Seg2 Seg3 Seg4 Seg5</div>
+            <div class="flow-arrow">Merge →</div>
+            <div class="flow-box flow-purple">Seg6 (合并后)</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">删除旧 Segment</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Tiered Merge Policy（默认策略）</h4>
+          <ul>
+            <li>将 Segment 按大小分层，每层合并大小相近的 Segment</li>
+            <li><strong>max_merged_segment</strong>：合并后的最大 Segment 大小（默认 5GB）</li>
+            <li><strong>merge factor</strong>：每层最多多少个 Segment 合并</li>
+            <li>合并是<strong>后台异步</strong>操作，使用独立线程池</li>
+            <li>合并时会物理删除标记为 deleted 的文档，释放空间</li>
+          </ul>
+          <div class="warn">段合并消耗大量 IO 和 CPU，可通过 <code>index.merge.scheduler.max_thread_count</code> 控制并发度。SSD 上可设为 1，HDD 上可设为核心数/2。</div>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 查询 DSL</h3>
+        <div class="diagram">
+          <div class="diagram-title">查询分类：Query vs Filter</div>
+          <table>
+            <thead><tr><th>类型</th><th>特点</th><th>缓存</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Query Context</span></td><td>计算相关性评分 _score</td><td>不缓存</td><td>match、multi_match</td></tr>
+              <tr><td><span class="badge badge-green">Filter Context</span></td><td>只判断是否匹配，不评分</td><td>可缓存（Bitset）</td><td>term、range、exists</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:0.5rem">性能原则：不需要评分的条件尽量放在 filter 中（利用缓存，跳过评分计算）。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">常用查询 DSL</div>
+          <pre><code>GET /my_index/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "title": "分布式系统" } }
+      ],
+      "filter": [
+        { "term": { "status": "published" } },
+        { "range": { "publish_date": { "gte": "2025-01-01" } } }
+      ],
+      "should": [
+        { "match": { "content": "Redis" } }
+      ],
+      "must_not": [
+        { "term": { "author": "admin" } }
+      ]
+    }
+  },
+  "sort": [{ "publish_date": "desc" }],
+  "from": 0, "size": 10,
+  "_source": ["title", "author", "publish_date"]
+}</code></pre>
+        </div>
+        <div class="card">
+          <h4>常用查询类型</h4>
+          <table>
+            <thead><tr><th>查询</th><th>用途</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td><code>match</code></td><td>全文检索</td><td>先分词再匹配，计算评分</td></tr>
+              <tr><td><code>match_phrase</code></td><td>短语匹配</td><td>分词后必须相邻且有序</td></tr>
+              <tr><td><code>term</code></td><td>精确匹配</td><td>不分词，用于 keyword/数值/日期</td></tr>
+              <tr><td><code>range</code></td><td>范围查询</td><td>gt/gte/lt/lte</td></tr>
+              <tr><td><code>bool</code></td><td>布尔组合</td><td>must/filter/should/must_not</td></tr>
+              <tr><td><code>nested</code></td><td>嵌套对象查询</td><td>嵌套文档独立评分</td></tr>
+              <tr><td><code>wildcard</code></td><td>通配符</td><td>性能差，避免前缀通配</td></tr>
+              <tr><td><code>fuzzy</code></td><td>模糊匹配</td><td>容错搜索，编辑距离</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-2">2.2 聚合分析</h3>
+        <div class="diagram">
+          <div class="diagram-title">聚合类型</div>
+          <table>
+            <thead><tr><th>类型</th><th>说明</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Metric</span></td><td>指标聚合：计算单个值</td><td>avg、sum、min、max、cardinality（去重计数）、percentiles</td></tr>
+              <tr><td><span class="badge badge-green">Bucket</span></td><td>桶聚合：将文档分到桶中</td><td>terms、date_histogram、range、histogram、filters</td></tr>
+              <tr><td><span class="badge badge-orange">Pipeline</span></td><td>管道聚合：对聚合结果再聚合</td><td>avg_bucket、derivative、cumulative_sum</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>聚合示例：按状态分组 + 计算平均价格</h4>
+          <pre><code>GET /products/_search
+{
+  "size": 0,
+  "aggs": {
+    "by_status": {
+      "terms": { "field": "status", "size": 10 },
+      "aggs": {
+        "avg_price": { "avg": { "field": "price" } },
+        "price_ranges": {
+          "range": {
+            "field": "price",
+            "ranges": [
+              { "to": 100 },
+              { "from": 100, "to": 500 },
+              { "from": 500 }
+            ]
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="card">
+          <h4>聚合性能优化</h4>
+          <ul>
+            <li><strong>精确去重</strong>：<code>cardinality</code> 使用 HyperLogLog++，占用内存小，0.8% 误差</li>
+            <li><strong>terms 聚合</strong>：设置合理 size，避免返回过多桶</li>
+            <li><strong>shard_size</strong>：增大可提高精确度，但增加开销</li>
+            <li><strong>execution_hint</strong>：<code>map</code>（低基数）、<code>global_ordinals</code>（高基数）</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-3">2.3 集群架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">ES 集群节点角色</div>
+          <table>
+            <thead><tr><th>节点角色</th><th>职责</th><th>配置建议</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Master</span></td><td>集群元数据管理、分片分配、集群状态维护</td><td>至少 3 个专用 Master 节点，CPU/内存要求不高</td></tr>
+              <tr><td><span class="badge badge-green">Data</span></td><td>存储数据、执行 CRUD、搜索、聚合</td><td>高内存 + SSD，分 Hot/Warm/Cold</td></tr>
+              <tr><td><span class="badge badge-orange">Coordinating</span></td><td>接收客户端请求，分发到数据节点，汇聚结果</td><td>可配置为专用协调节点</td></tr>
+              <tr><td><span class="badge badge-purple">Ingest</span></td><td>预处理文档（Pipeline），类似 Logstash</td><td>需要数据预处理时部署</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>分片与副本</h4>
+          <ul>
+            <li><strong>Primary Shard</strong>：数据水平拆分，每个文档属于一个 Primary Shard</li>
+            <li><strong>Replica Shard</strong>：Primary 的副本，提供高可用和读扩展</li>
+            <li><strong>路由算法</strong>：<code>shard_num = hash(_routing) % num_primary_shards</code></li>
+            <li><strong>_routing</strong>：默认为文档 _id，可自定义路由（相关文档落同一 shard）</li>
+            <li><strong>分片数不可更改</strong>（创建索引后固定，Reindex 可重新分配）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>读写请求路由</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">客户端请求</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Coordinating Node<br><span style="font-size:0.7rem">计算目标 Shard</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Data Node<br><span style="font-size:0.7rem">Primary Shard 处理</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Replica 同步</div>
+          </div>
+          <p style="margin-top:0.5rem">搜索请求：Coordinating Node 并发查询所有相关 Shard → 各自返回 Top N → 协调节点合并排序 → 返回最终结果。</p>
+        </div>
+
+        <h3 id="s2-4">2.4 ELK Stack 中的角色</h3>
+        <div class="diagram">
+          <div class="diagram-title">ELK 架构</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Beats<br><span style="font-size:0.7rem">轻量数据采集</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Logstash<br><span style="font-size:0.7rem">数据转换/过滤</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Elasticsearch<br><span style="font-size:0.7rem">存储 + 搜索 + 分析</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Kibana<br><span style="font-size:0.7rem">可视化仪表板</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>各组件职责</h4>
+          <table>
+            <thead><tr><th>组件</th><th>职责</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Beats</strong></td><td>轻量级数据采集器（Filebeat/Metricbeat/Heartbeat）</td><td>部署在边缘，资源占用极小</td></tr>
+              <tr><td><strong>Logstash</strong></td><td>数据处理管道（Input → Filter → Output）</td><td>Grok 解析、Mutate 转换、GeoIP</td></tr>
+              <tr><td><strong>Elasticsearch</strong></td><td>分布式搜索和分析引擎</td><td>倒排索引、近实时搜索、水平扩展</td></tr>
+              <tr><td><strong>Kibana</strong></td><td>数据可视化和管理界面</td><td>Dashboards、Dev Tools、Alerting</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Elasticsearch 的倒排索引是怎么工作的？</div>
+          <div class="a"><strong>参考</strong>：倒排索引由 Term Dictionary + Posting List + FST 三层结构组成。Term Dictionary 存储所有去重词项，Posting List 记录每个词出现在哪些文档（DocID + TF + Position），FST 是内存中的前缀树结构加速词项查找。<br><strong>追问</strong>：Posting List 使用 Roaring Bitmap 压缩，支持高效 AND/OR 合并。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 的近实时搜索是怎么实现的？Refresh 和 Flush 有什么区别？</div>
+          <div class="a"><strong>参考</strong>：文档写入 Buffer 后默认 1 秒 Refresh 生成内存 Segment（此时可搜索），这是 NRT 的由来。Refresh 不 fsync，可能丢数据。Flush 将 Segment fsync 到磁盘并清空 Translog，保证持久化。<br><strong>追问</strong>：手动 <code>POST /_refresh</code> 可强制刷新，但会增加 IO 负载。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 的分词器有哪些？中文分词怎么处理？</div>
+          <div class="a"><strong>参考</strong>：Standard（默认，中文逐字切分）、IK Smart（粗粒度）、IK Max Word（细粒度穷尽组合）、jieba。中文场景推荐索引时用 IK Max Word（高召回），搜索时用 IK Smart（高精度）。还可自定义词典和同义词。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 中 Query 和 Filter 有什么区别？</div>
+          <div class="a"><strong>参考</strong>：Query 计算相关性评分（_score），用于全文检索场景。Filter 只判断匹配与否，不评分，结果可缓存（Bitset），性能更好。原则：不需要评分的条件放 filter，需要评分的放 must/should。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 集群有哪些节点角色？分片怎么路由？</div>
+          <div class="a"><strong>参考</strong>：Master（元数据管理）、Data（数据存储和搜索）、Coordinating（请求路由和汇聚）、Ingest（预处理）。分片路由：<code>hash(_routing) % primary_shards</code>，默认 _routing 为 _id。<br><strong>追问</strong>：分片数创建后不可改，需提前规划。可自定义 _routing 让相关文档落同一分片。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 的段合并机制是什么？有什么影响？</div>
+          <div class="a"><strong>参考</strong>：每次 Refresh 产生新 Segment，后台线程异步合并小 Segment 为大 Segment。合并时会物理删除标记删除的文档。Tiered Merge Policy 按大小分层合并。合并消耗 IO 和 CPU，可通过 max_thread_count 控制并发度。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 如何保证高可用？</div>
+          <div class="a"><strong>参考</strong>：① Primary Shard + Replica Shard 机制，Primary 故障 Replica 自动提升；② Master 节点至少 3 个（奇数），Raft 选举；③ 跨机架/可用区部署避免单点故障；④ 分片自动再平衡。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ES 和 MySQL 的区别？什么时候用 ES？</div>
+          <div class="a"><strong>参考</strong>：ES 擅长全文检索、日志分析、复杂聚合，倒排索引搜索性能远超 MySQL B+Tree 的 LIKE 查询。MySQL 擅长事务、关系查询、精确匹配。场景选择：全文搜索/日志系统/实时分析用 ES，OLTP/强事务用 MySQL。两者常共存，MySQL 做主存储，ES 做搜索层。</div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Elasticsearch · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

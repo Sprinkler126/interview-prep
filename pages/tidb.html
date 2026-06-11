@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TiDB - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🔗 TiDB</h1>
+    <p class="subtitle">分布式 SQL · Raft · HTAP · TiKV · Placement Driver</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">TiKV 存储引擎</a></li>
+          <li class="sub"><a href="#s1-3">分布式事务</a></li>
+          <li class="sub"><a href="#s1-4">Raft 协议在 TiDB 中的应用</a></li>
+          <li class="sub"><a href="#s1-5">HTAP 架构</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">PD 调度器</a></li>
+          <li class="sub"><a href="#s2-2">SQL 优化器</a></li>
+          <li class="sub"><a href="#s2-3">与 MySQL 兼容性</a></li>
+          <li class="sub"><a href="#s2-4">适用场景</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 整体架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">TiDB 分层架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>客户端 / 应用层</strong>
+                <div class="arch-label">MySQL 协议兼容 · JDBC/MySQL Driver 直连</div>
+              </div>
+            </div>
+            <div class="arch-connector">MySQL 协议</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>TiDB Server（无状态 SQL 层）</strong>
+                <div class="arch-label">SQL 解析 / 优化 / 执行 / 分布式事务协调 / 无状态可水平扩展</div>
+              </div>
+            </div>
+            <div class="arch-connector">gRPC</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>TiKV</strong>
+                <div class="arch-label">分布式 KV 存储<br>Raft 一致性<br>行存 RocksDB</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>TiFlash</strong>
+                <div class="arch-label">列式存储引擎<br>实时分析<br>异步复制</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>PD</strong>
+                <div class="arch-label">元数据管理<br>TSO 时间戳<br>调度器</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>各组件职责</h4>
+          <table>
+            <thead><tr><th>组件</th><th>职责</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">TiDB Server</span></td><td>SQL 解析、优化、执行</td><td>无状态，兼容 MySQL 协议，可水平扩展</td></tr>
+              <tr><td><span class="badge badge-green">TiKV</span></td><td>分布式 KV 存储引擎</td><td>Raft 一致性，Region 自动分裂/合并</td></tr>
+              <tr><td><span class="badge badge-orange">TiFlash</span></td><td>列式存储引擎（HTAP）</td><td>异步复制 TiKV 数据，支持实时分析</td></tr>
+              <tr><td><span class="badge badge-purple">PD</span></td><td>集群大脑：元数据 + 调度 + TSO</td><td>Raft 部署（3 节点高可用）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-2">1.2 TiKV 存储引擎</h3>
+        <div class="diagram">
+          <div class="diagram-title">TiKV 内部结构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Region</strong> -- 数据分片的基本单位（默认 96~256MB）
+                <div class="arch-label">[start_key, end_key) 左闭右开区间 / 自动分裂/合并</div>
+              </div>
+            </div>
+            <div class="arch-connector">每个 Region 由 Raft Group 管理</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Leader</strong>
+                <div class="arch-label">读写请求处理<br>日志复制</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Follower x 2</strong>
+                <div class="arch-label">日志同步<br>可选举为 Leader</div>
+              </div>
+            </div>
+            <div class="arch-connector">底层存储</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>RocksDB (Raft Log)</strong>
+                <div class="arch-label">Raft 日志存储</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>RocksDB (KV Data)</strong>
+                <div class="arch-label">实际数据存储<br>LSM Tree</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Region 机制</h4>
+          <ul>
+            <li><strong>Region</strong>：TiKV 数据分片的最小单位，每个 Region 是一个 Raft Group</li>
+            <li><strong>分裂</strong>：Region 大小超过阈值（默认 256MB）时自动分裂为两个 Region</li>
+            <li><strong>合并</strong>：相邻小 Region 可合并，减少 Raft Group 开销</li>
+            <li><strong>Leader 调度</strong>：PD 根据负载情况调度 Region Leader 到不同节点，均衡读写</li>
+            <li><strong>3 副本</strong>：每个 Region 默认 3 副本，分布在不同的 TiKV 节点上</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 分布式事务</h3>
+        <div class="diagram">
+          <div class="diagram-title">Percolator 事务模型（两阶段提交）</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Prewrite 阶段<br><span style="font-size:0.7rem">并行写入所有 Key 的锁和数据</span></div>
+            <div class="flow-arrow">then</div>
+            <div class="flow-box flow-purple">获取 Commit TS<br><span style="font-size:0.7rem">从 PD 获取全局时间戳</span></div>
+            <div class="flow-arrow">then</div>
+            <div class="flow-box flow-green">Commit 阶段<br><span style="font-size:0.7rem">提交 Primary Key 的锁</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>两阶段提交详细流程</h4>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Prewrite（第一阶段）</strong>
+                <div class="arch-label">TiDB 选取一个 Key 作为 Primary Key，其余为 Secondary Key</div>
+              </div>
+            </div>
+            <div class="arch-connector">并行写入所有 Key</div>
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>写入 Lock</strong>
+                <div class="arch-label">在 Key 上写入锁标记<br>含 Primary Key 信息</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>写入 Data</strong>
+                <div class="arch-label">写入 value 到 write 列<br>使用 start_ts 版本</div>
+              </div>
+            </div>
+            <div class="arch-connector">所有 Key Prewrite 成功</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent5);background:rgba(244,114,182,0.06)">
+                <strong>Commit（第二阶段）</strong>
+                <div class="arch-label">只需提交 Primary Key（写入 commit_ts），Secondary Key 异步清理锁</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>MVCC 实现</h4>
+          <ul>
+            <li>TiKV 使用 <strong>start_ts</strong> 和 <strong>commit_ts</strong> 实现 MVCC</li>
+            <li>每个 Key 存储多版本数据，按时间戳排列</li>
+            <li><strong>start_ts</strong>：事务开始时从 PD 获取的全局时间戳</li>
+            <li><strong>commit_ts</strong>：事务提交时从 PD 获取的全局时间戳</li>
+            <li>读取时根据快照时间戳确定可见版本</li>
+          </ul>
+          <div class="tip">PD 的 TSO (Timestamp Oracle) 通过中心化分配保证全局唯一且递增的时间戳，是分布式事务的基础。</div>
+        </div>
+
+        <h3 id="s1-4">1.4 Raft 协议在 TiDB 中的应用</h3>
+        <div class="card">
+          <h4>Raft 核心机制</h4>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Leader 选举</strong>
+                <div class="arch-label">超时触发选举<br>多数派投票<br>Term 递增</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>日志复制</strong>
+                <div class="arch-label">Leader 接收写入<br>复制到 Follower<br>多数确认后提交</div>
+              </div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>成员变更</strong>
+                <div class="arch-label">Joint Consensus<br>安全增删节点<br>Region 迁移</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Raft 在 TiDB 中的特殊优化</h4>
+          <ul>
+            <li><strong>Multi-Raft</strong>：每个 Region 是独立的 Raft Group，整个集群数万个 Raft Group 并行运行</li>
+            <li><strong>Raft Learner</strong>：新增副本先作为 Learner 同步数据，追上后再转为 Voter，避免影响可用性</li>
+            <li><strong>Region 迁移</strong>：通过 Raft 成员变更将 Region 副本从一个节点迁移到另一个节点</li>
+            <li><strong>Leader Transfer</strong>：主动将 Region Leader 转移到 Follower，用于负载均衡</li>
+            <li><strong>并行 Raft Propose</strong>：不同 Region 的 Raft 互不干扰，高并发写入</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-5">1.5 HTAP 架构</h3>
+        <div class="diagram">
+          <div class="diagram-title">TiKV 行存 + TiFlash 列存 = HTAP</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>TiKV（行存）</strong>
+                <div class="arch-label">OLTP 优化<br>点查/事务<br>RocksDB LSM Tree</div>
+              </div>
+              <div style="display:flex;flex-direction:column;justify-content:center;color:var(--text-dim)">异步复制</div>
+              <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06)">
+                <strong>TiFlash（列存）</strong>
+                <div class="arch-label">OLAP 优化<br>列式压缩<br>向量化执行</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>TiFlash 特性</h4>
+          <ul>
+            <li><strong>列式存储</strong>：同列数据连续存储，压缩率高，扫描性能好</li>
+            <li><strong>异步复制</strong>：通过 Raft Learner 从 TiKV 异步复制数据，毫秒级延迟</li>
+            <li><strong>一致性保证</strong>：读取时通过 Raft 确认数据一致性（ReadIndex），保证强一致读</li>
+            <li><strong>智能路由</strong>：TiDB 优化器自动判断将 OLAP 查询发送到 TiFlash，OLTP 查询发送到 TiKV</li>
+            <li><strong>Stale Read</strong>：允许读取历史数据（指定时间戳），不阻塞实时写入</li>
+            <li><strong>向量化执行引擎</strong>：按列批处理，充分利用 CPU SIMD 指令</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>智能查询路由示例</h4>
+          <pre><code>-- TiDB 优化器自动选择执行引擎
+-- OLTP 点查 -> TiKV
+SELECT * FROM orders WHERE order_id = 1001;
+
+-- OLAP 全表扫描 -> TiFlash
+SELECT region, SUM(amount) FROM orders GROUP BY region;
+
+-- 强制指定引擎
+SELECT /*+ READ_FROM_STORAGE(TIFLASH[orders]) */ ...</code></pre>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 PD 调度器</h3>
+        <div class="card">
+          <h4>PD 核心职责</h4>
+          <table>
+            <thead><tr><th>职责</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>TSO 分配</strong></td><td>全局唯一递增时间戳，分布式事务和 MVCC 的基础</td></tr>
+              <tr><td><strong>元数据管理</strong></td><td>记录每个 Region 的位置信息</td></tr>
+              <tr><td><strong>调度决策</strong></td><td>根据集群状态生成调度 Operator</td></tr>
+              <tr><td><strong>热点调度</strong></td><td>检测读写热点，自动调度 Leader 或 Region</td></tr>
+              <tr><td><strong>Region 分裂/合并</strong></td><td>Region 过大分裂，相邻小 Region 合并</td></tr>
+              <tr><td><strong>Region 迁移</strong></td><td>扩缩容时副本迁入迁出</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>热点调度策略</h4>
+          <ul>
+            <li><strong>写热点</strong>：某个 TiKV 节点写入 QPS 过高，将 Leader 迁移到其他节点</li>
+            <li><strong>读热点</strong>：某个 Region Leader 读 QPS 过高，将 Leader 转移到负载低的 Follower</li>
+            <li><strong>热点打散</strong>：连续 key 范围的写热点，通过 Region 分裂 + Leader 分散</li>
+          </ul>
+          <div class="tip">PD 每 10 秒收集一次 TiKV 心跳信息（Region 统计、磁盘使用、读写 QPS），据此做出调度决策。</div>
+        </div>
+
+        <h3 id="s2-2">2.2 SQL 优化器</h3>
+        <div class="card">
+          <h4>基于代价的优化器 (CBO)</h4>
+          <ul>
+            <li><strong>统计信息</strong>：定期收集表的行数、列值分布（直方图）、索引信息</li>
+            <li><strong>代价模型</strong>：根据 IO、CPU、网络代价估算每个执行计划的总代价</li>
+            <li><strong>计划选择</strong>：选择代价最低的执行计划</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>常用优化手段</h4>
+          <table>
+            <thead><tr><th>优化</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>索引选择</strong></td><td>自动选择最优索引，支持 Index Merge</td></tr>
+              <tr><td><strong>Join 优化</strong></td><td>Hash Join / Merge Join / Index Join，根据表大小自动选择</td></tr>
+              <tr><td><strong>子查询展开</strong></td><td>将相关子查询转为 Join</td></tr>
+              <tr><td><strong>投影下推</strong></td><td>尽早过滤无用列，减少网络传输</td></tr>
+              <tr><td><strong>谓词下推</strong></td><td>将过滤条件下推到存储层执行</td></tr>
+              <tr><td><strong>TopN 优化</strong></td><td>ORDER BY + LIMIT 下推到 TiKV</td></tr>
+              <tr><td><strong>并行执行</strong></td><td>单条 SQL 多 Region 并行扫描</td></tr>
+            </tbody>
+          </table>
+          <pre><code>-- 查看执行计划
+EXPLAIN SELECT * FROM orders WHERE user_id = 1001 AND status = 'paid';
+EXPLAIN ANALYZE ...  -- 含实际执行统计</code></pre>
+        </div>
+
+        <h3 id="s2-3">2.3 与 MySQL 兼容性</h3>
+        <div class="diagram">
+          <div class="diagram-title">TiDB MySQL 兼容性</div>
+          <table>
+            <thead><tr><th>兼容点</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">协议兼容</span></td><td>MySQL 协议，JDBC/mysql-connector 直接连接</td></tr>
+              <tr><td><span class="badge badge-green">SQL 语法</span></td><td>大部分 MySQL 语法兼容（DML/DDL/DQL）</td></tr>
+              <tr><td><span class="badge badge-green">数据类型</span></td><td>支持 MySQL 常用类型（INT/VARCHAR/TEXT/JSON/ENUM）</td></tr>
+              <tr><td><span class="badge badge-green">索引</span></td><td>支持 B-tree、Hash、全文索引</td></tr>
+              <tr><td><span class="badge badge-orange">存储过程</span></td><td>逐步支持（持续完善中）</td></tr>
+              <tr><td><span class="badge badge-orange">外键</span></td><td>7.6+ 支持外键约束</td></tr>
+              <tr><td><span class="badge badge-orange">AUTO_INCREMENT</span></td><td>支持但行为有差异：分布式下非连续递增，建议使用 AUTO_RANDOM</td></tr>
+              <tr><td><span class="badge badge-red">触发器</span></td><td>不支持</td></tr>
+              <tr><td><span class="badge badge-red">全文索引</span></td><td>支持有限</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>迁移注意事项</h4>
+          <ul>
+            <li><strong>AUTO_INCREMENT</strong>：TiDB 分布式环境下自增 ID 不连续，高并发写入可能导致热点，建议使用 <code>AUTO_RANDOM</code></li>
+            <li><strong>自增 ID 分配</strong>：每个 TiDB Server 缓存一段 ID（默认 30000），批量分配提高性能</li>
+            <li><strong>外键</strong>：早期版本不支持外键，7.6+ 支持但建议应用层保证</li>
+            <li><strong>锁机制</strong>：TiDB 使用乐观锁 + 悲观锁（5.0+），与 MySQL 的行锁行为不完全相同</li>
+            <li><strong>事务大小限制</strong>：单事务默认限制 10MB，可通过配置调整</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-4">2.4 适用场景</h3>
+        <div class="card">
+          <h4>适用场景</h4>
+          <table>
+            <thead><tr><th>场景</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">HTAP 混合负载</span></td><td>OLTP + OLAP 在同一平台，无需 ETL</td></tr>
+              <tr><td><span class="badge badge-blue">MySQL 替代</span></td><td>数据量增长超出 MySQL 单机能力，需要水平扩展</td></tr>
+              <tr><td><span class="badge badge-orange">数据中台</span></td><td>统一存储层，减少数据同步链路</td></tr>
+              <tr><td><span class="badge badge-purple">实时分析</span></td><td>TiFlash 列存引擎支持实时 OLAP 分析</td></tr>
+              <tr><td><span class="badge badge-red">高可用</span></td><td>Raft 自动故障转移，RPO=0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>不适合的场景</h4>
+          <ul>
+            <li><strong>小规模单机应用</strong>：分布式系统有额外开销，单机 MySQL 更简单</li>
+            <li><strong>大量存储过程/触发器</strong>：TiDB 对这些支持有限</li>
+            <li><strong>强依赖外键</strong>：虽然 7.6+ 支持，但分布式外键有性能开销</li>
+            <li><strong>纯 OLAP</strong>：如果只有分析场景，专用 OLAP 引擎（ClickHouse）更合适</li>
+          </ul>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">TiDB 的整体架构是怎样的？各组件的职责是什么？</div>
+          <div class="a"><strong>参考</strong>：TiDB 采用分层架构——TiDB Server（无状态 SQL 层，兼容 MySQL 协议）、TiKV（分布式 KV 存储，Raft 一致性）、TiFlash（列存引擎，OLAP 分析）、PD（集群大脑，元数据管理 + TSO 分配 + 调度）。各组件独立扩展，TiDB Server 和 TiKV/TiFlash 可独立水平扩展。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TiDB 的分布式事务是怎么实现的？</div>
+          <div class="a"><strong>参考</strong>：基于 Percolator 模型的两阶段提交。Prewrite 阶段并行写入所有 Key 的锁和数据（选一个 Key 作为 Primary），Commit 阶段只需提交 Primary Key，Secondary Key 异步清理。使用 PD 分配的全局时间戳实现 MVCC。<br><strong>追问</strong>：Primary Key 提交成功即事务成功，Secondary Key 通过异步清理或读取时惰性修复。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TiDB 的 HTAP 架构是怎么实现的？</div>
+          <div class="a"><strong>参考</strong>：TiKV 行存（RocksDB LSM Tree）处理 OLTP，TiFlash 列存处理 OLAP。TiFlash 通过 Raft Learner 从 TiKV 异步复制数据（毫秒级延迟）。TiDB 优化器自动将 OLAP 查询路由到 TiFlash，OLTP 查询路由到 TiKV。TiFlash 支持向量化执行引擎，列式压缩和 SIMD 加速。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TiDB 中的 Region 是什么？为什么要分裂和合并？</div>
+          <div class="a"><strong>参考</strong>：Region 是 TiKV 数据分片的最小单位（默认 96~256MB），每个 Region 是一个 Raft Group。Region 过大（256MB）时分裂为两个 Region，分散到不同节点。相邻小 Region 合并减少 Raft Group 开销。Region 是 PD 调度的基本单位。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Raft 协议在 TiDB 中是怎么应用的？有什么特殊优化？</div>
+          <div class="a"><strong>参考</strong>：每个 Region 是一个 Raft Group，采用 Multi-Raft 架构（数万个 Raft Group 并行）。特殊优化：Raft Learner（新副本先同步再转 Voter）、Leader Transfer（主动转移 Leader 做负载均衡）、并行 Propose（不同 Region 互不干扰）。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PD 调度器有哪些核心功能？</div>
+          <div class="a"><strong>参考</strong>：① TSO 分配（全局时间戳）；② 元数据管理（Region 位置映射）；③ Region 分裂/合并/迁移调度；④ 热点调度（读写热点自动打散 Leader）；⑤ 扩缩容调度（节点上线/下线时迁移 Region）。PD 3 节点 Raft 部署，高可用。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TiDB 和 MySQL 有什么区别？什么时候用 TiDB？</div>
+          <div class="a"><strong>参考</strong>：TiDB 兼容 MySQL 协议和语法，但底层是分布式存储。区别：① TiDB 水平扩展（MySQL 单机有限）；② TiDB 内置 HTAP（MySQL 仅 OLTP）；③ TiDB 自增 ID 非连续；④ TiDB 不支持触发器。用 TiDB 的场景：数据量大需水平扩展、需要 HTAP 混合负载、需要高可用（RPO=0）。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">TiDB 的自增 ID 有什么特点？为什么建议用 AUTO_RANDOM？</div>
+          <div class="a"><strong>参考</strong>：TiDB 的 AUTO_INCREMENT 是分布式分配，每个 TiDB Server 缓存一段 ID（默认 30000），所以 ID 不连续。大量并发写入时，递增 ID 会导致写热点集中到一个 Region。AUTO_RANDOM 将 ID 高位随机化，打散到多个 Region，消除写热点。</div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">返回知识库目录</a><br><br>
+          TiDB / 面试知识复习库 / Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

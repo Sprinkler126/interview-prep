@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>算法与数据结构 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🧮 算法与数据结构</h1>
+    <p class="subtitle">排序 · 树 · 图 · DP · 贪心 · 回溯 · 复杂度分析</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">时间与空间复杂度</a></li>
+          <li class="sub"><a href="#s1-2">排序算法</a></li>
+          <li class="sub"><a href="#s1-3">二叉树</a></li>
+          <li class="sub"><a href="#s1-4">高级树结构</a></li>
+          <li class="sub"><a href="#s1-5">图算法</a></li>
+          <li class="sub"><a href="#s1-6">链表</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">动态规划</a></li>
+          <li class="sub"><a href="#s2-2">贪心算法</a></li>
+          <li class="sub"><a href="#s2-3">回溯法</a></li>
+          <li class="sub"><a href="#s2-4">双指针/滑动窗口/二分</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 时间与空间复杂度</h3>
+        <div class="card">
+          <h4>大 O 表示法</h4>
+          <p>大 O 表示法描述算法执行时间随输入规模 n 增长的<strong>上界</strong>，忽略常数项和低阶项。</p>
+          <table>
+            <thead><tr><th>复杂度</th><th>名称</th><th>示例</th><th>n=10^6 量级</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">O(1)</span></td><td>常数</td><td>哈希表查找、数组按下标访问</td><td>1</td></tr>
+              <tr><td><span class="badge badge-green">O(log n)</span></td><td>对数</td><td>二分查找、平衡BST操作</td><td>20</td></tr>
+              <tr><td><span class="badge badge-blue">O(n)</span></td><td>线性</td><td>遍历数组、链表查找</td><td>10^6</td></tr>
+              <tr><td><span class="badge badge-blue">O(n log n)</span></td><td>线性对数</td><td>快速排序、归并排序、堆排序</td><td>2×10^7</td></tr>
+              <tr><td><span class="badge badge-orange">O(n^2)</span></td><td>平方</td><td>冒泡排序、选择排序、插入排序</td><td>10^12</td></tr>
+              <tr><td><span class="badge badge-red">O(2^n)</span></td><td>指数</td><td>递归求斐波那契（无记忆化）</td><td>不可计算</td></tr>
+              <tr><td><span class="badge badge-red">O(n!)</span></td><td>阶乘</td><td>全排列暴力枚举</td><td>不可计算</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>主定理（Master Theorem）</h4>
+          <p>用于求解递推关系 <code>T(n) = aT(n/b) + O(n^d)</code>，其中 a &ge; 1, b &gt; 1, d &ge; 0：</p>
+          <table>
+            <thead><tr><th>条件</th><th>结果</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td>d &lt; log_b(a)</td><td>T(n) = O(n^(log_b(a)))</td><td>Strassen 矩阵乘法：T(n)=7T(n/2)+O(n^2) → O(n^2.81)</td></tr>
+              <tr><td>d = log_b(a)</td><td>T(n) = O(n^d log n)</td><td>归并排序：T(n)=2T(n/2)+O(n) → O(n log n)</td></tr>
+              <tr><td>d &gt; log_b(a)</td><td>T(n) = O(n^d)</td><td>二分查找：T(n)=T(n/2)+O(1) → O(log n)（特殊情况）</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">常见复杂度排序：O(1) &lt; O(log n) &lt; O(n) &lt; O(n log n) &lt; O(n^2) &lt; O(n^3) &lt; O(2^n) &lt; O(n!)</div>
+        </div>
+
+        <h3 id="s1-2">1.2 排序算法</h3>
+        <div class="card">
+          <h4>排序算法对比总览</h4>
+          <table>
+            <thead><tr><th>算法</th><th>平均</th><th>最坏</th><th>最好</th><th>空间</th><th>稳定性</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>冒泡排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>教学、小数据量</td></tr>
+              <tr><td><strong>选择排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n^2)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>小数据量</td></tr>
+              <tr><td><strong>插入排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>近乎有序数据、小数据量</td></tr>
+              <tr><td><strong>希尔排序</strong></td><td>O(n^1.3)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>中等数据量</td></tr>
+              <tr><td><strong>快速排序</strong></td><td>O(n log n)</td><td>O(n^2)</td><td>O(n log n)</td><td>O(log n)</td><td><span class="badge badge-red">不稳定</span></td><td>通用排序首选</td></tr>
+              <tr><td><strong>归并排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td><span class="badge badge-green">稳定</span></td><td>链表排序、外部排序</td></tr>
+              <tr><td><strong>堆排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>TopK 问题</td></tr>
+              <tr><td><strong>计数排序</strong></td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、范围不大</td></tr>
+              <tr><td><strong>基数排序</strong></td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、位数不多</td></tr>
+              <tr><td><strong>桶排序</strong></td><td>O(n+k)</td><td>O(n^2)</td><td>O(n)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>均匀分布数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>快速排序（Quick Sort）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">选择基准 pivot</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Partition 分区</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">递归左半部分</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">递归右半部分</div>
+          </div>
+          <pre><code>// 经典 Lomuto 分区
+int partition(int[] arr, int lo, int hi) {
+    int pivot = arr[hi], i = lo;
+    for (int j = lo; j &lt; hi; j++) {
+        if (arr[j] &lt;= pivot) { swap(arr, i, j); i++; }
+    }
+    swap(arr, i, hi);
+    return i;
+}
+
+// 随机化快排：随机选 pivot 与 arr[hi] 交换，避免最坏 O(n^2)
+// 三路快排（Dutch National Flag）：处理大量重复元素
+// [lo...lt-1] &lt; pivot | [lt...gt] == pivot | [gt+1...hi] &gt; pivot</code></pre>
+          <ul>
+            <li><strong>优化</strong>：随机化选 pivot 避免最坏情况；三路快排处理大量重复元素</li>
+            <li><strong>空间</strong>：O(log n) 递归栈深度（随机化后期望如此）</li>
+            <li><strong>最坏情况</strong>：每次选到最小/最大元素，退化为 O(n^2)</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>归并排序（Merge Sort）</h4>
+          <pre><code>// 自顶向下（递归）
+void mergeSort(int[] arr, int lo, int hi) {
+    if (lo &gt;= hi) return;
+    int mid = lo + (hi - lo) / 2;
+    mergeSort(arr, lo, mid);
+    mergeSort(arr, mid + 1, hi);
+    merge(arr, lo, mid, hi);  // 合并两个有序子数组
+}
+
+// 自底向上（迭代）：从步长 1 开始，两两归并，步长翻倍
+// 逆序对计数：在 merge 过程中，左半部分 arr[i] &gt; 右半部分 arr[j] 时，
+// 逆序对数量 += (mid - i + 1)</code></pre>
+          <ul>
+            <li><strong>稳定性</strong>：稳定排序（合并时相等元素保持原序）</li>
+            <li><strong>逆序对</strong>：归并排序的副产品，merge 时统计</li>
+            <li><strong>外部排序</strong>：数据无法全部装入内存时，归并排序是首选</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>堆排序（Heap Sort）</h4>
+          <pre><code>// 大顶堆：parent &gt;= children，用于升序排序
+// 小顶堆：parent &lt;= children，用于降序排序 / 优先队列
+
+void heapify(int[] arr, int n, int i) {
+    int largest = i, left = 2*i+1, right = 2*i+2;
+    if (left &lt; n && arr[left] &gt; arr[largest]) largest = left;
+    if (right &lt; n && arr[right] &gt; arr[largest]) largest = right;
+    if (largest != i) {
+        swap(arr, i, largest);
+        heapify(arr, n, largest);
+    }
+}
+
+// 建堆：从最后一个非叶子节点开始 heapify，O(n)
+// 排序：每次取堆顶放末尾，heapify 调整，O(n log n)</code></pre>
+          <ul>
+            <li><strong>优先队列</strong>：Java <code>PriorityQueue</code> 底层是小顶堆</li>
+            <li><strong>TopK 问题</strong>：维护大小为 K 的小顶堆，遍历数据，比堆顶大则替换并调整</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 二叉树</h3>
+        <div class="card">
+          <h4>二叉树遍历</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">递归遍历</h4>
+              <pre><code>// 前序（根→左→右）
+void preorder(TreeNode root) {
+    if (root == null) return;
+    visit(root);
+    preorder(root.left);
+    preorder(root.right);
+}
+
+// 中序（左→根→右）— BST 有序
+// 后序（左→右→根）— 释放资源</code></pre>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">迭代遍历（栈）</h4>
+              <pre><code>// 前序迭代
+void preorder(TreeNode root) {
+    Stack&lt;TreeNode&gt; stack = new Stack&lt;&gt;();
+    if (root != null) stack.push(root);
+    while (!stack.isEmpty()) {
+        TreeNode node = stack.pop();
+        visit(node);
+        if (node.right != null) stack.push(node.right);
+        if (node.left != null) stack.push(node.left);
+    }
+}
+
+// 中序迭代：一路向左入栈，弹出时访问并转向右子树</code></pre>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:0.8rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">层序遍历（BFS）</h4>
+              <pre><code>void levelOrder(TreeNode root) {
+    Queue&lt;TreeNode&gt; queue = new LinkedList&lt;&gt;();
+    if (root != null) queue.offer(root);
+    while (!queue.isEmpty()) {
+        int size = queue.size(); // 当前层节点数
+        for (int i = 0; i &lt; size; i++) {
+            TreeNode node = queue.poll();
+            visit(node);
+            if (node.left != null) queue.offer(node.left);
+            if (node.right != null) queue.offer(node.right);
+        }
+    }
+}</code></pre>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent5)">
+              <h4 style="color:var(--accent5)">Morris 遍历 O(1) 空间</h4>
+              <p>利用叶子节点的空指针指向中序前驱/后继，实现 O(1) 空间遍历。遍历完成后恢复树结构。</p>
+              <ul>
+                <li>前序/中序 Morris：O(n) 时间 O(1) 空间</li>
+                <li>后序 Morris：需要翻转路径，实现较复杂</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>二叉搜索树（BST）</h4>
+          <ul>
+            <li><strong>性质</strong>：左子树所有节点 &lt; 根 &lt; 右子树所有节点</li>
+            <li><strong>中序遍历</strong>：BST 的中序遍历结果是升序序列</li>
+            <li><strong>操作复杂度</strong>：查找/插入/删除平均 O(log n)，最坏退化为链表 O(n)</li>
+            <li><strong>验证 BST</strong>：递归传递上下界，或中序遍历检查是否严格递增</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-4">1.4 高级树结构</h3>
+        <div class="card">
+          <h4>AVL 树 vs 红黑树 vs B+ 树</h4>
+          <table>
+            <thead><tr><th>特性</th><th>AVL 树</th><th>红黑树</th><th>B+ 树</th></tr></thead>
+            <tbody>
+              <tr><td><strong>平衡方式</strong></td><td>严格平衡（高度差 &le; 1）</td><td>近似平衡（颜色约束）</td><td>多路平衡</td></tr>
+              <tr><td><strong>查找</strong></td><td>O(log n) 更快（树更矮）</td><td>O(log n)</td><td>O(log_m n)（m 路）</td></tr>
+              <tr><td><strong>插入/删除</strong></td><td>可能需多次旋转</td><td>最多 2-3 次旋转</td><td>分裂/合并</td></tr>
+              <tr><td><strong>旋转次数</strong></td><td>插入最多 2 次，删除 O(log n)</td><td>插入最多 2 次，删除最多 3 次</td><td>无旋转概念</td></tr>
+              <tr><td><strong>典型应用</strong></td><td>查找密集场景</td><td>Java TreeMap/HashMap、Linux CFS</td><td>MySQL InnoDB 索引、文件系统</td></tr>
+              <tr><td><strong>节点结构</strong></td><td>Key + 左右指针 + 高度</td><td>Key + 左右指针 + 颜色 + 父指针</td><td>多 Key + 多子指针 + 叶子链表</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>B 树 vs B+ 树</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">B 树</h4>
+              <ul>
+                <li>所有节点都存储数据</li>
+                <li>关键字不重复出现在不同层</li>
+                <li>没有叶子节点链表</li>
+                <li>适合随机读取</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">B+ 树</h4>
+              <ul>
+                <li>只有叶子节点存储数据</li>
+                <li>非叶子节点是索引冗余</li>
+                <li>叶子节点用双向链表连接</li>
+                <li>支持范围查询和顺序访问</li>
+                <li>扇出更高，树更矮</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip">为什么数据库用 B+ 树？① 非叶子节点不存数据，扇出高，树矮，IO 次数少；② 叶子链表支持高效范围查询；③ 所有查询路径长度相同，性能稳定。</div>
+        </div>
+
+        <h3 id="s1-5">1.5 图算法</h3>
+        <div class="card">
+          <h4>BFS 与 DFS</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">BFS（广度优先）</h4>
+              <ul>
+                <li>使用<strong>队列</strong>，逐层扩展</li>
+                <li>适合求<strong>最短路径</strong>（无权图）</li>
+                <li>空间复杂度 O(V)（队列）</li>
+                <li>应用：最短路径、层序遍历、拓扑排序（Kahn）</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">DFS（深度优先）</h4>
+              <ul>
+                <li>使用<strong>栈</strong>（或递归），深入探索</li>
+                <li>适合求<strong>连通性、回溯</strong></li>
+                <li>空间复杂度 O(V)（递归栈）</li>
+                <li>应用：连通分量、环检测、拓扑排序、回溯</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>最短路径算法</h4>
+          <table>
+            <thead><tr><th>算法</th><th>适用场景</th><th>时间复杂度</th><th>限制</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Dijkstra</strong></td><td>单源最短路径、非负权边</td><td>O((V+E) log V)（优先队列）</td><td>不能处理负权边</td></tr>
+              <tr><td><strong>Bellman-Ford</strong></td><td>单源最短路径、可有负权边</td><td>O(VE)</td><td>不能处理负权环</td></tr>
+              <tr><td><strong>Floyd-Warshall</strong></td><td>所有顶点对最短路径</td><td>O(V^3)</td><td>不能处理负权环</td></tr>
+              <tr><td><strong>SPFA</strong></td><td>单源最短路径、稀疏图</td><td>平均 O(E)，最坏 O(VE)</td><td>被卡时退化严重</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>最小生成树</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">Prim 算法</h4>
+              <ul>
+                <li>从一个顶点出发，每次选最小权边扩展</li>
+                <li>类似 Dijkstra，使用优先队列</li>
+                <li>适合<strong>稠密图</strong></li>
+                <li>时间：O(E log V)</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Kruskal 算法</h4>
+              <ul>
+                <li>按边权排序，依次加入不构成环的边</li>
+                <li>使用<strong>并查集</strong>判断环</li>
+                <li>适合<strong>稀疏图</strong></li>
+                <li>时间：O(E log E)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>拓扑排序</h4>
+          <ul>
+            <li><strong>前提</strong>：有向无环图（DAG）</li>
+            <li><strong>Kahn 算法（BFS）</strong>：入度为 0 的入队，每次取出减少邻居入度</li>
+            <li><strong>DFS 算法</strong>：后序遍历的逆序即拓扑序</li>
+            <li><strong>应用</strong>：课程安排、任务调度、编译依赖</li>
+            <li><strong>环检测</strong>：若拓扑排序结果节点数 &lt; 总节点数，说明有环</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-6">1.6 链表</h3>
+        <div class="card">
+          <h4>链表经典操作</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">反转链表</h4>
+              <pre><code>// 迭代法
+ListNode reverse(ListNode head) {
+    ListNode prev = null, curr = head;
+    while (curr != null) {
+        ListNode next = curr.next;
+        curr.next = prev;
+        prev = curr;
+        curr = next;
+    }
+    return prev;
+}
+
+// 递归法：reverse(node.next) 后
+// node.next.next = node; node.next = null;</code></pre>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">环检测（Floyd）</h4>
+              <pre><code>boolean hasCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+    while (fast != null && fast.next != null) {
+        slow = slow.next;
+        fast = fast.next.next;
+        if (slow == fast) {
+            // 找环入口：从 head 和相遇点同步走
+            ListNode entry = head;
+            while (entry != slow) {
+                entry = entry.next;
+                slow = slow.next;
+            }
+            return true; // entry 即环入口
+        }
+    }
+    return false;
+}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>LRU 缓存</h4>
+          <pre><code>// 哈希表 + 双向链表，O(1) get/put
+class LRUCache {
+    int capacity;
+    Map&lt;Integer, Node&gt; map = new HashMap&lt;&gt;();
+    Node head = new Node(), tail = new Node(); // 哨兵节点
+
+    // get(key)：存在则移到链表头部，返回值
+    // put(key, val)：存在则更新并移到头部；不存在则新增到头部
+    //   若超出容量，删除链表尾部节点（最久未使用）
+}</code></pre>
+          <ul>
+            <li><strong>核心思路</strong>：哈希表保证 O(1) 查找，双向链表保证 O(1) 插入/删除</li>
+            <li><strong>Java LinkedHashMap</strong>：内置 LRU 支持，<code>accessOrder=true</code></li>
+          </ul>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 动态规划</h3>
+        <div class="card">
+          <h4>动态规划核心思想</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">最优子结构</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">重叠子问题</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">状态转移方程</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">自底向上/记忆化</div>
+          </div>
+          <ul>
+            <li><strong>最优子结构</strong>：问题的最优解包含子问题的最优解</li>
+            <li><strong>重叠子问题</strong>：递归过程中同一子问题被多次计算</li>
+            <li><strong>状态转移方程</strong>：dp[i] 与 dp[i-1] 等的关系</li>
+            <li><strong>两种实现</strong>：自顶向下（递归 + 记忆化）vs 自底向上（迭代 + DP 表）</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>经典 DP 问题</h4>
+          <table>
+            <thead><tr><th>问题</th><th>状态定义</th><th>转移方程</th><th>复杂度</th></tr></thead>
+            <tbody>
+              <tr><td><strong>0-1 背包</strong></td><td>dp[i][w] = 前 i 件物品容量 w 的最大价值</td><td>dp[i][w] = max(dp[i-1][w], dp[i-1][w-wi]+vi)</td><td>O(nW)</td></tr>
+              <tr><td><strong>完全背包</strong></td><td>同上，物品可重复选</td><td>dp[i][w] = max(dp[i-1][w], dp[i][w-wi]+vi)</td><td>O(nW)</td></tr>
+              <tr><td><strong>LCS</strong></td><td>dp[i][j] = s1[0..i] 与 s2[0..j] 的最长公共子序列</td><td>s1[i]==s2[j] ? dp[i-1][j-1]+1 : max(dp[i-1][j],dp[i][j-1])</td><td>O(mn)</td></tr>
+              <tr><td><strong>LIS</strong></td><td>dp[i] = 以 arr[i] 结尾的最长递增子序列</td><td>dp[i] = max(dp[j]+1) for j &lt; i and arr[j] &lt; arr[i]</td><td>O(n^2) / O(n log n)</td></tr>
+              <tr><td><strong>编辑距离</strong></td><td>dp[i][j] = s1[0..i] 转为 s2[0..j] 的最少操作</td><td>s1[i]==s2[j] ? dp[i-1][j-1] : 1+min(增,删,改)</td><td>O(mn)</td></tr>
+              <tr><td><strong>区间 DP</strong></td><td>dp[i][j] = 区间 [i,j] 的最优解</td><td>dp[i][j] = min/max(dp[i][k]+dp[k+1][j]+cost)</td><td>O(n^3)</td></tr>
+              <tr><td><strong>状态压缩 DP</strong></td><td>dp[mask] = 集合 mask 的最优解</td><td>枚举 mask 的子集转移</td><td>O(2^n * n)</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">LIS 的 O(n log n) 优化：维护一个 tails 数组，tails[i] 表示长度为 i+1 的递增子序列的最小末尾元素，用二分查找更新。</div>
+        </div>
+
+        <h3 id="s2-2">2.2 贪心算法</h3>
+        <div class="card">
+          <h4>贪心核心思想</h4>
+          <ul>
+            <li><strong>贪心选择性质</strong>：局部最优选择能导致全局最优</li>
+            <li><strong>最优子结构</strong>：问题的最优解包含子问题的最优解</li>
+            <li><strong>与 DP 的区别</strong>：贪心每步只考虑当前最优，不回头；DP 考虑所有子问题</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>经典贪心问题</h4>
+          <table>
+            <thead><tr><th>问题</th><th>贪心策略</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><strong>活动选择</strong></td><td>按结束时间排序，选不冲突的最早结束活动</td><td>结束越早，留给后续活动的时间越多</td></tr>
+              <tr><td><strong>区间调度</strong></td><td>按结束时间排序，贪心选择</td><td>可证明最优</td></tr>
+              <tr><td><strong>哈夫曼编码</strong></td><td>每次选频率最小的两个节点合并</td><td>构建最优前缀编码树</td></tr>
+              <tr><td><strong>Kruskal MST</strong></td><td>按边权排序，选不形成环的最小边</td><td>并查集判环</td></tr>
+              <tr><td><strong>跳跃游戏</strong></td><td>维护当前能到达的最远位置</td><td>最远位置 &ge; 终点即可</td></tr>
+              <tr><td><strong>分糖果</strong></td><td>优先满足需求小的</td><td>排序后贪心分配</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-3">2.3 回溯法</h3>
+        <div class="card">
+          <h4>回溯模板</h4>
+          <pre><code>void backtrack(路径, 选择列表) {
+    if (满足结束条件) {
+        result.add(路径);
+        return;
+    }
+    for (选择 : 选择列表) {
+        做选择;           // 路径.add(选择)
+        backtrack(路径, 选择列表);
+        撤销选择;         // 路径.remove(选择)
+    }
+}</code></pre>
+          <ul>
+            <li><strong>本质</strong>：穷举所有可能，通过剪枝减少搜索空间</li>
+            <li><strong>时间复杂度</strong>：通常为指数级，剪枝可大幅降低</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>经典回溯问题</h4>
+          <table>
+            <thead><tr><th>问题</th><th>关键思路</th><th>优化</th></tr></thead>
+            <tbody>
+              <tr><td><strong>N 皇后</strong></td><td>逐行放置，检查列/对角线冲突</td><td>用三个集合记录列、主对角线、副对角线</td></tr>
+              <tr><td><strong>全排列</strong></td><td>每次选一个未使用的数</td><td>used[] 数组标记</td></tr>
+              <tr><td><strong>子集</strong></td><td>每个元素选或不选</td><td>start 参数避免重复</td></tr>
+              <tr><td><strong>组合总和</strong></td><td>排序后递归，可重复选</td><td>跳过重复元素、target &lt; 0 剪枝</td></tr>
+              <tr><td><strong>数独</strong></td><td>逐格尝试 1-9</td><td>位运算记录行/列/宫的已用数字</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s2-4">2.4 双指针 / 滑动窗口 / 二分查找</h3>
+        <div class="card">
+          <h4>双指针</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">对撞指针</h4>
+              <ul>
+                <li>左右指针从两端向中间逼近</li>
+                <li>适用：有序数组、回文判断</li>
+                <li>经典题：两数之和（有序）、接雨水、盛最多水</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">快慢指针</h4>
+              <ul>
+                <li>慢指针每次走 1 步，快指针每次走 2 步</li>
+                <li>适用：链表环检测、找中间节点</li>
+                <li>经典题：环形链表、删除倒数第 N 个节点</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>滑动窗口</h4>
+          <pre><code>// 滑动窗口模板
+int slidingWindow(string s) {
+    int left = 0, right = 0, result = 0;
+    Map&lt;Character, Integer&gt; window = new HashMap&lt;&gt;();
+    while (right &lt; s.length()) {
+        char c = s.charAt(right);
+        right++;
+        // 更新窗口内数据
+        while (窗口需要收缩) {
+            char d = s.charAt(left);
+            left++;
+            // 更新窗口内数据
+        }
+        result = Math.max(result, right - left);
+    }
+    return result;
+}</code></pre>
+          <ul>
+            <li><strong>核心</strong>：右指针扩展窗口，左指针收缩窗口，维护窗口内状态</li>
+            <li><strong>适用</strong>：最长/最短子串、包含所有字符的子串</li>
+            <li><strong>复杂度</strong>：O(n)，每个元素最多进出窗口各一次</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>二分查找</h4>
+          <pre><code>// 标准二分（左闭右闭）
+int binarySearch(int[] arr, int target) {
+    int lo = 0, hi = arr.length - 1;
+    while (lo &lt;= hi) {
+        int mid = lo + (hi - lo) / 2;  // 防溢出
+        if (arr[mid] == target) return mid;
+        else if (arr[mid] &lt; target) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+
+// 变种：查找左边界 / 右边界 / 第一个 &ge;= target</code></pre>
+          <ul>
+            <li><strong>适用</strong>：有序数组、旋转有序数组、二分答案</li>
+            <li><strong>防溢出</strong>：<code>mid = lo + (hi - lo) / 2</code></li>
+            <li><strong>二分答案</strong>：将最优化问题转化为判定问题</li>
+          </ul>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">快速排序的时间复杂度分析？什么情况下退化为 O(n^2)？如何优化？</div>
+          <div class="a">
+            <strong>参考</strong>：快排平均 O(n log n)，每次 partition 将数组分为大致相等的两部分，递归深度 O(log n)，每层 O(n)。最坏情况是每次选到最小或最大元素（如已排序数组选首元素），退化为 O(n^2)。
+            <br><strong>优化</strong>：① 随机化选 pivot；② 三数取中（median-of-three）；③ 三路快排处理大量重复元素；④ 小规模切换插入排序。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何判断一个二叉树是否是平衡二叉树？</div>
+          <div class="a">
+            <strong>参考</strong>：自底向上递归，对每个节点求左右子树高度，若高度差 &gt; 1 返回 -1 表示不平衡，否则返回 max(left, right) + 1。时间 O(n)，避免了自顶向下重复计算。
+            <br><strong>追问</strong>：自顶向下的方法每个节点会重复计算高度，时间 O(n log n) ~ O(n^2)，不如自底向上高效。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Dijkstra 算法的原理？为什么不能处理负权边？</div>
+          <div class="a">
+            <strong>参考</strong>：Dijkstra 是贪心算法，每次从优先队列中取出距离最小的未访问节点，更新其邻居的距离。它假设一旦节点被确定最短距离，就不会再被更新。负权边打破了这个假设：已确定的节点可能通过负权边被更短路径更新。
+            <br><strong>解决方案</strong>：负权边用 Bellman-Ford 或 SPFA 算法。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">动态规划和贪心算法有什么区别？如何判断用哪个？</div>
+          <div class="a">
+            <strong>参考</strong>：贪心每步选局部最优，不回头，效率高但不一定能得到全局最优。DP 考虑所有子问题，保证全局最优但可能更慢。
+            <br><strong>判断方法</strong>：① 尝试用贪心，看能否举出反例；② 如果问题具有<strong>贪心选择性质</strong>（局部最优导致全局最优），用贪心；③ 如果有重叠子问题和最优子结构但不满足贪心选择性质，用 DP。
+            <br><strong>例子</strong>：0-1 背包不能贪心（反例：价值/重量比最大的物品未必选），用 DP；分数背包可以贪心（按单位价值排序）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">LRU 缓存的实现原理？如何做到 O(1) 的 get 和 put？</div>
+          <div class="a">
+            <strong>参考</strong>：使用<strong>哈希表 + 双向链表</strong>。哈希表存 key 到链表节点的映射，保证 O(1) 查找。双向链表维护访问顺序，最近访问的放头部，最久未使用的在尾部。get 时将节点移到头部；put 时新增到头部，超出容量则删除尾部节点。所有操作都是 O(1)。
+            <br><strong>追问</strong>：为什么用双向链表而不是单向链表？因为删除节点需要 O(1) 访问前驱，双向链表可以直接通过 node.prev 获取。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何在 O(n log n) 时间内求最长递增子序列（LIS）？</div>
+          <div class="a">
+            <strong>参考</strong>：维护一个 tails 数组，tails[i] 表示长度为 i+1 的递增子序列的最小末尾元素。遍历数组，对每个元素用二分查找在 tails 中找到第一个 &ge; 它的位置：若在末尾则追加（序列变长），否则替换（保持末尾最小）。tails 数组始终有序，最终长度即 LIS 长度。
+            <br><strong>注意</strong>：tails 数组不是 LIS 本身，要还原 LIS 需要额外记录前驱。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">图的拓扑排序有哪些方法？如何检测有向图中是否有环？</div>
+          <div class="a">
+            <strong>参考</strong>：① <strong>Kahn 算法（BFS）</strong>：维护入度数组，将入度为 0 的节点入队，每次取出减少邻居入度。若结果节点数 &lt; 总数，说明有环。② <strong>DFS</strong>：后序遍历的逆序即拓扑序。用三色标记（白/灰/黑），遇到灰色节点说明有环。
+            <br><strong>追问</strong>：实际工程中常用 Kahn 算法，因为直观且能同时检测环。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何用两个栈实现一个队列？用两个队列实现一个栈？</div>
+          <div class="a">
+            <strong>参考</strong>：<strong>两栈实现队列</strong>：push 栈负责入队，pop 栈负责出队。出队时若 pop 栈为空，将 push 栈全部倒入 pop 栈。均摊 O(1)。
+            <br><strong>两队列实现栈</strong>：每次 push 到非空队列（保证一个队列始终为空），pop 时将非空队列的前 n-1 个元素移到另一个队列，最后一个即栈顶。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">B 树和 B+ 树有什么区别？为什么 MySQL InnoDB 使用 B+ 树？</div>
+          <div class="a">
+            <strong>参考</strong>：① B+ 树只有叶子节点存数据，非叶子节点只存索引，扇出更高，树更矮，IO 更少；② B+ 树叶子节点用双向链表连接，支持高效范围查询和顺序遍历；③ B+ 树所有查询都走到叶子节点，性能稳定（B 树可能在任意层命中，性能不一致）。
+            <br><strong>追问</strong>：MongoDB 用 B 树是因为它更多是单条文档查询，不需要范围查询优化。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          算法与数据结构 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

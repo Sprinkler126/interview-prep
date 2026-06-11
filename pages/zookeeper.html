@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zookeeper - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🦁 Zookeeper</h1>
+    <p class="subtitle">ZAB 协议 · 临时节点 · 分布式锁 · 选举机制 · 数据模型</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">数据模型</a></li>
+          <li class="sub"><a href="#s1-2">ZAB 协议</a></li>
+          <li class="sub"><a href="#s1-3">选举机制</a></li>
+          <li class="sub"><a href="#s1-4">Watcher 机制</a></li>
+          <li class="sub"><a href="#s1-5">会话管理</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">分布式锁</a></li>
+          <li class="sub"><a href="#s2-2">典型应用</a></li>
+          <li class="sub"><a href="#s2-3">Zookeeper 集群</a></li>
+          <li class="sub"><a href="#s2-4">ZK vs etcd vs Consul</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 数据模型 -->
+        <h3 id="s1-1">数据模型</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Zookeeper 树形数据模型</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">/ (根节点)</div>
+            </div>
+            <div class="arch-connector">↓</div>
+            <div class="arch-row">
+              <div class="arch-box">/services<br><small>持久节点</small></div>
+              <div class="arch-box" style="margin-left:1rem">/config<br><small>持久节点</small></div>
+              <div class="arch-box" style="margin-left:1rem">/locks<br><small>持久节点</small></div>
+            </div>
+            <div class="arch-connector">↓</div>
+            <div class="arch-row">
+              <div class="arch-box">/services/user<br><small>临时顺序节点</small></div>
+              <div class="arch-box" style="margin-left:1rem">/config/db.url<br><small>持久节点</small></div>
+              <div class="arch-box" style="margin-left:1rem">/locks/order-001<br><small>临时顺序节点</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>ZNode 类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>特点</th><th>生命周期</th><th>典型用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">持久节点</span></td><td>创建后一直存在</td><td>需手动删除</td><td>配置信息、元数据</td></tr>
+              <tr><td><span class="badge badge-green">临时节点</span></td><td>与 Session 绑定</td><td>Session 断开自动删除</td><td>服务注册、分布式锁</td></tr>
+              <tr><td><span class="badge badge-purple">持久顺序节点</span></td><td>持久 + 自增序号</td><td>需手动删除</td><td>全局 ID 生成</td></tr>
+              <tr><td><span class="badge badge-orange">临时顺序节点</span></td><td>临时 + 自增序号</td><td>Session 断开自动删除</td><td>公平分布式锁</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// ZNode 数据结构
+class DataNode {
+    byte[] data;           // 节点数据（最大 1MB）
+    Map&lt;String, DataNode&gt; children;  // 子节点
+    Set&lt;Watcher&gt; watchers; // 注册的 Watcher
+    StatPersisted stat;    // 状态信息（版本号、时间戳等）
+}
+
+// Stat 状态信息包含：
+// czxid - 创建事务 ID
+// mzxid - 最后修改事务 ID
+// ctime - 创建时间
+// mtime - 最后修改时间
+// version - 数据版本号（乐观锁）
+// cversion - 子节点版本号
+// aversion - ACL 版本号
+// ephemeralOwner - 临时节点的 Session ID</code></pre>
+        </div>
+
+        <!-- 1-2 ZAB 协议 -->
+        <h3 id="s1-2">ZAB 协议</h3>
+
+        <div class="card">
+          <h4>ZAB 协议两大模式</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>崩溃恢复（选举模式）</h4>
+              <ul>
+                <li>集群启动或 Leader 故障时进入</li>
+                <li>所有节点进入 Looking 状态</li>
+                <li>通过投票选出新 Leader</li>
+                <li>过半节点同意才能当选</li>
+                <li>新 Leader 等待 Follower 同步数据</li>
+                <li>同步完成后进入消息广播模式</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>消息广播（正常模式）</h4>
+              <ul>
+                <li>Leader 正常工作时进入</li>
+                <li>写请求统一由 Leader 处理</li>
+                <li>Leader 生成 Proposal 发给 Follower</li>
+                <li>Follower 返回 ACK 确认</li>
+                <li>过半 ACK 后 Leader 发送 COMMIT</li>
+                <li>类似 2PC 但无需全部节点确认</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>ZAB 消息广播流程</h4>
+          <div class="diagram">
+            <div class="diagram-title">ZAB 消息广播（类 2PC）</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">Client 发送写请求</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">Leader 生成 Proposal<br><small>分配全局 zxid</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">广播给 Follower</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">过半 ACK</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">Leader 发送 COMMIT</div>
+            </div>
+          </div>
+          <ul>
+            <li>Leader 为每个事务分配全局唯一的 <strong>zxid</strong>（64 位：高 32 位 epoch + 低 32 位计数器）</li>
+            <li>Proposal 包含 zxid 和数据，按 zxid 顺序发送给 Follower</li>
+            <li>Follower 收到 Proposal 后写入本地日志，返回 ACK</li>
+            <li>Leader 收到<strong>过半</strong> ACK 后发送 COMMIT，所有节点提交事务</li>
+            <li>只须过半确认而非全部，因此允许少数节点故障</li>
+          </ul>
+          <div class="tip">ZAB 与 Paxos/Raft 的关键区别：ZAB 保证消息的因果顺序（因果一致性），zxid 全局递增保证了顺序性。</div>
+        </div>
+
+        <!-- 1-3 选举机制 -->
+        <h3 id="s1-3">选举机制</h3>
+
+        <div class="card">
+          <h4>FastLeaderElection 算法</h4>
+          <pre><code>// 选举投票格式：(voteId, voteZxid, voteEpoch)
+// voteId: 候选节点的 myid
+// voteZxid: 候选节点的最新事务 ID
+// voteEpoch: 当前轮次
+
+// 选举规则（优先级从高到低）：
+// 1. epoch 大的胜出（新轮次优先）
+// 2. zxid 大的胜出（数据最新的优先）
+// 3. myid 大的胜出（ID 大的优先）
+
+// 选举流程（3 节点集群首次启动）：
+// 1. 节点 A(myid=1) 启动，投自己一票 (1,0,0)
+// 2. 节点 B(myid=2) 启动，投自己一票 (2,0,0)
+// 3. 节点 A 收到 B 的票，比较：B.myid(2) > A.myid(1)
+//    A 改投 B，A 的票变为 (2,0,0)
+// 4. B 收到 A 的票，发现自己的票已有 2 票（过半）
+//    B 当选 Leader，A 变为 Follower
+// 5. 节点 C(myid=3) 启动，发现已有 Leader，直接成为 Follower</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>节点状态</h4>
+          <table>
+            <thead>
+              <tr><th>状态</th><th>含义</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">LOOKING</span></td><td>正在寻找 Leader，发起投票</td></tr>
+              <tr><td><span class="badge badge-green">FOLLOWING</span></td><td>已发现 Leader，作为 Follower 跟随</td></tr>
+              <tr><td><span class="badge badge-purple">LEADING</span></td><td>已当选 Leader，负责协调</td></tr>
+              <tr><td><span class="badge badge-orange">OBSERVING</span></td><td>Observer 节点，不参与投票</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">面试重点：选举需要过半节点参与才能成功。因此 2n+1 节点的集群最多容忍 n 个节点故障。推荐奇数节点（3/5/7）。</div>
+        </div>
+
+        <!-- 1-4 Watcher 机制 -->
+        <h3 id="s1-4">Watcher 机制</h3>
+
+        <div class="card">
+          <h4>Watcher 核心特点</h4>
+          <ul>
+            <li><strong>一次性触发：</strong>Watcher 被触发后自动移除，需要重新注册</li>
+            <li><strong>有序性：</strong>客户端先收到 Watcher 通知，再读取到新数据</li>
+            <li><strong>轻量级：</strong>WatchEvent 只包含通知类型和节点路径，不包含数据</li>
+            <li><strong>异步通知：</strong>服务端通过异步线程发送 Watcher 通知</li>
+          </ul>
+          <pre><code>// Watcher 事件类型
+enum EventType {
+    NodeCreated,        // 节点创建
+    NodeDeleted,        // 节点删除
+    NodeDataChanged,    // 节点数据变更
+    NodeChildrenChanged // 子节点变更
+}
+
+// 注册方式（三种）
+// 1. getData() - 监听节点数据变更
+// 2. exists() - 监听节点创建/删除/数据变更
+// 3. getChildren() - 监听子节点变更
+
+// Java API 示例
+zk.exists("/config/db", new Watcher() {
+    @Override
+    public void process(WatchedEvent event) {
+        if (event.getType() == Event.EventType.NodeDataChanged) {
+            byte[] data = zk.getData("/config/db", this, null);
+            // 重新注册 Watcher 并处理新数据
+        }
+    }
+});</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Curator 的 NodeCache / TreeCache</h4>
+          <ul>
+            <li><strong>NodeCache：</strong>封装了 Watcher 的自动重注册，监听单个节点的变更</li>
+            <li><strong>PathChildrenCache：</strong>监听子节点的变更，自动维护子节点列表</li>
+            <li><strong>TreeCache：</strong>监听整棵子树的变更（NodeCache + PathChildrenCache 的结合）</li>
+          </ul>
+          <pre><code>// Curator NodeCache 示例（自动重注册 Watcher）
+NodeCache nodeCache = new NodeCache(client, "/config/db");
+nodeCache.getListenable().addListener(() -> {
+    byte[] data = nodeCache.getCurrentData().getData();
+    // 自动重注册，无需手动处理
+});
+nodeCache.start();</code></pre>
+        </div>
+
+        <!-- 1-5 会话管理 -->
+        <h3 id="s1-5">会话管理</h3>
+
+        <div class="card">
+          <h4>Session 生命周期</h4>
+          <div class="diagram">
+            <div class="diagram-title">Session 状态流转</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">CONNECTING<br><small>正在连接</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">CONNECTED<br><small>已连接</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">RECONNECTING<br><small>重连中</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">CLOSED<br><small>已关闭</small></div>
+            </div>
+          </div>
+          <ul>
+            <li>Session 超时时间由客户端设置（默认 30 秒），不能小于 2 倍的 tickTime</li>
+            <li>客户端定期向 Server 发送心跳（PING）维持 Session，默认间隔为超时时间的 1/3</li>
+            <li>Server 超过 Session 超时时间未收到心跳，会删除该 Session 的所有临时节点</li>
+            <li>客户端断开后在 Session 超时时间内重连到其他 Server，Session 仍然有效</li>
+          </ul>
+          <div class="tip">Session 临时窗口（Session Timeout Window）：客户端断开后，Server 不会立即删除临时节点，而是等待 Session 超时。这为重连提供了缓冲时间。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 分布式锁 -->
+        <h3 id="s2-1">分布式锁</h3>
+
+        <div class="card">
+          <h4>临时顺序节点实现公平锁</h4>
+          <pre><code>// 基于 Curator 的分布式锁实现
+InterProcessMutex lock = new InterProcessMutex(client, "/locks/order-lock");
+
+if (lock.acquire(10, TimeUnit.SECONDS)) {
+    try {
+        // 执行业务逻辑
+    } finally {
+        lock.release();
+    }
+}
+
+// 底层实现原理：
+// 1. 在 /locks/order-lock 下创建临时顺序节点
+//    /locks/order-lock/_c_uuid1_0000000001
+//    /locks/order-lock/_c_uuid2_0000000002
+//    /locks/order-lock/_c_uuid3_0000000003
+// 2. 获取所有子节点，判断自己是否是最小的
+// 3. 如果是最小的 → 获取锁
+// 4. 如果不是 → Watch 比自己小一号的节点
+// 5. 当 Watch 的节点删除时（释放锁），收到通知，再次判断
+// 效果：公平有序，避免惊群效应</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>读写锁</h4>
+          <pre><code>// Curator 读写锁
+InterProcessReadWriteLock rwLock = new InterProcessReadWriteLock(client, "/locks/rw");
+// 读锁（共享）
+InterProcessMutex readLock = rwLock.readLock();
+// 写锁（独占）
+InterProcessMutex writeLock = rwLock.writeLock();
+
+// 读操作：多个读者可同时进行
+readLock.acquire();
+try { /* 读取数据 */ } finally { readLock.release(); }
+
+// 写操作：独占
+writeLock.acquire();
+try { /* 修改数据 */ } finally { writeLock.release(); }</code></pre>
+        </div>
+
+        <!-- 2-2 典型应用 -->
+        <h3 id="s2-2">典型应用</h3>
+
+        <div class="card">
+          <h4>典型应用场景</h4>
+          <table>
+            <thead>
+              <tr><th>场景</th><th>实现方式</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>配置中心</strong></td><td>持久节点 + Watcher</td><td>配置存 ZNode，客户端 Watch 监听变更</td></tr>
+              <tr><td><strong>服务注册</strong></td><td>临时节点</td><td>服务注册为临时节点，断连自动删除</td></tr>
+              <tr><td><strong>分布式锁</strong></td><td>临时顺序节点</td><td>公平锁，避免惊群效应</td></tr>
+              <tr><td><strong>Leader 选举</strong></td><td>临时顺序节点</td><td>最小节点成为 Leader</td></tr>
+              <tr><td><strong>命名服务</strong></td><td>持久顺序节点</td><td>全局唯一 ID 生成</td></tr>
+              <tr><td><strong>队列</strong></td><td>临时顺序节点</td><td>FIFO 消息队列（不推荐生产使用）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-3 集群 -->
+        <h3 id="s2-3">Zookeeper 集群</h3>
+
+        <div class="card">
+          <h4>集群角色与过半机制</h4>
+          <ul>
+            <li><strong>Leader：</strong>处理所有写请求，协调事务顺序</li>
+            <li><strong>Follower：</strong>处理读请求，参与投票和事务确认</li>
+            <li><strong>Observer：</strong>处理读请求，不参与投票（用于扩展读能力）</li>
+          </ul>
+          <pre><code>// 集群配置 zoo.cfg
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/var/lib/zookeeper
+server.1=zk1:2888:3888
+server.2=zk2:2888:3888
+server.3=zk3:2888:3888
+# Observer 配置
+server.4=zk4:2888:3888:observer
+
+// 端口说明：
+// 2888 - Follower 与 Leader 通信端口
+// 3888 - 选举端口
+
+// 过半机制（Quorum）：
+// 3 节点集群 → 至少 2 节点存活
+// 5 节点集群 → 至少 3 节点存活
+// 2n+1 节点 → 最多容忍 n 节点故障</code></pre>
+          <div class="tip">Observer 的作用：不参与写操作的投票，因此不影响写性能。增加 Observer 可以扩展读能力而不影响集群的写性能和选举速度。</div>
+        </div>
+
+        <!-- 2-4 对比 -->
+        <h3 id="s2-4">ZK vs etcd vs Consul</h3>
+
+        <div class="card">
+          <h4>分布式协调服务对比</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>Zookeeper</th><th>etcd</th><th>Consul</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>语言</td><td>Java</td><td>Go</td><td>Go</td></tr>
+              <tr><td>一致性协议</td><td>ZAB</td><td>Raft</td><td>Raft</td></tr>
+              <tr><td>数据模型</td><td>树形 ZNode</td><td>KV（前缀匹配）</td><td>KV + 服务目录</td></tr>
+              <tr><td>健康检查</td><td>Session 心跳</td><td>Lease TTL</td><td>HTTP/TCP/Script/gRPC</td></tr>
+              <tr><td>Watch 机制</td><td>一次性 Watcher</td><td>持续 Watch（长连接）</td><td>Blocking Query</td></tr>
+              <tr><td>多数据中心</td><td>❌</td><td>❌</td><td>✅ 原生支持</td></tr>
+              <tr><td>服务发现</td><td>需自行实现</td><td>需自行实现</td><td>✅ 内置</td></tr>
+              <tr><td>使用复杂度</td><td>高</td><td>中</td><td>低</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">选型建议：Kafka/Hadoop 生态选 Zookeeper；Kubernetes 生态选 etcd；需要完整服务治理能力选 Consul。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请介绍 Zookeeper 的数据模型，ZNode 有哪些类型？</div>
+          <div class="a">
+            <strong>参考：</strong>Zookeeper 使用树形数据模型，每个节点称为 ZNode。ZNode 有四种类型：1）持久节点 — 创建后一直存在，需手动删除，适合存储配置信息；2）临时节点 — 与客户端 Session 绑定，Session 断开后自动删除，适合服务注册；3）持久顺序节点 — 持久 + 自增序号，适合全局 ID 生成；4）临时顺序节点 — 临时 + 自增序号，适合分布式锁（公平锁）。每个 ZNode 可以存储数据（最大 1MB）和子节点，还有版本号用于乐观锁控制。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ZAB 协议的工作流程是什么？与 Paxos 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>ZAB（Zookeeper Atomic Broadcast）有两个模式：崩溃恢复和消息广播。消息广播类似 2PC：Leader 为写请求生成 Proposal（带全局递增 zxid），广播给 Follower，收到过半 ACK 后发送 COMMIT。崩溃恢复：Leader 故障后所有节点进入 LOOKING 状态，通过 FastLeaderElection 选出新 Leader（比较 epoch > zxid > myid），新 Leader 确保所有 Follower 数据同步后切换到消息广播模式。与 Paxos 的区别：ZAB 保证消息的因果顺序（通过 zxid），Paxos 不保证顺序；ZAB 有明确的 Leader 角色，Paxos 的 proposer 可以是任意节点。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Zookeeper 的选举机制是如何工作的？为什么推荐奇数节点？</div>
+          <div class="a">
+            <strong>参考：</strong>Zookeeper 使用 FastLeaderElection 算法。每个节点投票格式为 (myid, zxid, epoch)，选举规则优先级：epoch > zxid > myid。流程：节点启动进入 LOOKING 状态并投自己一票，将投票广播给其他节点；收到其他节点的投票后比较，如果对方更优则改票并广播；当一个节点获得过半投票时当选 Leader。推荐奇数节点的原因：3 节点和 4 节点的容错能力相同（都只能容忍 1 个节点故障），但 3 节点的投票确认开销更小（2 vs 2 过半，但 4 节点多一个节点的资源消耗）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Zookeeper 的 Watcher 机制有什么特点？为什么是一次性触发？</div>
+          <div class="a">
+            <strong>参考：</strong>Watcher 的核心特点：1）一次性触发 — 触发后自动移除，需要重新注册；2）有序性 — 客户端先收到 Watcher 通知，再读到新数据；3）轻量级 — WatchEvent 只包含事件类型和路径，不包含数据。一次性触发的设计原因：减少服务端存储压力，避免大量 Watcher 累积；简化服务端通知逻辑，不需要维护复杂的订阅关系。实际使用中通常在 Watcher 回调中重新注册 Watcher。Curator 的 NodeCache 封装了自动重注册逻辑，简化了使用。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何用 Zookeeper 实现分布式锁？临时顺序节点的优势是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>基于临时顺序节点实现公平锁的流程：1）在锁节点下创建临时顺序节点；2）获取所有子节点，判断自己是否是最小的；3）是最小的则获取锁成功；4）不是最小的则 Watch 比自己小一号的节点；5）Watch 的节点删除时收到通知，重新判断。临时顺序节点的优势：临时性保证 Session 断开自动释放锁（避免死锁）；顺序性避免惊群效应（只 Watch 前一个节点而非所有节点），实现公平有序获取。Curator 的 InterProcessMutex 封装了这个逻辑。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Zookeeper 的 Session 机制是什么？断连后临时节点会怎样？</div>
+          <div class="a">
+            <strong>参考：</strong>Session 是客户端与 Zookeeper 服务端之间的会话。客户端连接时创建 Session，分配 SessionID。客户端定期发送心跳（PING）维持 Session，默认间隔为 Session 超时时间的 1/3。如果客户端断开连接，在 Session 超时时间内重连到其他 Server，Session 仍然有效，临时节点不会被删除。超过 Session 超时时间未重连，Server 会删除该 Session 的所有临时节点。因此 Session 超时时间的设置很关键：太短容易误删，太长故障感知慢。建议设置为 10~30 秒。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Zookeeper 集群中的 Observer 节点有什么作用？</div>
+          <div class="a">
+            <strong>参考：</strong>Observer 是 Zookeeper 的一种特殊角色，只处理读请求，不参与 Leader 投票和事务确认。Observer 的作用：1）扩展读能力 — 增加 Observer 不影响写性能和选举速度；2）跨机房部署 — Observer 可以部署在远程机房，读请求就近处理，不影响主机房的写性能。Observer 从 Leader 同步数据（与 Follower 相同），但不参与过半确认。典型用法：3 节点集群（1 Leader + 2 Follower）保证写可用性，再加 N 个 Observer 扩展读能力。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">在实际项目中，Zookeeper 作为配置中心和注册中心各有什么优缺点？</div>
+          <div class="a">
+            <strong>参考：</strong>配置中心：优点是 Watcher 机制可实时感知配置变更，ZAB 协议保证强一致性。缺点是 Watcher 一次性触发需重新注册，数据量有限（1MB/节点），大量配置管理不方便。注册中心：优点是临时节点天然支持服务注册（断连自动删除），Watch 机制支持服务发现。缺点是 CP 模型在 Leader 选举期间不可用，大规模实例下性能不如 AP 系统（如 Nacos）。现在很多项目已从 Zookeeper 迁移到 Nacos/Consul 等更现代的方案。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Zookeeper · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

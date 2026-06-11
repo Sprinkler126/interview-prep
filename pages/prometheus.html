@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prometheus - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>📈 Prometheus</h1>
+    <p class="subtitle">指标采集 · PromQL · 告警 · 服务发现 · 存储</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">指标类型</a></li>
+          <li class="sub"><a href="#s1-3">Pull vs Push</a></li>
+          <li class="sub"><a href="#s1-4">PromQL 查询</a></li>
+          <li class="sub"><a href="#s1-5">告警规则与 Alertmanager</a></li>
+          <li class="sub"><a href="#s1-6">服务发现</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">存储（TSDB / 远程存储）</a></li>
+          <li class="sub"><a href="#s2-2">Exporter 机制</a></li>
+          <li class="sub"><a href="#s2-3">与 Grafana 集成</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Prometheus 生态架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">Exporters<br><small>node / mysql / redis</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">应用暴露<br><small>/metrics 端点</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Pushgateway<br><small>短期任务推送</small></div>
+            </div>
+            <div class="arch-connector">↓ Pull 拉取 / Push 推送 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>Prometheus Server</strong><br>
+                <small>Retrieval（采集） + TSDB（存储） + HTTP API（查询）</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 触发告警 / 查询展示 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Alertmanager<br><small>告警分组/抑制/路由</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Grafana<br><small>可视化仪表盘</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">PromQL<br><small>查询语言</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心组件</h4>
+          <table>
+            <thead>
+              <tr><th>组件</th><th>职责</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Prometheus Server</strong></td><td>核心组件，负责指标采集、存储和查询。包含 Retrieval（拉取指标）、TSDB（时序数据库）、HTTP API</td></tr>
+              <tr><td><strong>Pushgateway</strong></td><td>接收短期任务（如 CronJob）推送的指标，供 Prometheus 拉取</td></tr>
+              <tr><td><strong>Alertmanager</strong></td><td>接收告警通知，支持分组、抑制、静默、路由</td></tr>
+              <tr><td><strong>Exporters</strong></td><td>将第三方系统的指标转换为 Prometheus 格式（node_exporter、mysqld_exporter 等）</td></tr>
+              <tr><td><strong>Service Discovery</strong></td><td>自动发现监控目标（K8s、Consul、文件等）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-2 指标类型 -->
+        <h3 id="s1-2">指标类型</h3>
+
+        <div class="card">
+          <h4>四种指标类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>特点</th><th>典型场景</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">Counter</span></td>
+                <td>计数器</td>
+                <td>只增不减（除非重启），单调递增</td>
+                <td>请求总数、错误数、处理字节数</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-green">Gauge</span></td>
+                <td>仪表盘</td>
+                <td>可增可减，反映当前值</td>
+                <td>CPU 使用率、内存使用、温度、队列长度</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">Histogram</span></td>
+                <td>直方图</td>
+                <td>对数据分桶统计，可计算分位数</td>
+                <td>请求延迟分布、响应大小分布</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-orange">Summary</span></td>
+                <td>摘要</td>
+                <td>客户端计算分位数，不可聚合</td>
+                <td>请求延迟（客户端计算 p99）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Histogram vs Summary</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>Histogram</h4>
+              <ul>
+                <li>服务端计算分位数（<code>histogram_quantile</code>）</li>
+                <li>可以跨实例聚合</li>
+                <li>数据量较大（多个 bucket）</li>
+                <li><strong>推荐使用</strong></li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>Summary</h4>
+              <ul>
+                <li>客户端计算分位数</li>
+                <li>不可跨实例聚合</li>
+                <li>数据量较小</li>
+                <li>适合单实例监控</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-3 Pull vs Push -->
+        <h3 id="s1-3">Pull vs Push 模式</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>Pull 模式（默认）</h4>
+            <ul>
+              <li>Prometheus <strong>主动拉取</strong>目标的 /metrics</li>
+              <li>目标不需要知道 Prometheus 地址</li>
+              <li>便于集中管理和监控目标健康</li>
+              <li>适合长期运行的服务</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>Push 模式（Pushgateway）</h4>
+            <ul>
+              <li>应用<strong>主动推送</strong>指标到 Pushgateway</li>
+              <li>Prometheus 再从 Pushgateway 拉取</li>
+              <li>适合短期任务（CronJob、Batch Job）</li>
+              <li>注意：可能丢失指标（Pushgateway 不持久化）</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="warn">不要滥用 Pushgateway。长期运行的服务应使用 Pull 模式直接暴露 /metrics 端点。Pushgateway 适合无法长期运行的批处理任务。Pushgateway 重启后指标会丢失。</div>
+
+        <!-- 1-4 PromQL -->
+        <h3 id="s1-4">PromQL 查询</h3>
+
+        <div class="card">
+          <h4>常用函数</h4>
+          <table>
+            <thead>
+              <tr><th>函数</th><th>用途</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>rate()</code></td>
+                <td>计算 Counter 在时间窗口内的<strong>每秒平均增长率</strong></td>
+                <td><code>rate(http_requests_total[5m])</code></td>
+              </tr>
+              <tr>
+                <td><code>increase()</code></td>
+                <td>计算 Counter 在时间窗口内的<strong>总增量</strong></td>
+                <td><code>increase(http_requests_total[1h])</code></td>
+              </tr>
+              <tr>
+                <td><code>irate()</code></td>
+                <td>基于最近两个数据点的<strong>瞬时增长率</strong></td>
+                <td><code>irate(http_requests_total[5m])</code></td>
+              </tr>
+              <tr>
+                <td><code>histogram_quantile()</code></td>
+                <td>从 Histogram 计算<strong>分位数</strong></td>
+                <td><code>histogram_quantile(0.99, rate(http_duration_bucket[5m]))</code></td>
+              </tr>
+              <tr>
+                <td><code>sum()</code></td>
+                <td>求和</td>
+                <td><code>sum(rate(http_requests_total[5m])) by (method)</code></td>
+              </tr>
+              <tr>
+                <td><code>avg()</code></td>
+                <td>平均值</td>
+                <td><code>avg(cpu_usage_percent) by (instance)</code></td>
+              </tr>
+              <tr>
+                <td><code>topk()</code></td>
+                <td>取 Top K</td>
+                <td><code>topk(5, rate(http_requests_total[5m]))</code></td>
+              </tr>
+              <tr>
+                <td><code>label_replace()</code></td>
+                <td>标签替换/提取</td>
+                <td>用于标签维度转换</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>PromQL 实战示例</h4>
+          <pre><code># 请求 QPS（按状态码分组）
+sum(rate(http_requests_total[5m])) by (status_code)
+
+# P99 延迟
+histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+
+# CPU 使用率
+100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# 内存使用率
+(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+
+# 磁盘使用率
+(1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100
+
+# 错误率
+sum(rate(http_requests_total{status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100</code></pre>
+        </div>
+
+        <!-- 1-5 告警规则 -->
+        <h3 id="s1-5">告警规则与 Alertmanager</h3>
+
+        <div class="card">
+          <h4>告警规则定义</h4>
+          <pre><code># prometheus.yml 中定义告警规则
+groups:
+  - name: example
+    rules:
+      # 高错误率告警
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m              # 持续 5 分钟才触发
+        labels:
+          severity: critical
+        annotations:
+          summary: "高错误率告警: {{ $value | humanizePercentage }}"
+          description: "服务 {{ $labels.service }} 错误率超过 5%"
+
+      # 实例宕机告警
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 宕机"</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Alertmanager 功能</h4>
+          <table>
+            <thead>
+              <tr><th>功能</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>分组（Grouping）</strong></td><td>将相关告警合并为一条通知</td><td>同一服务的多个实例宕机合并</td></tr>
+              <tr><td><strong>抑制（Inhibition）</strong></td><td>高优先级告警抑制低优先级</td><td>网络故障时抑制下游服务告警</td></tr>
+              <tr><td><strong>静默（Silence）</strong></td><td>临时屏蔽特定告警</td><td>维护窗口期间静默告警</td></tr>
+              <tr><td><strong>路由（Route）</strong></td><td>根据标签路由到不同接收者</td><td>critical → 电话，warning → 钉钉</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-6 服务发现 -->
+        <h3 id="s1-6">服务发现</h3>
+
+        <div class="card">
+          <h4>服务发现方式</h4>
+          <table>
+            <thead>
+              <tr><th>方式</th><th>说明</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>静态配置</strong></td><td>在 prometheus.yml 中硬编码目标地址</td><td>固定环境、少量目标</td></tr>
+              <tr><td><strong>Kubernetes SD</strong></td><td>自动发现 K8s 中的 Pod、Service、Node</td><td>K8s 环境</td></tr>
+              <tr><td><strong>Consul SD</strong></td><td>从 Consul 服务注册中心发现目标</td><td>使用 Consul 的微服务</td></tr>
+              <tr><td><strong>File SD</strong></td><td>从 JSON/YAML 文件读取目标列表</td><td>动态环境、自定义脚本</td></tr>
+              <tr><td><strong>DNS SD</strong></td><td>通过 DNS 解析发现目标</td><td>基于 DNS 的服务发现</td></tr>
+            </tbody>
+          </table>
+          <pre><code># 静态配置
+scrape_configs:
+  - job_name: 'node'
+    static_configs:
+      - targets: ['192.168.1.10:9100', '192.168.1.11:9100']
+
+# Kubernetes 服务发现
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: $1</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 存储 -->
+        <h3 id="s2-1">存储（TSDB / 远程存储）</h3>
+
+        <div class="card">
+          <h4>本地存储（TSDB）</h4>
+          <ul>
+            <li>Prometheus 内置时序数据库（TSDB），基于 LSM-Tree 结构</li>
+            <li>数据按 2 小时为一个 Block 存储，每个 Block 包含 chunks（数据）和 index（索引）</li>
+            <li>默认保留 15 天，可通过 <code>--storage.tsdb.retention.time</code> 调整</li>
+            <li>适合单机短期存储，不适合长期数据保留</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>远程存储方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>特点</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Thanos</strong></td><td>CNCF 项目，全局查询、长期存储、降采样</td><td>大规模集群、多集群监控</td></tr>
+              <tr><td><strong>VictoriaMetrics</strong></td><td>高性能、低资源占用、兼容 PromQL</td><td>高性能需求、替代本地存储</td></tr>
+              <tr><td><strong>Cortex</strong></td><td>多租户、水平扩展</td><td>SaaS 平台、多租户场景</td></tr>
+              <tr><td><strong>Mimir</strong></td><td>Grafana 出品，基于 Cortex</td><td>Grafana 生态用户</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-2 Exporter -->
+        <h3 id="s2-2">Exporter 机制</h3>
+
+        <div class="card">
+          <h4>常用 Exporter</h4>
+          <table>
+            <thead>
+              <tr><th>Exporter</th><th>监控对象</th><th>默认端口</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>node_exporter</strong></td><td>Linux 主机（CPU / 内存 / 磁盘 / 网络）</td><td>9100</td></tr>
+              <tr><td><strong>mysqld_exporter</strong></td><td>MySQL 数据库</td><td>9104</td></tr>
+              <tr><td><strong>redis_exporter</strong></td><td>Redis</td><td>9121</td></tr>
+              <tr><td><strong>kafka_exporter</strong></td><td>Kafka</td><td>9308</td></tr>
+              <tr><td><strong>blackbox_exporter</strong></td><td>HTTP / TCP / ICMP 探测</td><td>9115</td></tr>
+              <tr><td><strong>nginx_exporter</strong></td><td>Nginx</td><td>9113</td></tr>
+            </tbody>
+          </table>
+          <pre><code># 自定义 Exporter 核心步骤
+# 1. 实现 /metrics 端点，返回 Prometheus 文本格式
+# 2. 注册 Collector，实现 Collect() 方法
+# 3. 暴露指标：
+
+# HELP myapp_requests_total Total number of requests
+# TYPE myapp_requests_total counter
+myapp_requests_total{method="GET",status="200"} 1234
+myapp_requests_total{method="POST",status="200"} 567</code></pre>
+        </div>
+
+        <!-- 2-3 Grafana 集成 -->
+        <h3 id="s2-3">与 Grafana 集成</h3>
+
+        <div class="card">
+          <h4>集成步骤</h4>
+          <ol>
+            <li>在 Grafana 中添加 Prometheus 作为数据源（Configuration → Data Sources → Add → Prometheus）</li>
+            <li>填写 Prometheus Server 地址（如 <code>http://prometheus:9090</code>）</li>
+            <li>创建 Dashboard，添加 Panel</li>
+            <li>在 Panel 中使用 PromQL 查询</li>
+            <li>推荐导入社区 Dashboard（如 Node Exporter Full ID: 1860）</li>
+          </ol>
+          <div class="tip">Grafana 官方提供大量社区 Dashboard 模板，可在 grafana.com/grafana/dashboards 搜索导入，避免从零创建。</div>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">Prometheus 的架构是怎样的？各组件有什么作用？</div>
+          <div class="a">
+            <strong>参考：</strong>Prometheus 采用 Pull 模式采集指标。核心组件：Prometheus Server 负责指标拉取、存储（TSDB）和查询（PromQL）。Pushgateway 接收短期任务推送的指标。Alertmanager 接收告警并处理分组、抑制、静默、路由。Exporters 将第三方系统指标转换为 Prometheus 格式。Service Discovery 自动发现监控目标。Grafana 负责可视化展示。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Prometheus 的四种指标类型分别是什么？Histogram 和 Summary 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Counter（计数器，只增不减，如请求总数）、Gauge（仪表盘，可增可减，如 CPU 使用率）、Histogram（直方图，分桶统计，可计算分位数）、Summary（摘要，客户端计算分位数）。Histogram 和 Summary 的核心区别：Histogram 在服务端计算分位数，可以跨实例聚合，推荐使用；Summary 在客户端计算，不可聚合，适合单实例。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>rate() 和 irate() 有什么区别？该用哪个？</div>
+          <div class="a">
+            <strong>参考：</strong>rate() 计算时间窗口内每秒平均增长率，结果平滑，适合告警规则和趋势图。irate() 基于最近两个数据点计算瞬时增长率，灵敏度高，适合观察短期波动。告警和趋势分析用 rate()，仪表盘实时展示用 irate()。一般推荐 rate()，因为 irate() 容易被毛刺干扰。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 Prometheus 的 Pull 模式？和 Push 模式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Pull 模式是 Prometheus 主动从目标的 /metrics 端点拉取指标，目标只需暴露 HTTP 端点，不需要知道 Prometheus 地址。优势：集中管理、便于监控目标健康。Push 模式是应用主动推送指标到 Pushgateway，适合短期任务（如 CronJob），因为任务结束前 Prometheus 可能来不及拉取。长期运行的服务应使用 Pull 模式。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Prometheus 的本地存储有什么局限？如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>Prometheus 内置 TSDB 是单机存储，默认保留 15 天，不支持水平扩展和长期保留。解决方案：1）Thanos：提供全局查询、长期存储（对象存储如 S3）、降采样；2）VictoriaMetrics：高性能时序数据库，兼容 PromQL，资源占用更低；3）Remote Write：将数据写入远程存储，Prometheus 只负责采集。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Alertmanager 的分组、抑制、静默分别是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>分组（Grouping）将相关告警合并为一条通知，避免告警风暴（如同一服务多个实例同时宕机只发一条）。抑制（Inhibition）当高优先级告警触发时，自动抑制相关的低优先级告警（如网络故障时抑制下游服务告警）。静默（Silence）在维护窗口等场景下临时屏蔽特定告警，到期自动恢复。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>什么是 Exporter？如何自定义 Exporter？</div>
+          <div class="a">
+            <strong>参考：</strong>Exporter 是将第三方系统指标转换为 Prometheus 格式的组件。它暴露一个 /metrics HTTP 端点，返回 Prometheus 文本格式的指标。自定义步骤：1）使用 Prometheus 客户端库（如 prometheus/client_golang）；2）实现 Collector 接口的 Collect() 方法；3）注册指标（Counter/Gauge/Histogram）；4）暴露 HTTP 端点。也可以使用 textfile Collector 从文件读取指标。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Prometheus · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

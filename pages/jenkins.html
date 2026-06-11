@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jenkins / GitLab CI - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🔧 Jenkins / GitLab CI</h1>
+    <p class="subtitle">Pipeline · CI/CD · 构建 · 部署自动化 · GitOps</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Jenkins Pipeline</a></li>
+          <li class="sub"><a href="#s1-2">Jenkinsfile 语法</a></li>
+          <li class="sub"><a href="#s1-3">Jenkins 插件</a></li>
+          <li class="sub"><a href="#s1-4">GitLab CI</a></li>
+          <li class="sub"><a href="#s1-5">CI/CD 最佳实践</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">制品管理</a></li>
+          <li class="sub"><a href="#s2-2">部署策略</a></li>
+          <li class="sub"><a href="#s2-3">GitOps</a></li>
+          <li class="sub"><a href="#s2-4">工具对比</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 Jenkins Pipeline -->
+        <h3 id="s1-1">Jenkins Pipeline</h3>
+
+        <div class="card">
+          <h4>声明式 vs 脚本式 Pipeline</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>声明式（Declarative）</h4>
+              <ul>
+                <li>结构化语法，易读易维护</li>
+                <li>必须在 <code>pipeline {}</code> 块内</li>
+                <li>提供更好的语法校验</li>
+                <li>支持 Blue Ocean 可视化</li>
+                <li><strong>推荐使用</strong></li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>脚本式（Scripted）</h4>
+              <ul>
+                <li>Groovy 脚本，灵活性高</li>
+                <li>在 <code>node {}</code> 块内编写</li>
+                <li>语法校验较弱</li>
+                <li>可以使用所有 Groovy 特性</li>
+                <li>适合复杂逻辑</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-2 Jenkinsfile 语法 -->
+        <h3 id="s1-2">Jenkinsfile 语法</h3>
+
+        <div class="card">
+          <h4>声明式 Pipeline 完整示例</h4>
+          <pre><code>pipeline {
+    agent any  // 或 agent { docker { image 'maven:3.9-eclipse-temurin-17' } }
+
+    environment {
+        DOCKER_REGISTRY = 'registry.example.com'
+        APP_NAME = 'my-app'
+        VERSION = "${env.BUILD_NUMBER}"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'registry-creds') {
+                        def image = docker.build("${DOCKER_REGISTRY}/${APP_NAME}:${VERSION}")
+                        image.push()
+                        image.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh "kubectl set image deployment/${APP_NAME} ${APP_NAME}=${DOCKER_REGISTRY}/${APP_NAME}:${VERSION}"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded!'
+            // 通知：钉钉、邮件等
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+        always {
+            cleanWs()  // 清理工作空间
+        }
+    }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>核心指令说明</h4>
+          <table>
+            <thead>
+              <tr><th>指令</th><th>作用</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>agent</code></td><td>指定执行节点</td><td><code>any</code>（任意节点）、<code>docker</code>（Docker 容器）、<code>label</code>（指定节点标签）</td></tr>
+              <tr><td><code>stages</code></td><td>定义阶段集合</td><td>包含多个 stage，按顺序执行</td></tr>
+              <tr><td><code>stage</code></td><td>定义单个阶段</td><td>包含 steps，是 Pipeline 的基本单元</td></tr>
+              <tr><td><code>steps</code></td><td>定义具体步骤</td><td>sh、bat、checkout 等操作</td></tr>
+              <tr><td><code>environment</code></td><td>定义环境变量</td><td>全局或 stage 级别</td></tr>
+              <tr><td><code>when</code></td><td>条件执行</td><td><code>branch</code>、<code>expression</code>、<code>not</code> 等</td></tr>
+              <tr><td><code>post</code></td><td>后置操作</td><td><code>success</code>、<code>failure</code>、<code>always</code></td></tr>
+              <tr><td><code>parallel</code></td><td>并行执行</td><td>多个 stage 同时执行</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-3 Jenkins 插件 -->
+        <h3 id="s1-3">Jenkins 插件</h3>
+
+        <div class="card">
+          <h4>核心插件</h4>
+          <table>
+            <thead>
+              <tr><th>插件</th><th>用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Pipeline</strong></td><td>Pipeline as Code 支持（核心插件）</td></tr>
+              <tr><td><strong>Git</strong></td><td>Git 代码拉取</td></tr>
+              <tr><td><strong>Docker Pipeline</strong></td><td>Docker 构建和推送集成</td></tr>
+              <tr><td><strong>Kubernetes</strong></td><td>动态创建 K8s Pod 作为 Agent</td></tr>
+              <tr><td><strong>Blue Ocean</strong></td><td>Pipeline 可视化界面</td></tr>
+              <tr><td><strong>Credentials</strong></td><td>凭证管理（密码、Token、SSH Key）</td></tr>
+              <tr><td><strong>SonarQube Scanner</strong></td><td>代码质量扫描集成</td></tr>
+              <tr><td><strong>Nexus Artifact Uploader</strong></td><td>制品上传到 Nexus</td></tr>
+              <tr><td><strong>Pipeline Utility Steps</strong></td><td>实用工具步骤（readJSON、writeJSON 等）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-4 GitLab CI -->
+        <h3 id="s1-4">GitLab CI</h3>
+
+        <div class="card">
+          <h4>.gitlab-ci.yml 语法</h4>
+          <pre><code># 全局配置
+image: maven:3.9-eclipse-temurin-17
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  DOCKER_REGISTRY: "registry.example.com"
+
+# 缓存配置
+cache:
+  paths:
+    - .m2/repository/
+
+# 定义阶段（按顺序执行）
+stages:
+  - build
+  - test
+  - quality
+  - deploy
+
+# 构建任务
+build:
+  stage: build
+  script:
+    - mvn clean package -DskipTests
+  artifacts:
+    paths:
+      - target/*.jar
+    expire_in: 1 hour
+
+# 测试任务
+test:
+  stage: test
+  script:
+    - mvn test
+  artifacts:
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
+  coverage: '/Code coverage: (\d+\.?\d*)%/'
+
+# 代码质量检查
+sonarqube:
+  stage: quality
+  script:
+    - mvn sonar:sonar
+  only:
+    - merge_requests
+    - main
+
+# 部署到生产（仅 main 分支）
+deploy-prod:
+  stage: deploy
+  script:
+    - docker build -t $DOCKER_REGISTRY/my-app:$CI_COMMIT_SHA .
+    - docker push $DOCKER_REGISTRY/my-app:$CI_COMMIT_SHA
+    - kubectl set image deployment/my-app my-app=$DOCKER_REGISTRY/my-app:$CI_COMMIT_SHA
+  only:
+    - main
+  when: manual          # 手动触发
+  environment:
+    name: production
+    url: https://my-app.example.com</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>GitLab CI 核心概念</h4>
+          <table>
+            <thead>
+              <tr><th>概念</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Pipeline</strong></td><td>一次 CI/CD 运行，包含多个 Stage</td></tr>
+              <tr><td><strong>Stage</strong></td><td>阶段（build → test → deploy），同阶段的 Job 并行执行</td></tr>
+              <tr><td><strong>Job</strong></td><td>最小执行单元，定义在某个 Stage 中</td></tr>
+              <tr><td><strong>Runner</strong></td><td>执行 Job 的代理（Shared Runner / Specific Runner）</td></tr>
+              <tr><td><strong>Artifact</strong></td><td>Job 产物，可在 Stage 间传递</td></tr>
+              <tr><td><strong>Cache</strong></td><td>缓存依赖，加速构建（如 .m2/repository）</td></tr>
+              <tr><td><strong>Environment</strong></td><td>部署环境（staging / production），支持回滚</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-5 CI/CD 最佳实践 -->
+        <h3 id="s1-5">CI/CD 最佳实践</h3>
+
+        <div class="card">
+          <h4>标准 Pipeline 流程</h4>
+          <div class="diagram">
+            <div class="diagram-title">CI/CD 最佳实践流水线</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">代码提交<br><small>Git Push / MR</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">代码检查<br><small>Lint / SonarQube</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">单元测试<br><small>JUnit / Coverage</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">构建打包<br><small>Docker Build</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">部署<br><small>K8s / 云平台</small></div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>代码提交触发：</strong>Git Push 或 Merge Request 自动触发 Pipeline</li>
+            <li><strong>代码质量门禁：</strong>SonarQube 扫描，不通过则阻断 Pipeline</li>
+            <li><strong>自动化测试：</strong>单元测试 + 集成测试，覆盖率阈值检查</li>
+            <li><strong>制品管理：</strong>构建产物推送到制品仓库（Nexus / Harbor）</li>
+            <li><strong>自动化部署：</strong>staging 自动部署，production 手动审批</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 制品管理 -->
+        <h3 id="s2-1">制品管理</h3>
+
+        <div class="card">
+          <h4>制品仓库对比</h4>
+          <table>
+            <thead>
+              <tr><th>工具</th><th>类型</th><th>支持格式</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Nexus</strong></td><td>通用制品仓库</td><td>Maven / npm / Docker / PyPI / NuGet</td><td>Java 项目、多语言项目</td></tr>
+              <tr><td><strong>Artifactory</strong></td><td>通用制品仓库</td><td>全格式支持</td><td>企业级、全格式需求</td></tr>
+              <tr><td><strong>Harbor</strong></td><td>Docker 镜像仓库</td><td>Docker / OCI</td><td>容器镜像管理、K8s 集成</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">制品一旦构建完成就不应再修改。使用不可变标签（如 Git SHA / Build Number），避免使用 <code>latest</code> 标签。</div>
+        </div>
+
+        <!-- 2-2 部署策略 -->
+        <h3 id="s2-2">部署策略</h3>
+
+        <div class="card">
+          <h4>三种部署策略对比</h4>
+          <table>
+            <thead>
+              <tr><th>策略</th><th>原理</th><th>回滚速度</th><th>资源消耗</th><th>风险</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-green">蓝绿部署</span></td>
+                <td>准备一套新环境（绿），验证通过后切换流量到绿环境，蓝环境保留作为回滚</td>
+                <td><strong>秒级</strong>（切换负载均衡）</td>
+                <td><strong>2 倍资源</strong></td>
+                <td>低</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">金丝雀部署</span></td>
+                <td>新版本先部署少量实例，逐步扩大流量比例（5%→20%→50%→100%）</td>
+                <td>快（缩容金丝雀）</td>
+                <td>少量额外</td>
+                <td>低</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-purple">滚动更新</span></td>
+                <td>逐步用新版本替换旧版本 Pod（K8s 默认策略）</td>
+                <td>较慢（逐个回滚）</td>
+                <td>少量额外</td>
+                <td>中</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Kubernetes 中的部署实践</h4>
+          <pre><code># 滚动更新配置
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%         # 最多多出 25% Pod
+      maxUnavailable: 0     # 不允许不可用
+
+# 金丝雀部署（通过 Ingress 权重路由）
+# Nginx Ingress 注解
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"   # 10% 流量</code></pre>
+        </div>
+
+        <!-- 2-3 GitOps -->
+        <h3 id="s2-3">GitOps</h3>
+
+        <div class="card">
+          <h4>GitOps 原理</h4>
+          <div class="diagram">
+            <div class="diagram-title">GitOps 工作流程</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">开发者推送代码</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">CI Pipeline<br><small>构建 + 测试 + 推送镜像</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">更新 Git 仓库<br><small>K8s manifests</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">GitOps 工具<br><small>ArgoCD / FluxCD</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-pink">自动同步到 K8s</div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>核心理念：</strong>Git 仓库是唯一的真理来源（Single Source of Truth）</li>
+            <li><strong>声明式：</strong>K8s 的 YAML 配置存放在 Git 中，描述期望状态</li>
+            <li><strong>自动同步：</strong>GitOps 工具持续监控 Git 仓库，自动将变更同步到集群</li>
+            <li><strong>审计追溯：</strong>所有变更都有 Git 提交记录，可追溯、可回滚</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>ArgoCD vs FluxCD</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>ArgoCD</th><th>FluxCD</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>UI</td><td><span class="badge badge-green">自带 Web UI</span></td><td>无自带 UI（可用 Weave GitOps）</td></tr>
+              <tr><td>多租户</td><td>AppProject 隔离</td><td>K8s Namespace 隔离</td></tr>
+              <tr><td>同步策略</td><td>手动/自动，支持 Sync Waves</td><td>自动同步，Kustomization 控制</td></tr>
+              <tr><td>Helm 支持</td><td>原生支持</td><td>原生支持</td></tr>
+              <tr><td>学习曲线</td><td>中等</td><td>较陡（纯 K8s 原生）</td></tr>
+              <tr><td>社区</td><td>CNCF 孵化项目</td><td>CNCF 孵化项目</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 工具对比 -->
+        <h3 id="s2-4">Jenkins vs GitLab CI vs GitHub Actions</h3>
+
+        <div class="card">
+          <h4>CI/CD 工具对比</h4>
+          <table>
+            <thead>
+              <tr><th>维度</th><th>Jenkins</th><th>GitLab CI</th><th>GitHub Actions</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>部署方式</td><td>自托管</td><td>SaaS / 自托管</td><td>SaaS</td></tr>
+              <tr><td>配置文件</td><td>Jenkinsfile</td><td>.gitlab-ci.yml</td><td>.github/workflows/*.yml</td></tr>
+              <tr><td>扩展性</td><td><span class="badge badge-green">最强</span>（插件生态）</td><td>中等</td><td>Marketplace Actions</td></tr>
+              <tr><td>学习曲线</td><td>较陡</td><td>中等</td><td><span class="badge badge-green">简单</span></td></tr>
+              <tr><td>维护成本</td><td><span class="badge badge-orange">高</span></td><td>中等</td><td><span class="badge badge-green">低</span></td></tr>
+              <tr><td>容器支持</td><td>好（需配置）</td><td><span class="badge badge-green">原生</span></td><td><span class="badge badge-green">原生</span></td></tr>
+              <tr><td>适用场景</td><td>复杂企业级 CI/CD</td><td>使用 GitLab 的团队</td><td>开源项目、GitHub 用户</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是 CI/CD？它们有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>CI（持续集成）是开发人员频繁将代码合并到主干，每次合并都自动触发构建和测试，尽早发现问题。CD 有两层含义：持续交付（Continuous Delivery）是代码随时可以部署到生产，但需要手动审批；持续部署（Continuous Deployment）是代码通过所有测试后自动部署到生产。典型流程：代码提交 → 自动构建 → 自动测试 → 自动部署到 staging → 手动审批 → 部署到 production。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Jenkins Pipeline 的声明式和脚本式有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>声明式 Pipeline 使用结构化语法（pipeline/stages/stage/steps），易读易维护，有语法校验，支持 Blue Ocean 可视化，推荐使用。脚本式 Pipeline 使用 Groovy 脚本，灵活性高，可以使用所有 Groovy 特性，但语法校验弱。声明式底层也是转为脚本式执行。简单场景用声明式，复杂逻辑（如条件分支、循环）用脚本式包装在声明式的 script {} 块中。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 GitOps？和传统 CI/CD 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>GitOps 是一种以 Git 仓库为唯一真理来源的运维模式。传统 CI/CD 是 Pipeline 主动推送（Push）变更到集群；GitOps 是 GitOps 工具（ArgoCD/FluxCD）持续拉取（Pull）Git 仓库中的声明式配置并同步到集群。优势：所有变更都有 Git 记录（审计追溯）、Git 回滚即集群回滚、声明式管理更安全。核心工具是 ArgoCD 和 FluxCD。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">蓝绿部署、金丝雀部署、滚动更新有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>蓝绿部署准备完整的新环境，验证通过后一次性切换流量，回滚秒级但需要 2 倍资源。金丝雀部署先将少量流量导向新版本，逐步扩大比例，风险低但配置复杂。滚动更新逐步替换旧 Pod（K8s 默认），资源消耗少但回滚较慢。生产推荐金丝雀部署（配合 Ingress 权重或 Istio），大版本变更用蓝绿部署。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">GitLab CI 的 Runner 是什么？有哪几种类型？</div>
+          <div class="a">
+            <strong>参考：</strong>Runner 是执行 GitLab CI Job 的代理。分为三种：1）Shared Runner：GitLab 实例共享，所有项目可用，适合通用构建；2）Group Runner：组内共享，只有该组的项目可用；3）Specific Runner：专属于某个项目。Runner 可以运行在物理机、虚拟机、Docker 容器或 K8s Pod 中。推荐使用 Docker Executor（每个 Job 在独立容器中运行，环境隔离、清理方便）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">如何保证 CI/CD Pipeline 的安全性？</div>
+          <div class="a">
+            <strong>参考：</strong>1）凭证管理：使用 Secret 管理工具（Vault、K8s Secrets），不在代码中硬编码密码；2）镜像安全：使用 Trivy/Snyk 扫描镜像漏洞；3）代码质量：SonarQube 代码扫描，不通过阻断 Pipeline；4）最小权限：CI/CD 的 ServiceAccount 只给必要权限；5）制品签名：对 Docker 镜像签名（cosign），防止篡改；6）审计日志：所有部署操作可追溯。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Jenkins 如何实现动态 Agent？</div>
+          <div class="a">
+            <strong>参考：</strong>Jenkins 支持通过 Kubernetes 插件动态创建 Agent。配置方式：在 Jenkins 中配置 K8s Cloud，定义 Pod Template（包含容器镜像、资源限制等）。Pipeline 运行时，Jenkins 自动在 K8s 中创建 Pod 作为 Agent，任务完成后自动销毁。优势：资源按需分配、环境隔离、无需维护固定 Agent 节点。配置示例：agent { kubernetes { yaml '''...''' } }。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是制品管理？为什么需要制品仓库？</div>
+          <div class="a">
+            <strong>参考：</strong>制品（Artifact）是 CI 构建的产出物（JAR、Docker 镜像、npm 包等）。制品仓库（Nexus/Artifactory/Harbor）用于统一存储和管理这些产物。必要性：1）不可变性：制品一旦构建不应修改，确保各环境部署一致；2）版本管理：支持回滚到任意历史版本；3）依赖缓存：避免每次从公网下载依赖；4）安全扫描：集成漏洞扫描；5）权限控制：不同环境访问不同制品。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Jenkins / GitLab CI · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

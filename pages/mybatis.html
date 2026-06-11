@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyBatis - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🗃️ MyBatis</h1>
+    <p class="subtitle">动态 SQL · 缓存 · 插件 · 延迟加载 · 源码分析</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">动态 SQL</a></li>
+          <li class="sub"><a href="#s1-3">一级缓存 vs 二级缓存</a></li>
+          <li class="sub"><a href="#s1-4">插件机制</a></li>
+          <li class="sub"><a href="#s1-5">延迟加载</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">#{} vs ${}</a></li>
+          <li class="sub"><a href="#s2-2">ResultMap 映射</a></li>
+          <li class="sub"><a href="#s2-3">MyBatis-Plus</a></li>
+          <li class="sub"><a href="#s2-4">常见问题与优化</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">MyBatis 整体架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#e3f2fd">接口层（SqlSession）<br><small>对外提供 API：selectOne / selectList / insert / update / delete</small></div>
+            </div>
+            <div class="arch-connector">↓ 调用 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="background:#e8f5e9">配置层<br><small>Configuration<br>解析 XML/注解</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;background:#fff3e0">SQL 解析<br><small>SqlSource<br>动态 SQL 处理</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;background:#fce4ec">SQL 执行<br><small>Executor<br>StatementHandler</small></div>
+            </div>
+            <div class="arch-connector">↓ 底层 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="background:#bbdefb">插件层<br><small>Interceptor<br>四大对象代理</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;background:#c8e6c9">类型处理<br><small>TypeHandler<br>Java↔JDBC 类型转换</small></div>
+              <div class="arch-box" style="margin-left:0.5rem;background:#fff9c4">结果映射<br><small>ResultSetHandler<br>结果集→Java 对象</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>核心执行流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">SqlSessionFactory<br><small>解析配置，创建工厂</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">SqlSession<br><small>会话，操作数据库的入口</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Executor<br><small>执行器，管理缓存和 SQL 执行</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">StatementHandler<br><small>处理 JDBC Statement</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">ResultSetHandler<br><small>处理结果集</small></div>
+          </div>
+          <pre><code>// MyBatis 核心 API 使用
+// 1. 创建 SqlSessionFactory
+String resource = "mybatis-config.xml";
+InputStream inputStream = Resources.getResourceAsStream(resource);
+SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(inputStream);
+
+// 2. 获取 SqlSession
+try (SqlSession session = factory.openSession()) {
+    // 3. 获取 Mapper 代理
+    UserMapper mapper = session.getMapper(UserMapper.class);
+    // 4. 执行查询
+    User user = mapper.selectById(1L);
+    // 5. 提交事务
+    session.commit();
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>Executor 三种类型</h4>
+          <table>
+            <thead>
+              <tr><th>类型</th><th>说明</th><th>特点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>SimpleExecutor</strong></td><td>简单执行器（默认）</td><td>每次执行都创建新的 Statement</td></tr>
+              <tr><td><strong>ReuseExecutor</strong></td><td>复用执行器</td><td>复用 Statement 对象（Map 缓存）</td></tr>
+              <tr><td><strong>BatchExecutor</strong></td><td>批处理执行器</td><td>批量执行 SQL，减少网络往返</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">默认使用 SimpleExecutor，开启二级缓存后会用 CachingExecutor 装饰（装饰器模式）。BatchExecutor 适合批量插入/更新场景，注意需要手动 flushStatements()。</div>
+        </div>
+
+        <!-- 1-2 动态 SQL -->
+        <h3 id="s1-2">动态 SQL</h3>
+
+        <div class="card">
+          <h4>动态 SQL 标签</h4>
+          <table>
+            <thead>
+              <tr><th>标签</th><th>作用</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>&lt;if&gt;</code></td><td>条件判断</td><td><code>&lt;if test="name != null"&gt;AND name = #{name}&lt;/if&gt;</code></td></tr>
+              <tr><td><code>&lt;choose&gt;</code></td><td>多条件分支（类似 switch）</td><td><code>&lt;choose&gt;&lt;when&gt;...&lt;/when&gt;&lt;otherwise&gt;...&lt;/otherwise&gt;&lt;/choose&gt;</code></td></tr>
+              <tr><td><code>&lt;where&gt;</code></td><td>自动处理 WHERE 和 AND/OR</td><td>自动去掉多余的 AND/OR 前缀</td></tr>
+              <tr><td><code>&lt;set&gt;</code></td><td>自动处理 SET 和逗号</td><td>UPDATE 语句自动去掉多余逗号</td></tr>
+              <tr><td><code>&lt;foreach&gt;</code></td><td>遍历集合</td><td>IN 查询、批量插入</td></tr>
+              <tr><td><code>&lt;trim&gt;</code></td><td>自定义前缀/后缀处理</td><td>where/set 的底层实现</td></tr>
+              <tr><td><code>&lt;sql&gt;</code></td><td>定义 SQL 片段</td><td>复用公共 SQL 片段</td></tr>
+              <tr><td><code>&lt;include&gt;</code></td><td>引用 SQL 片段</td><td><code>&lt;include refid="Base_Column_List"/&gt;</code></td></tr>
+            </tbody>
+          </table>
+          <pre><code>&lt;!-- 动态 SQL 综合示例 --&gt;
+&lt;select id="findUsers" resultType="User"&gt;
+    SELECT * FROM user
+    &lt;where&gt;
+        &lt;if test="name != null and name != ''"&gt;
+            AND name LIKE CONCAT('%', #{name}, '%')
+        &lt;/if&gt;
+        &lt;if test="status != null"&gt;
+            AND status = #{status}
+        &lt;/if&gt;
+        &lt;if test="ids != null and ids.size() > 0"&gt;
+            AND id IN
+            &lt;foreach collection="ids" item="id" open="(" separator="," close=")"&gt;
+                #{id}
+            &lt;/foreach&gt;
+        &lt;/if&gt;
+    &lt;/where&gt;
+    ORDER BY create_time DESC
+&lt;/select&gt;
+
+&lt;!-- 批量插入 --&gt;
+&lt;insert id="batchInsert"&gt;
+    INSERT INTO user (name, email) VALUES
+    &lt;foreach collection="users" item="u" separator=","&gt;
+        (#{u.name}, #{u.email})
+    &lt;/foreach&gt;
+&lt;/insert&gt;</code></pre>
+        </div>
+
+        <!-- 1-3 缓存 -->
+        <h3 id="s1-3">一级缓存 vs 二级缓存</h3>
+
+        <div class="card">
+          <h4>缓存对比</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>一级缓存（Local Cache）</h4>
+              <ul>
+                <li><strong>作用域：</strong>SqlSession 级别</li>
+                <li><strong>默认：</strong>开启（SESSION 级别）</li>
+                <li><strong>实现：</strong>HashMap（PerpetualCache）</li>
+                <li><strong>生命周期：</strong>与 SqlSession 相同</li>
+                <li>同一个 SqlSession 中相同查询直接返回缓存</li>
+                <li>执行 insert/update/delete 后清空</li>
+                <li>可设置为 STATEMENT 级别（每次查询后清空）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>二级缓存（Global Cache）</h4>
+              <ul>
+                <li><strong>作用域：</strong>Mapper（namespace）级别</li>
+                <li><strong>默认：</strong>关闭</li>
+                <li><strong>实现：</strong>装饰器模式（多个 Cache 实现）</li>
+                <li><strong>生命周期：</strong>与应用相同</li>
+                <li>多个 SqlSession 共享同一 Mapper 的缓存</li>
+                <li>SqlSession 关闭或提交后才写入二级缓存</li>
+                <li>需要手动开启：<code>&lt;cache/&gt;</code></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>缓存失效场景</h4>
+          <table>
+            <thead>
+              <tr><th>场景</th><th>一级缓存</th><th>二级缓存</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>执行写操作（insert/update/delete）</td><td>清空当前 SqlSession 缓存</td><td>清空整个 namespace 缓存</td></tr>
+              <tr><td>调用 clearCache()</td><td>清空</td><td>不清空</td></tr>
+              <tr><td>SqlSession 关闭</td><td>缓存销毁</td><td>缓存写入二级缓存</td></tr>
+              <tr><td>配置 flushCache="true"</td><td>每次查询前清空</td><td>每次查询前清空</td></tr>
+              <tr><td>配置 localCacheScope=STATEMENT</td><td>每次查询后清空</td><td>不受影响</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">二级缓存的坑：1）多表关联查询时，A 表的修改不会清空 B 表 Mapper 的缓存，导致脏读；2）分布式环境下二级缓存默认是本地的，节点间不同步。解决方案：1）避免多表关联查询使用二级缓存；2）使用 Redis 等外部缓存作为二级缓存（如 mybatis-redis-cache）。</div>
+        </div>
+
+        <div class="card">
+          <h4>装饰器模式实现缓存</h4>
+          <pre><code>// MyBatis 缓存装饰器链
+// 最底层：PerpetualCache（HashMap 实现）
+// 装饰器层：
+LruCache → FifoCache → SoftCache/WeakCache → LoggingCache → SerializedCache → SynchronizedCache → TransactionalCache
+
+// 装饰顺序（从外到内）：
+TransactionalCache
+  → SynchronizedCache（线程安全）
+    → LoggingCache（日志记录）
+      → SerializedCache（序列化存储）
+        → LruCache（最近最少使用淘汰）
+          → PerpetualCache（HashMap 存储）</code></pre>
+        </div>
+
+        <!-- 1-4 插件机制 -->
+        <h3 id="s1-4">插件机制</h3>
+
+        <div class="card">
+          <h4>四大可拦截对象</h4>
+          <table>
+            <thead>
+              <tr><th>对象</th><th>拦截方法</th><th>典型用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Executor</strong></td><td>update / query / commit / rollback</td><td>二级缓存、拦截器</td></tr>
+              <tr><td><strong>StatementHandler</strong></td><td>prepare / parameterize / batch / query</td><td>分页插件、SQL 改写</td></tr>
+              <tr><td><strong>ParameterHandler</strong></td><td>setParameters / getParameterObject</td><td>参数加密</td></tr>
+              <tr><td><strong>ResultSetHandler</strong></td><td>handleResultSets / handleOutputParameters</td><td>结果集映射</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>插件原理：责任链 + 动态代理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">解析 @Intercepts 注解<br><small>确定拦截的目标对象和方法</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">创建代理对象<br><small>JDK 动态代理（Plugin.wrap()）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">组装责任链<br><small>多个插件层层代理</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">执行时按链顺序<br><small>intercept() 方法</small></div>
+          </div>
+          <pre><code>// 自定义插件示例：SQL 执行耗时统计
+@Intercepts({
+    @Signature(
+        type = StatementHandler.class,     // 拦截的目标对象
+        method = "query",                  // 拦截的方法
+        args = {Statement.class, ResultHandler.class}  // 方法参数
+    )
+})
+public class SlowSqlInterceptor implements Interceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        long start = System.currentTimeMillis();
+        try {
+            return invocation.proceed();  // 执行原方法
+        } finally {
+            long cost = System.currentTimeMillis() - start;
+            if (cost > 1000) {
+                StatementHandler handler = (StatementHandler) invocation.getTarget();
+                BoundSql boundSql = handler.getBoundSql();
+                log.warn("慢 SQL [{}ms]: {}", cost, boundSql.getSql());
+            }
+        }
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        return Plugin.wrap(target, this);  // 创建代理
+    }
+}</code></pre>
+          <div class="tip">插件执行顺序与注册顺序相反（后注册的先执行，类似洋葱模型）。MyBatis 插件本质是 JDK 动态代理 + 责任链模式。</div>
+        </div>
+
+        <!-- 1-5 延迟加载 -->
+        <h3 id="s1-5">延迟加载</h3>
+
+        <div class="card">
+          <h4>延迟加载原理</h4>
+          <p>延迟加载（Lazy Loading）是指在查询主对象时不立即加载关联对象，只有在访问关联对象时才发送 SQL 查询。</p>
+          <pre><code>&lt;!-- 开启延迟加载 --&gt;
+&lt;settings&gt;
+    &lt;setting name="lazyLoadingEnabled" value="true"/&gt;
+    &lt;setting name="aggressiveLazyLoading" value="false"/&gt;  &lt;!-- 按需加载 --&gt;
+    &lt;setting name="lazyLoadTriggerMethods" value="equals,clone,hashCode,toString"/&gt;
+&lt;/settings&gt;
+
+&lt;!-- association 延迟加载 --&gt;
+&lt;resultMap id="orderWithUser" type="Order"&gt;
+    &lt;id property="id" column="id"/&gt;
+    &lt;result property="orderNo" column="order_no"/&gt;
+    &lt;association property="user" javaType="User"
+                 select="com.example.mapper.UserMapper.selectById"
+                 column="user_id" fetchType="lazy"/&gt;
+&lt;/resultMap&gt;
+
+&lt;!-- collection 延迟加载 --&gt;
+&lt;resultMap id="userWithOrders" type="User"&gt;
+    &lt;id property="id" column="id"/&gt;
+    &lt;result property="name" column="name"/&gt;
+    &lt;collection property="orders" ofType="Order"
+                select="com.example.mapper.OrderMapper.selectByUserId"
+                column="id" fetchType="lazy"/&gt;
+&lt;/resultMap&gt;</code></pre>
+          <p><strong>实现原理：</strong>MyBatis 通过 CGLIB 为关联对象创建代理。当访问关联属性时，代理对象拦截 getter 方法，发送额外的 SQL 查询并填充数据。</p>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 #{} vs ${} -->
+        <h3 id="s2-1">#{} vs ${}</h3>
+
+        <div class="card">
+          <h4>区别对比</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>#{}（预编译参数）</h4>
+              <ul>
+                <li>使用 PreparedStatement 的 ? 占位符</li>
+                <li>参数会被转义，<strong>防止 SQL 注入</strong></li>
+                <li>自动进行类型转换</li>
+                <li>适合传递参数值</li>
+                <li>默认会对字符串加引号</li>
+              </ul>
+              <pre><code>-- 生成的 SQL
+SELECT * FROM user WHERE name = ?
+-- 参数：'张三'</code></pre>
+            </div>
+            <div class="compare-box">
+              <h4>${}（字符串拼接）</h4>
+              <ul>
+                <li>直接拼接到 SQL 字符串中</li>
+                <li>不做转义，<strong>有 SQL 注入风险</strong></li>
+                <li>不做类型转换</li>
+                <li>适合传递表名、列名、ORDER BY</li>
+                <li>不会自动加引号</li>
+              </ul>
+              <pre><code>-- 生成的 SQL
+SELECT * FROM user WHERE name = '张三'
+-- 字符串直接拼接</code></pre>
+            </div>
+          </div>
+          <pre><code>-- #{} 的使用（推荐）
+SELECT * FROM user WHERE id = #{id} AND name = #{name}
+
+-- ${} 的使用场景（必须用时）
+SELECT * FROM ${tableName} ORDER BY ${columnName} ${order}
+-- 注意：使用 ${} 时必须在代码层做参数校验，防止 SQL 注入</code></pre>
+          <div class="warn">原则：能用 #{} 就用 #{}，只有在动态表名、列名、ORDER BY 等无法使用占位符的场景才用 ${}。使用 ${} 时必须在代码层做白名单校验。</div>
+        </div>
+
+        <!-- 2-2 ResultMap -->
+        <h3 id="s2-2">ResultMap 映射</h3>
+
+        <div class="card">
+          <h4>一对一映射（association）</h4>
+          <pre><code>&lt;!-- 方式 1：嵌套结果映射（推荐，一次查询） --&gt;
+&lt;resultMap id="orderWithUser" type="Order"&gt;
+    &lt;id property="id" column="order_id"/&gt;
+    &lt;result property="orderNo" column="order_no"/&gt;
+    &lt;association property="user" javaType="User"&gt;
+        &lt;id property="id" column="user_id"/&gt;
+        &lt;result property="name" column="user_name"/&gt;
+    &lt;/association&gt;
+&lt;/resultMap&gt;
+
+&lt;select id="selectOrderWithUser" resultMap="orderWithUser"&gt;
+    SELECT o.id order_id, o.order_no, u.id user_id, u.name user_name
+    FROM orders o LEFT JOIN users u ON o.user_id = u.id
+    WHERE o.id = #{id}
+&lt;/select&gt;
+
+&lt;!-- 方式 2：嵌套查询（N+1 问题） --&gt;
+&lt;association property="user" javaType="User"
+             select="selectUserById" column="user_id" fetchType="lazy"/&gt;</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>一对多映射（collection）</h4>
+          <pre><code>&lt;resultMap id="userWithOrders" type="User"&gt;
+    &lt;id property="id" column="user_id"/&gt;
+    &lt;result property="name" column="user_name"/&gt;
+    &lt;collection property="orders" ofType="Order"&gt;
+        &lt;id property="id" column="order_id"/&gt;
+        &lt;result property="orderNo" column="order_no"/&gt;
+    &lt;/collection&gt;
+&lt;/resultMap&gt;
+
+&lt;select id="selectUserWithOrders" resultMap="userWithOrders"&gt;
+    SELECT u.id user_id, u.name user_name, o.id order_id, o.order_no
+    FROM users u LEFT JOIN orders o ON u.id = o.user_id
+    WHERE u.id = #{id}
+&lt;/select&gt;</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>鉴别器（discriminator）</h4>
+          <pre><code>&lt;!-- 根据列值走不同映射逻辑 --&gt;
+&lt;resultMap id="vehicleMap" type="Vehicle"&gt;
+    &lt;id property="id" column="id"/&gt;
+    &lt;result property="name" column="name"/&gt;
+    &lt;discriminator javaType="int" column="vehicle_type"&gt;
+        &lt;case value="1" resultType="Car"&gt;
+            &lt;result property="doorCount" column="door_count"/&gt;
+        &lt;/case&gt;
+        &lt;case value="2" resultType="Truck"&gt;
+            &lt;result property="loadCapacity" column="load_capacity"/&gt;
+        &lt;/case&gt;
+    &lt;/discriminator&gt;
+&lt;/resultMap&gt;</code></pre>
+        </div>
+
+        <!-- 2-3 MyBatis-Plus -->
+        <h3 id="s2-3">MyBatis-Plus</h3>
+
+        <div class="card">
+          <h4>MyBatis-Plus 常用功能</h4>
+          <table>
+            <thead>
+              <tr><th>功能</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>BaseMapper</strong></td><td>通用 CRUD</td><td>insert/deleteById/updateById/selectById</td></tr>
+              <tr><td><strong>IService</strong></td><td>Service 层通用接口</td><td>save/remove/update/getById/list</td></tr>
+              <tr><td><strong>条件构造器</strong></td><td>链式查询条件</td><td>QueryWrapper / LambdaQueryWrapper</td></tr>
+              <tr><td><strong>分页插件</strong></td><td>物理分页</td><td>Page&lt;User&gt; page = new Page&lt;&gt;(1, 10)</td></tr>
+              <tr><td><strong>代码生成器</strong></td><td>自动生成代码</td><td>Entity/Mapper/Service/Controller</td></tr>
+              <tr><td><strong>逻辑删除</strong></td><td>deleted 字段标记删除</td><td>@TableLogic</td></tr>
+              <tr><td><strong>自动填充</strong></td><td>自动填充 create_time 等</td><td>@TableField(fill = FieldFill.INSERT)</td></tr>
+              <tr><td><strong>乐观锁</strong></td><td>version 字段</td><td>@Version</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// LambdaQueryWrapper 示例（推荐，避免字段名硬编码）
+LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+wrapper.eq(User::getStatus, 1)
+       .like(StringUtils.hasText(name), User::getName, name)
+       .between(User::getCreateTime, startTime, endTime)
+       .orderByDesc(User::getCreateTime);
+
+Page<User> page = new Page<>(1, 10);
+Page<User> result = userMapper.selectPage(page, wrapper);
+// result.getRecords() → 数据列表
+// result.getTotal()   → 总记录数
+
+// LambdaUpdateWrapper 示例
+LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+updateWrapper.eq(User::getId, userId)
+             .set(User::getStatus, 0)
+             .set(User::getUpdateTime, LocalDateTime.now());
+userMapper.update(null, updateWrapper);</code></pre>
+        </div>
+
+        <!-- 2-4 常见问题与优化 -->
+        <h3 id="s2-4">常见问题与优化</h3>
+
+        <div class="card">
+          <h4>N+1 查询问题</h4>
+          <p><strong>问题：</strong>查询 N 个主对象后，每个主对象的关联对象需要单独发一次 SQL，总共 N+1 次查询。</p>
+          <p><strong>解决方案：</strong></p>
+          <ul>
+            <li><strong>嵌套结果映射：</strong>使用 JOIN 查询，一次 SQL 获取所有数据（推荐）</li>
+            <li><strong>批量查询：</strong>先查主表 ID 列表，再用 IN 批量查关联表</li>
+            <li><strong>延迟加载：</strong>只在访问关联属性时才查询（适合不总是需要关联数据的场景）</li>
+            <li><strong>MyBatis-Plus：</strong>使用 Wrapper 组装查询条件</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>MyBatis 常见性能优化</h4>
+          <table>
+            <thead>
+              <tr><th>优化项</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>避免 SELECT *</strong></td><td>只查询需要的字段，减少网络传输和内存占用</td></tr>
+              <tr><td><strong>批量操作</strong></td><td>使用 foreach 批量插入/更新，减少数据库交互次数</td></tr>
+              <tr><td><strong>合理使用缓存</strong></td><td>一级缓存默认开启；二级缓存按需开启，注意多表关联的脏读问题</td></tr>
+              <tr><td><strong>避免 N+1 查询</strong></td><td>使用 JOIN 或批量查询替代嵌套查询</td></tr>
+              <tr><td><strong>分页查询</strong></td><td>大数据量使用物理分页（LIMIT），避免全表查询</td></tr>
+              <tr><td><strong>索引优化</strong></td><td>确保 WHERE/JOIN 条件的字段有索引</td></tr>
+              <tr><td><strong>使用 PreparedStatement</strong></td><td>使用 #{} 而非 ${}，利用预编译和计划缓存</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">MyBatis 的整体架构是怎样的？一次 SQL 查询经历了哪些步骤？</div>
+          <div class="a">
+            <strong>参考：</strong>MyBatis 架构分为三层：1）接口层（SqlSession），提供 CRUD API；2）核心处理层（配置解析、SQL 解析、SQL 执行、结果映射）；3）基础支撑层（连接管理、事务管理、缓存、类型处理）。一次查询流程：SqlSession → Executor（检查缓存 → 执行查询） → StatementHandler（创建 Statement、设置参数、执行 SQL） → ResultSetHandler（将 ResultSet 映射为 Java 对象）。期间插件可以在四大对象（Executor、StatementHandler、ParameterHandler、ResultSetHandler）上进行拦截增强。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>MyBatis 的一级缓存和二级缓存有什么区别？各自的工作原理是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>一级缓存是 SqlSession 级别的，默认开启。同一个 SqlSession 中执行相同查询会直接返回缓存结果，执行写操作后清空。实现是 HashMap。二级缓存是 Mapper（namespace）级别的，默认关闭，需要在 XML 中加 &lt;cache/&gt; 开启。SqlSession 关闭或提交后，数据才写入二级缓存。二级缓存使用装饰器模式，底层也是 HashMap，外层包装了 LruCache、SerializedCache、SynchronizedCache 等。注意：二级缓存在多表关联查询时可能导致脏读（A 表修改不会清空 B 表的缓存），分布式环境下默认是本地缓存，建议使用 Redis 替代。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>#{} 和 ${} 有什么区别？为什么推荐使用 #{}？</div>
+          <div class="a">
+            <strong>参考：</strong>#{} 使用 PreparedStatement 的参数占位符（?），参数会被预编译和转义，可以防止 SQL 注入。${} 是字符串直接拼接，不做任何转义，有 SQL 注入风险。推荐使用 #{} 因为：1）安全，防止 SQL 注入；2）性能好，PreparedStatement 可以复用执行计划；3）自动类型转换。${} 的使用场景：动态表名、动态列名、ORDER BY 子句（因为这些无法用占位符）。使用 ${} 时必须在代码层做白名单校验。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">MyBatis 的插件机制是如何实现的？如何自定义插件？</div>
+          <div class="a">
+            <strong>参考：</strong>MyBatis 插件基于 JDK 动态代理 + 责任链模式。核心是 Interceptor 接口，通过 @Intercepts 注解声明要拦截的目标对象和方法（四大对象：Executor、StatementHandler、ParameterHandler、ResultSetHandler）。在 Configuration 创建四大对象时，MyBatis 会遍历所有注册的 Interceptor，通过 Plugin.wrap() 用动态代理包装目标对象。多个插件按注册顺序的逆序层层代理，执行时按责任链顺序调用 intercept() 方法。自定义插件步骤：1）实现 Interceptor 接口；2）用 @Intercepts 声明拦截目标；3）在 intercept() 中实现增强逻辑，调用 invocation.proceed() 执行原方法；4）注册到 MyBatis 配置。典型应用：分页插件 PageHelper、SQL 性能监控插件。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>MyBatis 的延迟加载原理是什么？在什么场景下使用？</div>
+          <div class="a">
+            <strong>参考：</strong>延迟加载通过 CGLIB 动态代理实现。查询主对象时，MyBatis 为关联属性创建代理对象。当访问关联属性时，代理对象拦截 getter 方法，发送额外的 SQL 查询填充数据。配置：lazyLoadingEnabled=true 开启，aggressiveLazyLoading=false 设置按需加载。使用场景：1）关联数据不是每次都需要（如订单详情可能不需要查看用户信息）；2）避免 N+1 查询的权衡方案。注意事项：延迟加载在 SqlSession 关闭后无法工作（因为需要发送 SQL），所以要么在 SqlSession 生命周期内访问关联属性，要么使用嵌套结果映射替代。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>MyBatis-Plus 相比 MyBatis 有哪些增强？LambdaQueryWrapper 的好处是什么？</div>
+          <div class="a">
+            <strong>参考：</strong>MyBatis-Plus 增强：1）通用 CRUD：BaseMapper 和 IService 提供单表增删改查，无需写 XML；2）条件构造器：QueryWrapper/LambdaQueryWrapper 链式构建查询条件；3）分页插件：物理分页，自动拼接 LIMIT；4）代码生成器：一键生成 Entity/Mapper/Service/Controller；5）逻辑删除：@TableLogic 注解实现软删除；6）自动填充：@TableField(fill=FieldFill.INSERT) 自动填充创建时间等；7）乐观锁：@Version 注解。LambdaQueryWrapper 好处：1）使用方法引用（User::getName），编译期检查字段名，避免拼写错误；2）重构友好，字段改名时编译报错；3）代码可读性更好。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>MyBatis 中 ResultMap 的 association 和 collection 有什么区别？如何避免 N+1 查询？</div>
+          <div class="a">
+            <strong>参考：</strong>association 用于一对一关联映射（如订单关联用户），collection 用于一对多关联映射（如用户关联多个订单）。两种实现方式：1）嵌套结果映射（推荐）：使用 JOIN 查询一次获取所有数据，在 ResultMap 中用 association/collection 定义映射关系；2）嵌套查询：association/collection 的 select 属性指向另一个查询方法，有 N+1 问题。避免 N+1 的方式：优先使用嵌套结果映射（JOIN）；如果关联数据不需要每次加载，使用延迟加载（fetchType="lazy"）；或者先查主表 ID 列表，再用 IN 批量查关联表。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          MyBatis · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

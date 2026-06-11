@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>共识算法 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🗳️ 共识算法</h1>
+    <p class="subtitle">Paxos · Raft · ZAB · Gossip · 拜占庭容错</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">共识问题定义</a></li>
+          <li class="sub"><a href="#s1-2">Paxos 算法</a></li>
+          <li class="sub"><a href="#s1-3">Raft 协议</a></li>
+          <li class="sub"><a href="#s1-4">ZAB 协议</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">Gossip 协议</a></li>
+          <li class="sub"><a href="#s2-2">PBFT 拜占庭容错</a></li>
+          <li class="sub"><a href="#s2-3">各算法对比</a></li>
+          <li class="sub"><a href="#s2-4">实际应用场景</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 共识问题定义 -->
+        <h3 id="s1-1">共识问题定义</h3>
+
+        <div class="card">
+          <h4>什么是共识问题</h4>
+          <p>共识问题是指在分布式系统中，多个节点对某个值（提案）达成一致的过程。共识算法需要满足以下四个性质：</p>
+          <table>
+            <thead>
+              <tr><th>性质</th><th>定义</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>一致性（Agreement）</strong></td><td>所有正确的节点决定相同的值</td><td>不会出现不同节点决定不同值的情况</td></tr>
+              <tr><td><strong>合法性（Validity）</strong></td><td>决定的值必须是某个节点提出的</td><td>不能凭空产生值</td></tr>
+              <tr><td><strong>终止性（Termination）</strong></td><td>所有正确的节点最终都能做出决定</td><td>不会无限期等待（活性保证）</td></tr>
+              <tr><td><strong>容错性（Fault Tolerance）</strong></td><td>系统在部分节点故障时仍能达成共识</td><td>CFT: N/2+1 正常；BFT: 2N/3+1 正常</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">FLP 不可能定理证明：在异步系统中，只要有 1 个节点可能宕机，就不存在确定性算法能保证共识一定达成。实际共识算法通过引入随机性或超时机制绕过这个限制。</div>
+        </div>
+
+        <div class="card">
+          <h4>共识算法分类</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>崩溃容错（CFT）</h4>
+              <ul>
+                <li>节点只会宕机或超时，不会发送错误消息</li>
+                <li>需要 N/2+1 个正常节点</li>
+                <li>代表：Paxos、Raft、ZAB</li>
+                <li>适用于可信环境（企业内部）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>拜占庭容错（BFT）</h4>
+              <ul>
+                <li>节点可能发送任意错误消息（含恶意行为）</li>
+                <li>需要 2N/3+1 个正常节点</li>
+                <li>代表：PBFT、PoW、PoS</li>
+                <li>适用于不可信环境（区块链）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-2 Paxos 算法 -->
+        <h3 id="s1-2">Paxos 算法</h3>
+
+        <div class="card">
+          <h4>Paxos 角色</h4>
+          <ul>
+            <li><strong>Proposer（提案者）：</strong>发起提案，提出一个值</li>
+            <li><strong>Acceptor（接受者）：</strong>对提案进行投票，决定是否接受</li>
+            <li><strong>Learner（学习者）：</strong>学习被选定的值，不参与投票</li>
+          </ul>
+          <p>一个节点可以同时担任多个角色。共识的达成需要<strong>多数派（Quorum）</strong>的 Acceptor 接受同一个提案。</p>
+        </div>
+
+        <div class="card">
+          <h4>Basic Paxos 流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">阶段1a: Prepare<br><small>Proposer 发送 Prepare(n)<br>n 为提案编号（全局唯一递增）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">阶段1b: Promise<br><small>Acceptor 承诺不再接受编号 < n 的提案<br>返回已接受的最大编号提案</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">阶段2a: Accept<br><small>Proposer 发送 Accept(n, value)<br>value = 已接受提案的值 或 自己的值</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">阶段2b: Accepted<br><small>Acceptor 接受提案<br>多数派接受后值被选定</small></div>
+          </div>
+          <div class="warn">Basic Paxos 的问题：活锁（两个 Proposer 交替提出更高编号的提案，导致永远无法达成共识）。Multi-Paxos 通过选出 Leader 解决此问题。</div>
+        </div>
+
+        <div class="card">
+          <h4>Multi-Paxos 优化</h4>
+          <ul>
+            <li><strong>选出 Leader：</strong>通过一轮完整的 Paxos 选出稳定的 Leader，后续所有提案由 Leader 发起</li>
+            <li><strong>跳过 Prepare：</strong>Leader 确定后，省略 Prepare 阶段，直接进入 Accept</li>
+            <li><strong>日志复制：</strong>每个日志槽位（log slot）运行一次 Paxos，实现连续的值复制</li>
+            <li><strong>效果：</strong>从两次 RPC 减少到一次 RPC（仅 Accept），大幅提升吞吐</li>
+          </ul>
+        </div>
+
+        <!-- 1-3 Raft 协议 -->
+        <h3 id="s1-3">Raft 协议</h3>
+
+        <div class="card">
+          <h4>Raft 三种角色</h4>
+          <table>
+            <thead>
+              <tr><th>角色</th><th>职责</th><th>数量</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-green">Leader</span></td><td>处理所有客户端请求，管理日志复制</td><td>同一时刻只有一个</td></tr>
+              <tr><td><span class="badge badge-blue">Follower</span></td><td>被动接收 Leader 的日志和心跳</td><td>多数节点</td></tr>
+              <tr><td><span class="badge badge-orange">Candidate</span></td><td>竞选 Leader 的中间状态</td><td>选举期间临时角色</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Leader 选举详解</h4>
+          <ol>
+            <li>Follower 在选举超时（150~300ms 随机）内未收到心跳，转变为 Candidate</li>
+            <li>Candidate 自增 Term（任期号），先给自己投票，再向所有节点发 <code>RequestVote(term, lastLogIndex, lastLogTerm)</code></li>
+            <li>节点投票规则：每个 Term 只投一票（先到先得），且 Candidate 的日志不能比自己旧</li>
+            <li>获得多数派投票 → 成为 Leader；发现更高 Term → 退回 Follower</li>
+            <li>票数分裂（无多数派）→ 等待随机超时后重新选举</li>
+          </ol>
+          <pre><code>// 投票决策伪代码
+function handleRequestVote(candidateTerm, candidateLastLogIdx, candidateLastLogTerm):
+    if candidateTerm < currentTerm: return false
+    if candidateTerm > currentTerm: stepDown(candidateTerm)
+    if votedFor == null OR votedFor == candidateId:
+        // 选举限制：候选人的日志至少和自己一样新
+        if candidateLastLogTerm > lastLogTerm:
+            return true
+        if candidateLastLogTerm == lastLogTerm AND candidateLastLogIdx >= lastLogIndex:
+            return true
+    return false</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>日志复制详解</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Client 写请求</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Leader 追加日志<br><small>(term, index, command)</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">AppendEntries RPC<br>复制到 Follower</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">多数派确认<br>Leader 提交</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">通知 Follower 提交<br>应用到状态机</div>
+          </div>
+          <ul>
+            <li><strong>日志条目：</strong>(term, index, command) 三元组，term 是 Leader 任期号</li>
+            <li><strong>提交条件：</strong>该条目被复制到多数节点，且当前 Leader 的最新条目已提交（Raft 安全性保证）</li>
+            <li><strong>日志匹配：</strong>AppendEntries 携带 prevLogIndex 和 prevLogTerm，Follower 校验一致性</li>
+            <li><strong>日志修复：</strong>Follower 日志不一致时，Leader 递减 nextIndex 重试直到匹配</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Raft 安全性保证</h4>
+          <ul>
+            <li><strong>选举安全：</strong>每个 Term 最多一个 Leader（一 Term 一票制）</li>
+            <li><strong>日志匹配：</strong>如果两个日志在某个 index 的 term 相同，则该 index 之前所有条目都相同</li>
+            <li><strong>Leader 完整性：</strong>已提交的日志条目一定出现在所有后续 Leader 的日志中（选举限制保证）</li>
+            <li><strong>状态机安全：</strong>如果一个节点在某个 index 已提交，其他节点在同一 index 不会提交不同的值</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>成员变更与日志压缩</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>成员变更</h4>
+              <ul>
+                <li><strong>单步变更：</strong>每次只增减一个节点，新旧配置的 Quorum 一定有交集</li>
+                <li><strong>联合共识：</strong>先切换到中间配置（C_old + C_new），再切换到新配置</li>
+                <li>成员变更也通过日志复制实现</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>日志压缩（Snapshot）</h4>
+              <ul>
+                <li>定期将已提交的日志压缩为快照</li>
+                <li>快照包含状态机的完整状态 + 最后一个日志的 index 和 term</li>
+                <li>可以丢弃快照之前的所有日志</li>
+                <li>Follower 落后太多时，Leader 发送 InstallSnapshot</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1-4 ZAB 协议 -->
+        <h3 id="s1-4">ZAB 协议</h3>
+
+        <div class="card">
+          <h4>ZAB 两种模式</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>消息广播模式（正常工作）</h4>
+              <ul>
+                <li>Leader 接收写请求，为每个事务分配全局递增的 ZXID</li>
+                <li>Leader 将事务以 Proposal 发送给所有 Follower</li>
+                <li>Follower 收到后写入日志，返回 ACK</li>
+                <li>Leader 收到多数派 ACK 后发送 COMMIT</li>
+                <li>Follower 收到 COMMIT 后将事务应用到状态机</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>崩溃恢复模式（Leader 故障）</h4>
+              <ul>
+                <li>Follower 检测到 Leader 心跳超时，进入选举</li>
+                <li>选举 ZXID 最大的节点为新 Leader（数据最新）</li>
+                <li>新 Leader 与 Follower 同步数据</li>
+                <li>同步完成后切换到消息广播模式</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>ZXID 结构</h4>
+          <pre><code>// ZXID 是 64 位整数
+// ┌──────────────┬──────────────┐
+// │  Epoch (32位) │ Counter (32位)│
+// └──────────────┴──────────────┘
+//
+// Epoch：Leader 编号，每次选举新 Leader 递增
+// Counter：事务计数器，每个事务递增
+//
+// 比较规则：先比较 Epoch，再比较 Counter
+// ZXID 越大 → 数据越新 → 优先成为 Leader</code></pre>
+          <div class="tip">ZAB 与 Raft 的核心区别：ZAB 用 ZXID（Epoch+Counter）保证日志顺序，Raft 用 Term+Index。ZAB 的选举优先选数据最新的节点，Raft 通过选举限制保证安全性。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 Gossip 协议 -->
+        <h3 id="s2-1">Gossip 协议</h3>
+
+        <div class="card">
+          <h4>Gossip 协议概述</h4>
+          <p>Gossip（流言传播）协议是一种去中心化的最终一致性协议，节点之间通过随机交换信息来传播状态。</p>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>三种通信方式</h4>
+              <ul>
+                <li><strong>Push：</strong>节点主动将自己的数据推给随机选中的节点</li>
+                <li><strong>Pull：</strong>节点主动从随机节点拉取数据</li>
+                <li><strong>Push-Pull：</strong>双向交换数据（最高效）</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>两种传播模式</h4>
+              <ul>
+                <li><strong>反熵（Anti-Entropy）：</strong>每次全量同步所有数据，保证最终一致</li>
+                <li><strong>谣言传播（Rumor-Mongering）：</strong>只传播新变更的数据，收敛后停止</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Gossip 特性</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>去中心化</td><td>无中心节点，每个节点地位平等</td></tr>
+              <tr><td>最终一致性</td><td>不保证强一致，但保证最终所有节点收敛到相同状态</td></tr>
+              <tr><td>可扩展性</td><td>新增节点无需特殊处理，自动融入协议</td></tr>
+              <tr><td>容错性</td><td>部分节点故障不影响整体传播</td></tr>
+              <tr><td>收敛时间</td><td>O(logN) 轮后所有节点收敛</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-2 PBFT -->
+        <h3 id="s2-2">PBFT 拜占庭容错</h3>
+
+        <div class="card">
+          <h4>PBFT 三阶段流程</h4>
+          <p>PBFT（Practical Byzantine Fault Tolerance）能在 N ≥ 3f+1 个节点中容忍 f 个拜占庭节点。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">Pre-Prepare<br><small>Leader 分配序号 n<br>广播 PRE-PREPARE(v,n,m)</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Prepare<br><small>节点广播 PREPARE(v,n,m,d)<br>收到 2f 个 PREPARE 进入 Prepared 状态</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Commit<br><small>节点广播 COMMIT(v,n,d)<br>收到 2f+1 个 COMMIT 执行请求</small></div>
+          </div>
+          <ul>
+            <li><strong>v：</strong>视图编号（类似 Raft 的 Term）</li>
+            <li><strong>n：</strong>请求序号</li>
+            <li><strong>f：</strong>拜占庭节点数上限，系统总节点数 N ≥ 3f+1</li>
+            <li><strong>视图切换：</strong>Leader 故障时，通过 ViewChange 协议选举新 Leader</li>
+          </ul>
+        </div>
+
+        <!-- 2-3 各算法对比 -->
+        <h3 id="s2-3">各算法对比</h3>
+
+        <div class="card">
+          <h4>共识算法综合对比</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>容错类型</th><th>容错数</th><th>一致性</th><th>性能</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Paxos</strong></td><td>CFT</td><td>(N-1)/2</td><td>强一致</td><td>高（Multi-Paxos）</td><td>分布式存储（Chubby）</td></tr>
+              <tr><td><strong>Raft</strong></td><td>CFT</td><td>(N-1)/2</td><td>强一致</td><td>高</td><td>配置中心、分布式锁（etcd）</td></tr>
+              <tr><td><strong>ZAB</strong></td><td>CFT</td><td>(N-1)/2</td><td>强一致</td><td>中</td><td>分布式协调（ZooKeeper）</td></tr>
+              <tr><td><strong>Gossip</strong></td><td>CFT</td><td>—</td><td>最终一致</td><td>极高</td><td>成员管理、状态传播</td></tr>
+              <tr><td><strong>PBFT</strong></td><td>BFT</td><td>(N-1)/3</td><td>强一致</td><td>低（O(N²)）</td><td>区块链、联盟链</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 实际应用 -->
+        <h3 id="s2-4">实际应用场景</h3>
+
+        <div class="card">
+          <h4>实际应用对照表</h4>
+          <table>
+            <thead>
+              <tr><th>算法</th><th>应用系统</th><th>使用场景</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Raft</td><td>etcd</td><td>Kubernetes 配置存储</td><td>K8s 的核心组件，存储所有集群状态</td></tr>
+              <tr><td>Raft</td><td>Consul</td><td>服务发现与配置</td><td>支持多数据中心的服务网格</td></tr>
+              <tr><td>Raft</td><td>TiKV</td><td>分布式 KV 存储</td><td>TiDB 的存储层，多副本强一致</td></tr>
+              <tr><td>ZAB</td><td>ZooKeeper</td><td>分布式协调服务</td><td>Hadoop/Kafka/HBase 的依赖组件</td></tr>
+              <tr><td>Gossip</td><td>Redis Cluster</td><td>集群节点管理</td><td>节点间交换槽位和状态信息</td></tr>
+              <tr><td>Gossip</td><td>Consul</td><td>成员管理（SWIM）</td><td>使用 SWIM 协议管理集群成员</td></tr>
+              <tr><td>Gossip</td><td>Cassandra</td><td>集群拓扑同步</td><td>去中心化数据库的节点发现</td></tr>
+              <tr><td>Paxos</td><td>Chubby</td><td>Google 分布式锁</td><td>Google 内部的分布式锁服务</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>Raft vs ZAB 深度对比</h4>
+          <table>
+            <thead>
+              <tr><th>维度</th><th>Raft</th><th>ZAB</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>日志编号</td><td>Term + Index</td><td>ZXID（Epoch + Counter）</td></tr>
+              <tr><td>Leader 选举</td><td>随机超时 + 多数派投票 + 日志限制</td><td>ZXID 最大者优先</td></tr>
+              <tr><td>日志提交</td><td>当前 Term 的日志才能间接提交</td><td>Leader 发送 COMMIT 即提交</td></tr>
+              <tr><td>日志连续性</td><td>允许日志有空洞（不连续 Index）</td><td>日志严格连续</td></tr>
+              <tr><td>客户端交互</td><td>读写都经过 Leader</td><td>写经 Leader，读可从 Follower（过时读）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是共识算法？为什么分布式系统需要共识？</div>
+          <div class="a">
+            <strong>参考：</strong>共识算法是让分布式系统中多个节点对某个值达成一致的算法。需要共识的原因：1）分布式系统中节点独立运行，需要协调各自的状态；2）网络不可靠，消息可能丢失、延迟、乱序；3）节点可能宕机，系统需要在部分节点故障时仍能正常工作。共识算法的四个性质：一致性（所有正确节点决定相同值）、合法性（决定的值必须是提出的值）、终止性（最终能做出决定）、容错性（部分节点故障时仍可工作）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Raft 协议是如何保证日志一致性的？</div>
+          <div class="a">
+            <strong>参考：</strong>Raft 通过三个机制保证日志一致性：1）Leader 完整性——选举限制保证已提交的日志一定出现在新 Leader 中（候选人的日志必须至少和多数节点一样新）；2）日志匹配——AppendEntries 携带 prevLogIndex 和 prevLogTerm，Follower 校验前一条日志是否匹配，不匹配则拒绝；3）日志修复——Leader 递减 nextIndex 重试直到找到匹配点，然后覆盖 Follower 的冲突日志。此外，只有当前 Term 的日志被多数派复制后，之前 Term 的日志才能被间接提交，避免了已提交日志被覆盖的问题。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">ZAB 协议和 Raft 协议有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>主要区别：1）日志编号：Raft 用 Term+Index，ZAB 用 ZXID（Epoch+Counter）；2）选举策略：Raft 随机超时+日志限制，ZAB 优先选 ZXID 最大的节点；3）日志提交：Raft 当前 Term 的日志才能间接提交之前 Term 的日志，ZAB Leader 发 COMMIT 即可提交；4）日志连续性：Raft 允许空洞，ZAB 严格连续。两者都是 CFT 共识，需要 N/2+1 正常节点，都能保证强一致性。ZAB 专为 ZooKeeper 设计，Raft 更通用（etcd、Consul、TiKV 都使用）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Gossip 协议的原理是什么？为什么 Redis Cluster 用 Gossip 而不用 Raft？</div>
+          <div class="a">
+            <strong>参考：</strong>Gossip 是去中心化的最终一致性协议，节点随机选择其他节点交换信息，像流言传播一样。Push-Pull 模式下，O(logN) 轮后所有节点收敛到相同状态。Redis Cluster 用 Gossip 而非 Raft 的原因：1）Redis Cluster 是 AP 系统，不需要强一致性，最终一致即可；2）Gossip 去中心化，无 Leader 选举，性能更高；3）Redis Cluster 只用 Gossip 传播节点状态和槽位信息（元数据），实际数据由各 Master 节点独立负责，不需要共识。如果用 Raft，每个写操作都需要多数派确认，会严重影响 Redis 的性能。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Paxos 算法和 Raft 算法有什么关系？为什么有了 Paxos 还需要 Raft？</div>
+          <div class="a">
+            <strong>参考：</strong>Raft 是 Paxos 的等价算法，两者在理论上能解决相同的共识问题。Paxos 的问题：1）难以理解——Lamport 的论文晦涩难懂；2）难以实现——论文只描述了单个值的共识，Multi-Paxos 的实现细节未明确说明；3）工程挑战——成员变更、日志压缩等问题需要自行解决。Raft 的改进：1）强 Leader 模型——所有日志只能从 Leader 流向 Follower，简化了推理；2）分解问题——将共识拆分为选举、日志复制、安全性三个子问题；3）工程友好——论文给出了完整的实现细节。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PBFT 是如何实现拜占庭容错的？与 Raft 有什么本质区别？</div>
+          <div class="a">
+            <strong>参考：</strong>PBFT 通过三阶段协议（Pre-Prepare、Prepare、Commit）实现拜占庭容错。在 Prepare 阶段收集 2f 个确认，在 Commit 阶段收集 2f+1 个确认，确保即使 f 个节点是恶意的，诚实节点也能达成一致。与 Raft 的本质区别：1）容错模型不同——Raft 容忍崩溃故障（CFT），PBFT 容忍拜占庭故障（BFT）；2）节点数量要求——Raft 需要 N/2+1，PBFT 需要 2N/3+1；3）性能差异——PBFT 需要 O(N²) 消息交换，Raft 只需 O(N)，因此 PBFT 性能较差，不适合大规模集群。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">在实际系统中如何选择共识算法？</div>
+          <div class="a">
+            <strong>参考：</strong>选择依据：1）一致性需求——强一致选 Raft/Paxos/ZAB，最终一致选 Gossip；2）容错模型——可信环境用 CFT（Raft），不可信环境用 BFT（PBFT）；3）性能需求——高性能选 Gossip（无共识开销）或 Raft（强 Leader 模型），PBFT 性能最低；4）集群规模——Raft/Paxos 适合 3-7 节点小集群，Gossip 可扩展到数百节点。常见选型：配置中心/分布式锁用 Raft（etcd）或 ZAB（ZooKeeper），服务发现用 Gossip（Consul/Redis Cluster），区块链用 PBFT 或 PoW/PoS。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          共识算法 · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

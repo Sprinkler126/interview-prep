@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELK Stack - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>📝 ELK Stack</h1>
+    <p class="subtitle">Elasticsearch · Logstash · Kibana · 日志收集 · 全文检索</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">整体架构</a></li>
+          <li class="sub"><a href="#s1-2">Filebeat vs Logstash</a></li>
+          <li class="sub"><a href="#s1-3">Logstash 管道</a></li>
+          <li class="sub"><a href="#s1-4">Grok / Mutate / GeoIP</a></li>
+          <li class="sub"><a href="#s1-5">Elasticsearch 索引管理</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">Kibana 可视化</a></li>
+          <li class="sub"><a href="#s2-2">日志规范</a></li>
+          <li class="sub"><a href="#s2-3">架构演进</a></li>
+          <li class="sub"><a href="#s2-4">性能优化与安全</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 整体架构 -->
+        <h3 id="s1-1">整体架构</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">ELK Stack 架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box">应用日志<br><small>Log4j2 / Logback</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">系统日志<br><small>syslog / journal</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Nginx 日志<br><small>access.log</small></div>
+            </div>
+            <div class="arch-connector">↓ 采集 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
+                <strong>Filebeat（轻量采集）</strong><br>
+                <small>或 Logstash（重量级处理）</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 传输 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
+                <strong>Elasticsearch</strong><br>
+                <small>索引 · 存储 · 搜索 · 聚合</small>
+              </div>
+            </div>
+            <div class="arch-connector">↓ 查询展示 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
+                <strong>Kibana</strong><br>
+                <small>Discover · Visualize · Dashboard</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>组件职责</h4>
+          <table>
+            <thead>
+              <tr><th>组件</th><th>职责</th><th>特点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Elasticsearch</strong></td><td>分布式搜索引擎，存储和检索日志</td><td>倒排索引、近实时、水平扩展</td></tr>
+              <tr><td><strong>Logstash</strong></td><td>数据处理管道，过滤和转换日志</td><td>功能强大、资源消耗大</td></tr>
+              <tr><td><strong>Kibana</strong></td><td>可视化界面，查询和展示日志</td><td>Discover / Visualize / Dashboard</td></tr>
+              <tr><td><strong>Filebeat</strong></td><td>轻量级日志采集器</td><td>资源占用少、可靠传输</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-2 Filebeat vs Logstash -->
+        <h3 id="s1-2">Filebeat vs Logstash</h3>
+
+        <div class="compare-row">
+          <div class="compare-box">
+            <h4>Filebeat</h4>
+            <ul>
+              <li>Go 语言编写，<strong>轻量级</strong></li>
+              <li>内存占用 ~10MB</li>
+              <li>只负责采集和发送，不做复杂处理</li>
+              <li>支持背压敏感，不会丢失数据</li>
+              <li>适合部署在每台服务器上</li>
+              <li>支持多种输入：log、container、redis、kafka</li>
+            </ul>
+          </div>
+          <div class="compare-box">
+            <h4>Logstash</h4>
+            <ul>
+              <li>JRuby 编写，<strong>重量级</strong></li>
+              <li>内存占用 ~200MB+</li>
+              <li>强大的数据处理能力（Filter）</li>
+              <li>支持 Grok、Mutate、GeoIP 等插件</li>
+              <li>适合集中式数据处理</li>
+              <li>支持多种输入/输出</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>典型组合方案</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Filebeat<br><small>每台服务器部署</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Kafka / Redis<br><small>缓冲队列</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Logstash<br><small>集中处理</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Elasticsearch<br><small>索引存储</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">Kibana<br><small>可视化</small></div>
+          </div>
+          <div class="tip">生产环境推荐 Filebeat + Kafka + Logstash + Elasticsearch + Kibana 的组合。Filebeat 负责轻量采集，Kafka 削峰，Logstash 集中处理，ES 存储检索。</div>
+        </div>
+
+        <!-- 1-3 Logstash 管道 -->
+        <h3 id="s1-3">Logstash 管道</h3>
+
+        <div class="card">
+          <h4>Input → Filter → Output</h4>
+          <pre><code># logstash.conf
+input {
+  beats {
+    port => 5044
+  }
+  # 也可以从 Kafka 消费
+  kafka {
+    bootstrap_servers => "kafka:9092"
+    topics => ["app-logs"]
+    group_id => "logstash-group"
+  }
+}
+
+filter {
+  # Grok 解析非结构化日志
+  grok {
+    match => {
+      "message" => '%{TIMESTAMP_ISO8601:timestamp} \[%{LOGLEVEL:level}\] \[%{DATA:thread}\] %{GREEDYDATA:msg}'
+    }
+  }
+
+  # 日期解析
+  date {
+    match => ["timestamp", "yyyy-MM-dd HH:mm:ss.SSS"]
+    target => "@timestamp"
+  }
+
+  # Mutate 字段处理
+  mutate {
+    remove_field => ["timestamp", "message"]
+    rename => { "msg" => "log_message" }
+    convert => { "response_time" => "integer" }
+  }
+
+  # GeoIP 地理位置解析
+  geoip {
+    source => "client_ip"
+    target => "geo"
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["es:9200"]
+    index => "app-logs-%{+YYYY.MM.dd}"
+    # 或使用 ILM
+    # index => "app-logs"
+  }
+}</code></pre>
+        </div>
+
+        <!-- 1-4 Grok / Mutate / GeoIP -->
+        <h3 id="s1-4">Grok / Mutate / GeoIP</h3>
+
+        <div class="card">
+          <h4>Grok 解析</h4>
+          <pre><code># Grok 语法：%{PATTERN:field_name}
+# 常用 Pattern：
+# %{TIMESTAMP_ISO8601:timestamp}  - 时间戳
+# %{LOGLEVEL:level}               - 日志级别
+# %{IP:client_ip}                 - IP 地址
+# %{INT:status_code}              - 整数
+# %{GREEDYDATA:message}           - 任意文本
+
+# 示例：解析 Nginx access log
+grok {
+  match => {
+    "message" => '%{IPORHOST:client_ip} - %{DATA:user} \[%{HTTPDATE:timestamp}\] "%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}" %{NUMBER:status_code} %{NUMBER:bytes}'
+  }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>常用 Filter 插件</h4>
+          <table>
+            <thead>
+              <tr><th>插件</th><th>作用</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Grok</strong></td><td>正则解析非结构化日志</td><td>解析 Nginx / 应用日志</td></tr>
+              <tr><td><strong>Mutate</strong></td><td>字段重命名、删除、类型转换</td><td><code>rename => {"msg" => "message"}</code></td></tr>
+              <tr><td><strong>GeoIP</strong></td><td>IP 地址解析为地理位置</td><td><code>geoip { source => "client_ip" }</code></td></tr>
+              <tr><td><strong>Date</strong></td><td>日期解析</td><td><code>date { match => ["timestamp", "ISO8601"] }</code></td></tr>
+              <tr><td><strong>Json</strong></td><td>JSON 解析</td><td><code>json { source => "message" }</code></td></tr>
+              <tr><td><strong>Dissect</strong></td><td>简单分隔符解析（比 Grok 快）</td><td><code>dissect { mapping => {"message" => "%{ts} %{level} %{msg}"} }</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-5 Elasticsearch 索引管理 -->
+        <h3 id="s1-5">Elasticsearch 索引管理</h3>
+
+        <div class="card">
+          <h4>ILM（Index Lifecycle Management）生命周期管理</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">Hot<br><small>写入 + 查询<br>SSD 存储</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Warm<br><small>只读 + 查询<br>HDD 存储</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Cold<br><small>低频查询<br>压缩存储</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Delete<br><small>过期删除</small></div>
+          </div>
+          <pre><code># ILM 策略示例
+PUT _ilm/policy/app-logs-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_size": "50gb",
+            "max_age": "1d"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "7d",
+        "actions": {
+          "shrink": { "number_of_shards": 1 },
+          "forcemerge": { "max_num_segments": 1 }
+        }
+      },
+      "delete": {
+        "min_age": "30d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 Kibana -->
+        <h3 id="s2-1">Kibana 可视化</h3>
+
+        <div class="card">
+          <h4>Kibana 核心功能</h4>
+          <table>
+            <thead>
+              <tr><th>功能</th><th>说明</th><th>用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Discover</strong></td><td>日志搜索和浏览</td><td>实时查看日志、KQL 查询</td></tr>
+              <tr><td><strong>Visualize</strong></td><td>创建可视化图表</td><td>柱状图、饼图、折线图、表格</td></tr>
+              <tr><td><strong>Dashboard</strong></td><td>组合多个图表</td><td>业务监控大屏</td></tr>
+              <tr><td><strong>Dev Tools</strong></td><td>ES 查询控制台</td><td>调试 DSL 查询</td></tr>
+              <tr><td><strong>Index Patterns</strong></td><td>索引模式配置</td><td>定义日志索引的字段映射</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-2 日志规范 -->
+        <h3 id="s2-2">日志规范</h3>
+
+        <div class="card">
+          <h4>结构化日志最佳实践</h4>
+          <pre><code># 推荐：JSON 结构化日志
+{
+  "timestamp": "2026-06-10T10:30:00.123Z",
+  "level": "ERROR",
+  "service": "user-service",
+  "traceId": "abc123",
+  "spanId": "def456",
+  "thread": "http-nio-8080-exec-1",
+  "logger": "com.example.UserService",
+  "message": "Failed to create user",
+  "exception": "java.lang.NullPointerException",
+  "stackTrace": "...",
+  "userId": "12345",
+  "requestPath": "/api/users"
+}</code></pre>
+          <ul>
+            <li><strong>结构化：</strong>使用 JSON 格式，便于 ES 索引和查询</li>
+            <li><strong>TraceId：</strong>注入链路追踪 ID，便于关联日志和链路</li>
+            <li><strong>日志级别：</strong>ERROR / WARN / INFO / DEBUG / TRACE，生产环境 INFO</li>
+            <li><strong>敏感信息：</strong>不打印密码、Token 等敏感数据</li>
+            <li><strong>日志切割：</strong>按天/按大小切割，避免单文件过大</li>
+          </ul>
+        </div>
+
+        <!-- 2-3 架构演进 -->
+        <h3 id="s2-3">架构演进</h3>
+
+        <div class="card">
+          <h4>ELK 架构演进</h4>
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>架构</th><th>特点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">ELK</span></td><td>Elasticsearch + Logstash + Kibana</td><td>经典架构，Logstash 直接采集</td></tr>
+              <tr><td><span class="badge badge-green">EFK</span></td><td>Elasticsearch + Fluentd + Kibana</td><td>K8s 生态常用，Fluentd 采集</td></tr>
+              <tr><td><span class="badge badge-purple">Elastic Stack</span></td><td>Filebeat + Kafka + Logstash + ES + Kibana</td><td>生产级架构，完整数据管道</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 性能优化与安全 -->
+        <h3 id="s2-4">性能优化与安全</h3>
+
+        <div class="card">
+          <h4>性能优化</h4>
+          <ul>
+            <li><strong>索引策略：</strong>按日期创建索引（如 app-logs-2026.06.10），使用 ILM 管理生命周期</li>
+            <li><strong>分片数量：</strong>单个分片建议 10-50GB，过多分片影响性能</li>
+            <li><strong>副本数量：</strong>写入密集时可临时设为 0，查询需要时再增加</li>
+            <li><strong>JVM 调优：</strong>堆内存设置为物理内存的 50%（不超过 32GB），留内存给 OS 文件缓存</li>
+            <li><strong>批量写入：</strong>使用 Bulk API 批量索引，减少请求次数</li>
+            <li><strong>Force Merge：</strong>对不再写入的索引执行 force merge，减少段数量</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>安全配置</h4>
+          <ul>
+            <li><strong>X-Pack Security：</strong>ES 内置安全插件，支持认证和授权</li>
+            <li><strong>TLS/SSL：</strong>节点间通信加密、客户端连接加密</li>
+            <li><strong>RBAC：</strong>基于角色的访问控制，不同用户不同权限</li>
+            <li><strong>API Key：</strong>程序化访问使用 API Key 而非用户名密码</li>
+            <li><strong>网络隔离：</strong>ES 集群不应暴露到公网</li>
+          </ul>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">ELK Stack 的架构是怎样的？各组件有什么作用？</div>
+          <div class="a">
+            <strong>参考：</strong>ELK 由三部分组成：Elasticsearch（分布式搜索引擎，负责日志的索引、存储和检索，基于倒排索引实现近实时搜索）、Logstash（数据处理管道，负责日志的过滤、转换和转发）、Kibana（可视化界面，提供 Discover（日志搜索）、Visualize（图表）、Dashboard（大屏）功能）。生产环境通常加入 Filebeat（轻量采集）和 Kafka（缓冲队列）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Filebeat 和 Logstash 有什么区别？什么时候用哪个？</div>
+          <div class="a">
+            <strong>参考：</strong>Filebeat 是 Go 语言编写的轻量级采集器，内存占用约 10MB，只负责采集和发送，适合部署在每台应用服务器上。Logstash 是 JRuby 编写的重量级处理器，内存占用 200MB+，支持 Grok、Mutate 等强大的数据处理功能。生产方案：Filebeat 部署在每台服务器采集日志，发送到 Kafka 缓冲，Logstash 从 Kafka 消费并集中处理，然后写入 ES。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 Grok？如何使用它解析日志？</div>
+          <div class="a">
+            <strong>参考：</strong>Grok 是 Logstash 的正则解析插件，用于将非结构化日志转换为结构化字段。语法：<code>%{PATTERN:field_name}</code>。常用 Pattern：TIMESTAMP_ISO8601（时间戳）、LOGLEVEL（日志级别）、IP（IP 地址）、INT（整数）、GREEDYDATA（任意文本）。示例：<code>%{TIMESTAMP_ISO8601:timestamp} [%{LOGLEVEL:level}] %{GREEDYDATA:message}</code>。对于简单分隔符日志，推荐使用 Dissect（性能更好）。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Elasticsearch 的 ILM 是什么？有什么作用？</div>
+          <div class="a">
+            <strong>参考：</strong>ILM（Index Lifecycle Management）是 ES 的索引生命周期管理功能。它将索引分为四个阶段：Hot（写入+查询，SSD 存储）、Warm（只读+查询，HDD 存储）、Cold（低频查询，压缩存储）、Delete（过期删除）。通过 Rollover 策略自动创建新索引（按大小或时间），旧索引自动降级或删除。好处：避免单个索引过大、自动管理存储成本、保留合理的数据周期。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>ELK 的架构是如何演进的？什么是 EFK？</div>
+          <div class="a">
+            <strong>参考：</strong>最初是 ELK（Elasticsearch + Logstash + Kibana），Logstash 直接采集日志。后来 Filebeat 替代 Logstash 做采集（更轻量），形成 Filebeat + Logstash + ES + Kibana。EFK 是 Kubernetes 生态常用架构，用 Fluentd 替代 Logstash（Fluentd 是 CNCF 项目，与 K8s 集成更好）。生产级架构：Filebeat + Kafka + Logstash + ES + Kibana，加入 Kafka 做缓冲队列。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Elasticsearch 的分片和副本是什么？如何设置？</div>
+          <div class="a">
+            <strong>参考：</strong>分片（Shard）是 ES 的基本存储单元，数据被分散到多个分片上实现水平扩展。副本（Replica）是分片的复制，提供高可用和查询性能。设置建议：单个分片 10-50GB，日志场景按日期创建索引，每个索引 1-3 个主分片。副本数通常为 1（写入密集时可临时设为 0）。分片数在创建索引后不可修改（需要 Reindex），副本数可以动态调整。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>如何保证 ELK 日志系统的安全性？</div>
+          <div class="a">
+            <strong>参考：</strong>1）X-Pack Security：ES 内置安全插件，支持用户名密码认证和 RBAC 权限控制；2）TLS/SSL：节点间通信和客户端连接加密；3）API Key：程序化访问使用 API Key；4）网络隔离：ES 集群不应暴露到公网，使用防火墙限制访问；5）日志脱敏：不打印密码、Token 等敏感信息；6）审计日志：记录所有访问操作。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          ELK Stack · 面试知识复习库 · Last updated 2026-06-10
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

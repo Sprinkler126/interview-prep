@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🐍 Python</h1>
+    <p class="subtitle">GIL · 装饰器 · 元类 · 协程 · 数据模型 · 面向对象</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Python 数据模型</a></li>
+          <li class="sub"><a href="#s1-2">GIL 全局解释器锁</a></li>
+          <li class="sub"><a href="#s1-3">装饰器</a></li>
+          <li class="sub"><a href="#s1-4">元类</a></li>
+          <li class="sub"><a href="#s1-5">协程与异步</a></li>
+          <li class="sub"><a href="#s1-6">内存管理</a></li>
+          <li class="sub"><a href="#s1-7">面向对象</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">多进程 vs 多线程</a></li>
+          <li class="sub"><a href="#s2-2">异步 Web 服务</a></li>
+          <li class="sub"><a href="#s2-3">装饰器实战</a></li>
+          <li class="sub"><a href="#s2-4">Python 性能优化</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 Python 数据模型 -->
+        <h3 id="s1-1">Python 数据模型</h3>
+
+        <div class="card">
+          <h4>可变 vs 不可变类型</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>不可变类型</h4>
+              <p><span class="badge badge-blue">id 不变，值不可修改</span></p>
+              <ul>
+                <li>int / float / complex</li>
+                <li>str（字符串）</li>
+                <li>tuple（元组）</li>
+                <li>frozenset（冻结集合）</li>
+                <li>bytes</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>可变类型</h4>
+              <p><span class="badge badge-orange">id 不变，值可修改</span></p>
+              <ul>
+                <li>list（列表）</li>
+                <li>dict（字典）</li>
+                <li>set（集合）</li>
+                <li>bytearray</li>
+                <li>自定义对象</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>深拷贝与浅拷贝</h4>
+          <pre><code>import copy
+
+# 浅拷贝：只复制最外层，内部元素仍是引用
+original = [[1, 2], [3, 4]]
+shallow = copy.copy(original)
+# 或 shallow = original.copy() / list(original) / original[:]
+
+shallow[0][0] = 99
+print(original[0][0])  # 99（内部列表是同一个对象）
+
+shallow.append([5, 6])
+print(len(original))   # 2（外层列表是不同对象）
+
+# 深拷贝：递归复制所有层级
+deep = copy.deepcopy(original)
+deep[0][0] = 0
+print(original[0][0])  # 99（完全独立的副本）
+
+# 不可变类型的特殊情况
+a = (1, [2, 3])
+b = copy.copy(a)
+# 浅拷贝的元组：元组本身不可变，但内部可变元素仍是引用
+# 深拷贝的元组：内部可变元素也会被复制</code></pre>
+          <div class="tip">Python 中赋值操作（=）不是拷贝，只是创建一个新的引用（别名）。要创建独立副本必须使用 copy() 或 deepcopy()。</div>
+        </div>
+
+        <div class="card">
+          <h4>列表推导式与生成器表达式</h4>
+          <pre><code># 列表推导式（List Comprehension）—— 一次性生成所有元素
+squares = [x**2 for x in range(10)]
+filtered = [x for x in range(20) if x % 2 == 0]
+nested = [(x, y) for x in range(3) for y in range(3) if x != y]
+
+# 生成器表达式（Generator Expression）—— 惰性求值，按需生成
+gen = (x**2 for x in range(1000000))  # 不占用大量内存
+print(next(gen))  # 0
+print(next(gen))  # 1
+
+# 生成器函数（yield）
+def fibonacci():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+fib = fibonacci()
+for _ in range(10):
+    print(next(fib), end=" ")  # 0 1 1 2 3 5 8 13 21 34
+
+# yield from（委托生成器，Python 3.3+）
+def chain(*iterables):
+    for it in iterables:
+        yield from it  # 等价于 for i in it: yield i
+
+# 迭代器协议
+# __iter__() 返回迭代器对象（自身）
+# __next__() 返回下一个元素，耗尽时抛出 StopIteration
+class Countdown:
+    def __init__(self, start):
+        self.count = start
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.count &lt;= 0:
+            raise StopIteration
+        self.count -= 1
+        return self.count + 1</code></pre>
+        </div>
+
+        <!-- 1-2 GIL -->
+        <h3 id="s1-2">GIL 全局解释器锁</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">GIL（Global Interpreter Lock）工作机制</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide">Python 解释器（CPython）</div>
+            </div>
+            <div class="arch-connector">↓ 内部 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">GIL（全局锁）<br><small>同一时刻只有一个线程</small><br><small>持有 GIL 执行字节码</small></div>
+              <div class="arch-box" style="margin-left:1rem">引用计数器<br><small>gc_refcount</small><br><small>非线程安全</small></div>
+            </div>
+            <div class="arch-connector">↓ 线程调度 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box">Thread 1<br><small>持有 GIL</small><br><small>执行 100 条字节码</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Thread 2<br><small>等待 GIL</small><br><small>阻塞</small></div>
+              <div class="arch-box" style="margin-left:0.5rem">Thread 3<br><small>等待 GIL</small><br><small>阻塞</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>GIL 本质与影响</h4>
+          <ul>
+            <li><strong>什么是 GIL：</strong>CPython 解释器级别的全局互斥锁，同一时刻只有一个线程能执行 Python 字节码</li>
+            <li><strong>为什么需要 GIL：</strong>CPython 的内存管理（引用计数）不是线程安全的，GIL 是最简单的线程安全方案</li>
+            <li><strong>GIL 的影响：</strong>多线程无法利用多核 CPU 进行并行计算，CPU 密集型任务多线程甚至可能更慢（上下文切换开销）</li>
+            <li><strong>GIL 释放：</strong>IO 操作时会释放 GIL（如文件读写、网络请求、time.sleep），所以 IO 密集型任务多线程仍然有效</li>
+            <li><strong>切换机制：</strong>Python 3.2+ 使用基于时间片的 GIL 切换（默认 5ms sys.setswitchinterval()）</li>
+          </ul>
+          <div class="warn">GIL 是 CPython 特有的，Jython、PyPy（可选）、IronPython 没有 GIL。Python 3.13 实验性支持禁用 GIL（--disable-gil 编译选项），Python 3.14 进一步优化。</div>
+        </div>
+
+        <div class="card">
+          <h4>绕过 GIL 的方案</h4>
+          <table>
+            <thead>
+              <tr><th>方案</th><th>原理</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">多进程 multiprocessing</span></td><td>每个进程独立解释器，绕过 GIL</td><td>CPU 密集型任务</td></tr>
+              <tr><td><span class="badge badge-green">C 扩展</span></td><td>C 代码执行时释放 GIL（Py_BEGIN_ALLOW_THREADS）</td><td>NumPy/Pandas 等科学计算</td></tr>
+              <tr><td><span class="badge badge-orange">异步 asyncio</span></td><td>单线程并发，IO 切换不涉及 GIL</td><td>IO 密集型任务</td></tr>
+              <tr><td><span class="badge badge-purple">其他解释器</span></td><td>PyPy STM / Jython / GraalPy 无 GIL</td><td>对 C 扩展依赖少的场景</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-3 装饰器 -->
+        <h3 id="s1-3">装饰器</h3>
+
+        <div class="card">
+          <h4>装饰器原理（函数即对象 + 闭包）</h4>
+          <pre><code># Python 中函数是一等公民（first-class object）
+# 可以赋值给变量、作为参数传递、作为返回值
+
+# 装饰器本质：接收一个函数，返回一个新函数的高阶函数
+def timer(func):
+    import time
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"{func.__name__} 耗时 {end-start:.4f}s")
+        return result
+    return wrapper
+
+@timer  # 等价于 hello = timer(hello)
+def hello():
+    print("Hello!")
+
+# 闭包：内部函数引用了外部函数的变量
+# func 被 wrapper 闭包捕获，即使 timer 函数已执行完毕
+
+# 使用 functools.wraps 保留原函数元信息
+import functools
+def timer(func):
+    @functools.wraps(func)  # 保留 __name__, __doc__ 等
+    def wrapper(*args, **kwargs):
+        ...
+    return wrapper</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>带参数装饰器与类装饰器</h4>
+          <pre><code># 带参数装饰器：三层嵌套
+def retry(max_retries=3, delay=1):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+@retry(max_retries=3, delay=0.5)
+def call_api():
+    ...
+
+# 类装饰器：实现 __call__ 方法
+class Cache:
+    def __init__(self, maxsize=128):
+        self.cache = {}
+        self.maxsize = maxsize
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args):
+            if args not in self.cache:
+                if len(self.cache) >= self.maxsize:
+                    self.cache.pop(next(iter(self.cache)))
+                self.cache[args] = func(*args)
+            return self.cache[args]
+        return wrapper
+
+@Cache(maxsize=256)
+def expensive_computation(n):
+    return sum(range(n))
+
+# 多个装饰器的执行顺序（从下到上装饰，从外到内执行）
+@decorator_a
+@decorator_b
+@decorator_c
+def func():
+    pass
+# 等价于 func = decorator_a(decorator_b(decorator_c(func)))</code></pre>
+        </div>
+
+        <!-- 1-4 元类 -->
+        <h3 id="s1-4">元类</h3>
+
+        <div class="card">
+          <h4>type() 与元类</h4>
+          <pre><code># Python 中一切皆对象，类也是对象
+# 类的类型是 type，type 就是元类
+
+# type() 的两种用法：
+# 1. 查看类型
+print(type(42))       # &lt;class 'int'&gt;
+print(type([1, 2]))   # &lt;class 'list'&gt;
+
+# 2. 动态创建类（三参数形式）
+MyClass = type('MyClass', (BaseClass,), {
+    'attr': 42,
+    'method': lambda self: self.attr
+})
+# 等价于：
+class MyClass(BaseClass):
+    attr = 42
+    def method(self):
+        return self.attr
+
+# 自定义元类（控制类的创建过程）
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+class Database(metaclass=SingletonMeta):
+    def __init__(self):
+        self.connection = "connected"
+
+db1 = Database()
+db2 = Database()
+print(db1 is db2)  # True（单例）
+
+# 元类的 __new__ 和 __init__
+class ModelMeta(type):
+    def __new__(mcs, name, bases, namespace):
+        # 在类创建前修改类属性
+        namespace['__tablename__'] = name.lower()
+        return super().__new__(mcs, name, bases, namespace)
+
+    def __init__(cls, name, bases, namespace):
+        # 在类创建后执行初始化
+        super().__init__(name, bases, namespace)</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>描述符协议</h4>
+          <pre><code># 描述符：实现了 __get__、__set__、__delete__ 中任一方法的对象
+# 分为两类：数据描述符（有 __set__）和非数据描述符（只有 __get__）
+
+class Property:
+    """模拟 property 的描述符实现"""
+    def __init__(self, fget, fset=None):
+        self.fget = fget
+        self.fset = fset
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+        self.fset(obj, value)
+
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius
+
+    @Property
+    def area(self):
+        return 3.14159 * self._radius ** 2
+
+# 属性查找顺序（MRO + 描述符优先级）：
+# 1. 数据描述符（类中定义了 __set__ 的描述符）
+# 2. 实例属性（__dict__）
+# 3. 非数据描述符（类中只有 __get__ 的描述符）
+# 4. __getattr__（最后的兜底）
+
+# property 就是基于描述符协议实现的
+class User:
+    def __init__(self, name):
+        self._name = name
+
+    @property
+    def name(self):          # 创建 Property 描述符
+        return self._name
+
+    @name.setter
+    def name(self, value):   # 设置 fset
+        if not isinstance(value, str):
+            raise TypeError("name must be str")
+        self._name = value</code></pre>
+        </div>
+
+        <!-- 1-5 协程与异步 -->
+        <h3 id="s1-5">协程与异步</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">协程演进历程</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">yield<br><small>生成器（Python 2）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">yield from<br><small>委托生成器（Python 3.3）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">async/await<br><small>原生协程（Python 3.5+）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">asyncio<br><small>事件循环 + Task</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>async/await 与 asyncio</h4>
+          <pre><code>import asyncio
+
+# async def 定义协程函数，调用返回协程对象（不会立即执行）
+async def fetch_data(url):
+    print(f"开始请求 {url}")
+    await asyncio.sleep(1)  # 模拟 IO 操作，让出控制权
+    return f"{url} 的数据"
+
+# asyncio 事件循环
+async def main():
+    # 方式 1：顺序执行（一个完成再执行下一个）
+    result1 = await fetch_data("url1")
+    result2 = await fetch_data("url2")
+
+    # 方式 2：并发执行（同时发起多个请求）
+    tasks = [
+        asyncio.create_task(fetch_data("url1")),
+        asyncio.create_task(fetch_data("url2")),
+        asyncio.create_task(fetch_data("url3")),
+    ]
+    results = await asyncio.gather(*tasks)
+
+    # 方式 3：TaskGroup（Python 3.11+，结构化并发）
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(fetch_data("url1"))
+        task2 = tg.create_task(fetch_data("url2"))
+    results = [task1.result(), task2.result()]
+
+# 运行事件循环
+asyncio.run(main())  # Python 3.7+
+
+# await 的本质：暂停当前协程，将控制权交给事件循环
+# 事件循环调度其他就绪的协程执行
+# 当 await 的结果准备好时，恢复当前协程</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>asyncio 事件循环原理</h4>
+          <pre><code># 事件循环的核心：调度协程的执行
+# 1. 维护一个就绪队列（ready queue）和等待列表（waiting list）
+# 2. 从就绪队列取出协程执行
+# 3. 遇到 await 时，如果 await 的对象未就绪，暂停协程并放入等待列表
+# 4. IO 完成后将协程移回就绪队列
+# 5. 重复直到所有任务完成
+
+# 底层依赖操作系统的 IO 多路复用
+# Linux: epoll, macOS: kqueue, Windows: IOCP
+
+# 异步上下文管理器
+class AsyncDB:
+    async def __aenter__(self):
+        self.conn = await create_connection()
+        return self.conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.conn.close()
+
+async def query():
+    async with AsyncDB() as conn:
+        await conn.execute("SELECT 1")
+
+# 异步迭代器
+class AsyncRange:
+    def __init__(self, stop):
+        self.stop = stop
+        self.current = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.current >= self.stop:
+            raise StopAsyncIteration
+        self.current += 1
+        await asyncio.sleep(0.1)
+        return self.current - 1</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>GIL 与 asyncio 的关系</h4>
+          <div class="tip">asyncio 运行在单线程上，不需要多线程，因此 GIL 不是问题。asyncio 的并发是协作式的（cooperative），协程主动 await 让出控制权，不存在抢占。GIL 主要影响的是多线程并行计算的场景，而 asyncio 解决的是 IO 并发（大量 IO 等待时切换执行其他任务），两者本质不同。</div>
+        </div>
+
+        <!-- 1-6 内存管理 -->
+        <h3 id="s1-6">内存管理</h3>
+
+        <div class="card">
+          <h4>Python 内存管理机制</h4>
+          <pre><code># 1. 引用计数（主要机制）
+import sys
+a = [1, 2, 3]
+print(sys.getrefcount(a))  # 2（a + getrefcount 参数）
+b = a                       # 引用计数 +1
+del b                       # 引用计数 -1
+
+# 引用计数为 0 时立即释放内存
+# 问题：循环引用无法解决
+
+# 2. 垃圾回收（分代回收，解决循环引用）
+import gc
+gc.collect()  # 手动触发垃圾回收
+
+# 分代回收策略：
+# 第 0 代（young）：新创建的对象，检查最频繁
+# 第 1 代（middle）：第 0 代存活下来的对象
+# 第 2 代（old）：长期存活的对象，检查最少
+# 阈值可通过 gc.get_threshold() 查看：(700, 10, 10)
+
+# 3. 内存池（小对象优化）
+# Python 对小对象（&lt; 512 bytes）使用内存池（pymalloc）
+# 大对象直接调用系统的 malloc/free
+# 整数池（-5 ~ 256）和字符串驻留（intern）也是优化手段
+
+# 循环引用示例
+class Node:
+    def __init__(self):
+        self.ref = None
+
+a = Node()
+b = Node()
+a.ref = b  # a -> b
+b.ref = a  # b -> a（循环引用）
+del a, b   # 引用计数不为 0，但无法访问
+gc.collect()  # 垃圾回收检测并清理循环引用</code></pre>
+        </div>
+
+        <!-- 1-7 面向对象 -->
+        <h3 id="s1-7">面向对象</h3>
+
+        <div class="card">
+          <h4>魔术方法（Dunder Methods）</h4>
+          <table>
+            <thead>
+              <tr><th>方法</th><th>触发时机</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>__new__</td><td>创建实例时</td><td>真正创建对象（在 __init__ 之前），控制实例创建过程</td></tr>
+              <tr><td>__init__</td><td>初始化实例时</td><td>初始化已创建的对象（不返回值）</td></tr>
+              <tr><td>__call__</td><td>对象被调用时 obj()</td><td>使实例可调用（常用于装饰器、策略模式）</td></tr>
+              <tr><td>__str__</td><td>str(obj) / print(obj)</td><td>面向用户的字符串表示</td></tr>
+              <tr><td>__repr__</td><td>repr(obj) / 交互式终端</td><td>面向开发者的字符串表示（应可 eval 还原）</td></tr>
+              <tr><td>__len__</td><td>len(obj)</td><td>返回长度</td></tr>
+              <tr><td>__getitem__</td><td>obj[key]</td><td>索引/键访问</td></tr>
+              <tr><td>__setitem__</td><td>obj[key] = value</td><td>索引/键赋值</td></tr>
+              <tr><td>__eq__ / __hash__</td><td>== / hash(obj)</td><td>相等性判断和哈希</td></tr>
+              <tr><td>__enter__ / __exit__</td><td>with obj</td><td>上下文管理器</td></tr>
+            </tbody>
+          </table>
+          <pre><code>class Money:
+    __slots__ = ('amount', 'currency')  # 限制属性，节省内存
+
+    def __init__(self, amount, currency='CNY'):
+        self.amount = amount
+        self.currency = currency
+
+    def __repr__(self):
+        return f"Money({self.amount}, '{self.currency}')"
+
+    def __str__(self):
+        return f"{self.amount} {self.currency}"
+
+    def __add__(self, other):
+        if isinstance(other, Money):
+            if self.currency != other.currency:
+                raise ValueError("Currency mismatch")
+            return Money(self.amount + other.amount, self.currency)
+        return Money(self.amount + other, self.currency)
+
+    def __eq__(self, other):
+        return isinstance(other, Money) and \
+               self.amount == other.amount and self.currency == other.currency
+
+    def __hash__(self):
+        return hash((self.amount, self.currency))
+
+    def __bool__(self):
+        return self.amount != 0</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>MRO（方法解析顺序）</h4>
+          <pre><code># Python 使用 C3 线性化算法确定多继承的方法解析顺序
+class A:
+    def method(self):
+        return "A"
+
+class B(A):
+    def method(self):
+        return "B"
+
+class C(A):
+    def method(self):
+        return "C"
+
+class D(B, C):
+    pass
+
+print(D.__mro__)
+# (&lt;class 'D'&gt;, &lt;class 'B'&gt;, &lt;class 'C'&gt;, &lt;class 'A'&gt;, &lt;class 'object'&gt;)
+# D -> B -> C -> A -> object（左优先，深度优先，去重保留最后一个）
+
+d = D()
+print(d.method())  # "B"（MRO 中 B 在 C 前面）
+
+# super() 按 MRO 顺序调用下一个类的方法
+class B(A):
+    def method(self):
+        return "B -> " + super().method()  # 调用 MRO 中下一个（C）</code></pre>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 多进程 vs 多线程 -->
+        <h3 id="s2-1">多进程 vs 多线程</h3>
+
+        <div class="card">
+          <h4>并发方案选型</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>多线程 threading</h4>
+              <p><span class="badge badge-orange">受 GIL 限制</span></p>
+              <ul>
+                <li>适合 IO 密集型（网络请求、文件读写）</li>
+                <li>线程间共享内存，通信简单</li>
+                <li>创建/销毁开销小</li>
+                <li>受 GIL 限制，无法多核并行计算</li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>多进程 multiprocessing</h4>
+              <p><span class="badge badge-green">绕过 GIL</span></p>
+              <ul>
+                <li>适合 CPU 密集型（计算、图像处理）</li>
+                <li>每个进程独立内存，通信需 IPC</li>
+                <li>创建/销毁开销大（fork/exec）</li>
+                <li>可充分利用多核 CPU</li>
+              </ul>
+            </div>
+          </div>
+          <pre><code># 多线程示例
+from concurrent.futures import ThreadPoolExecutor
+import requests
+
+urls = ["https://api.example.com/1", "https://api.example.com/2"]
+
+def fetch(url):
+    return requests.get(url).json()
+
+with ThreadPoolExecutor(max_workers=10) as executor:
+    results = list(executor.map(fetch, urls))
+
+# 多进程示例
+from concurrent.futures import ProcessPoolExecutor
+
+def compute(n):
+    return sum(i*i for i in range(n))
+
+with ProcessPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(compute, [10**7]*4))
+
+# 线程池 vs 进程池选择：
+# IO 密集 → ThreadPoolExecutor
+# CPU 密集 → ProcessPoolExecutor
+# 混合型 → 多进程 + 每个进程内使用异步</code></pre>
+        </div>
+
+        <!-- 2-2 异步 Web 服务 -->
+        <h3 id="s2-2">异步 Web 服务</h3>
+
+        <div class="card">
+          <h4>FastAPI 异步示例</h4>
+          <pre><code>from fastapi import FastAPI
+import httpx
+
+app = FastAPI()
+
+@app.get("/user/{user_id}")
+async def get_user(user_id: int):
+    # 异步 HTTP 请求（使用 httpx 替代 requests）
+    async with httpx.AsyncClient() as client:
+        # 并发请求多个服务
+        user_resp, orders_resp = await asyncio.gather(
+            client.get(f"http://user-service/users/{user_id}"),
+            client.get(f"http://order-service/orders?user_id={user_id}")
+        )
+    return {
+        "user": user_resp.json(),
+        "orders": orders_resp.json()
+    }
+
+# 对比同步框架（Flask）：
+# 同步：每个请求占用一个线程，100 个并发请求需要 100 个线程
+# 异步：单线程事件循环，100 个并发请求只需 1 个线程（IO 时切换）
+
+# 性能对比（典型场景）：
+# Flask + Gunicorn (4 workers, 1000 threads): ~2000 req/s
+# FastAPI + uvicorn (4 workers): ~10000+ req/s（IO 密集场景）</code></pre>
+        </div>
+
+        <!-- 2-3 装饰器实战 -->
+        <h3 id="s2-3">装饰器实战</h3>
+
+        <div class="card">
+          <h4>常用装饰器模式</h4>
+          <pre><code># 1. 缓存装饰器（类似 functools.lru_cache）
+def memoize(func):
+    cache = {}
+    @functools.wraps(func)
+    def wrapper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+    wrapper.cache_clear = cache.clear
+    return wrapper
+
+@memoize
+def fibonacci(n):
+    if n &lt; 2:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+# 2. 权限检查装饰器
+def require_role(role):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if user.role != role:
+                raise PermissionError(f"Requires {role}")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+@require_role("admin")
+def delete_user(user_id):
+    ...
+
+# 3. 重试装饰器
+def retry(exceptions=(Exception,), max_retries=3, delay=1):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    time.sleep(delay * 2**attempt)  # 指数退避
+        return wrapper
+    return decorator
+
+# 4. functools.lru_cache（标准库）
+@functools.lru_cache(maxsize=256)
+def expensive_api_call(param):
+    ...</code></pre>
+        </div>
+
+        <!-- 2-4 Python 性能优化 -->
+        <h3 id="s2-4">Python 性能优化</h3>
+
+        <div class="card">
+          <h4>性能优化技巧</h4>
+          <table>
+            <thead>
+              <tr><th>优化方向</th><th>方法</th><th>效果</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>算法优化</td><td>选择合适的数据结构和算法</td><td>数量级提升</td></tr>
+              <tr><td>内置函数</td><td>使用 map/filter/sum 等内置函数（C 实现）</td><td>2~10x</td></tr>
+              <tr><td>列表推导式</td><td>代替 for 循环</td><td>1.5~3x</td></tr>
+              <tr><td>局部变量</td><td>频繁访问的全局变量转为局部变量</td><td>1.2~1.5x</td></tr>
+              <tr><td>__slots__</td><td>限制实例属性，减少内存</td><td>内存减少 30%~50%</td></tr>
+              <tr><td>C 扩展</td><td>Cython / cffi / Ctypes</td><td>10~100x</td></tr>
+              <tr><td>JIT 编译</td><td>PyPy / Numba</td><td>10~100x（数值计算）</td></tr>
+            </tbody>
+          </table>
+          <pre><code># 局部变量优化示例
+import math
+
+# 慢：每次循环查找 math.sqrt（全局查找）
+def compute_slow(n):
+    result = 0
+    for i in range(n):
+        result += math.sqrt(i)
+    return result
+
+# 快：局部变量缓存
+def compute_fast(n):
+    sqrt = math.sqrt  # 转为局部变量
+    result = 0
+    for i in range(n):
+        result += sqrt(i)
+    return result
+
+# 字符串拼接优化
+# 慢：循环中 += 拼接字符串（每次创建新字符串）
+s = ""
+for i in range(10000):
+    s += str(i)
+
+# 快：join 一次性拼接
+s = "".join(str(i) for i in range(10000))</code></pre>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">什么是 GIL？它对 Python 多线程有什么影响？如何绕过？</div>
+          <div class="a">
+            <strong>参考：</strong>GIL（Global Interpreter Lock）是 CPython 解释器的全局互斥锁，同一时刻只有一个线程能执行 Python 字节码。它存在的原因是 CPython 的内存管理（引用计数）不是线程安全的。<br>
+            影响：多线程无法利用多核 CPU 并行计算。CPU 密集型任务多线程可能更慢（上下文切换开销 > 并发收益）。但 IO 操作时会释放 GIL，所以 IO 密集型任务多线程仍然有效。<br>
+            绕过方案：1）多进程（multiprocessing），每个进程独立解释器；2）C 扩展（NumPy 等计算时释放 GIL）；3）asyncio 单线程异步（IO 并发）；4）使用无 GIL 的解释器（PyPy、Jython）。<br>
+            <strong>追问：Python 3.13 的 no-GIL 是什么？</strong> 是 CPython 的实验性构建选项（--disable-gil），允许每个线程独立获取 GIL，实现真正的多线程并行。但目前仍处于实验阶段。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">装饰器的原理是什么？带参数的装饰器和普通装饰器有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>装饰器本质是一个高阶函数，接收一个函数作为参数，返回一个新函数。利用闭包捕获原函数，在新函数中添加额外逻辑后调用原函数。语法糖 @decorator 等价于 func = decorator(func)。<br>
+            普通装饰器是两层嵌套：外层接收 func，内层 wrapper 是替代函数。带参数装饰器是三层嵌套：最外层接收装饰器参数，返回中间层 decorator，decorator 再接收 func 返回 wrapper。<br>
+            <strong>追问：如何保留被装饰函数的元信息？</strong> 使用 <code>@functools.wraps(func)</code> 装饰 wrapper 函数，它会复制原函数的 __name__、__doc__、__module__ 等属性。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Python 的元类是什么？什么时候需要自定义元类？</div>
+          <div class="a">
+            <strong>参考：</strong>元类是创建类的类。Python 中 type 是默认的元类，所有类都是 type 的实例。<code>class Foo: pass</code> 等价于 <code>Foo = type('Foo', (), {})</code>。自定义元类通过继承 type 并重写 __new__ 或 __init__ 来控制类的创建过程。<br>
+            使用场景：1）单例模式（在 __call__ 中缓存实例）；2）ORM 框架（自动创建表名、字段映射）；3）API 注册（自动注册子类）；4）接口检查（验证子类是否实现了必要方法）。<br>
+            <strong>追问：元类和类装饰器有什么区别？</strong> 类装饰器在类创建后修改类（后处理），元类在类创建时控制过程（内处理）。元类会被子类继承，类装饰器不会。大多数场景类装饰器更简单，只有需要深度控制类创建过程时才用元类。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">async/await 的原理是什么？和多线程有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>async def 定义协程函数，调用返回协程对象。await 暂停当前协程，将控制权交给事件循环，事件循环调度其他就绪的协程。底层通过生成器（yield from）实现状态保存和恢复。<br>
+            和多线程的区别：1）协程是协作式调度（主动 await 让出），线程是抢占式调度（操作系统强制切换）；2）协程运行在单线程上，无锁竞争，无线程安全问题；3）协程切换开销极小（用户态切换），线程切换涉及内核态（~1us vs ~1ms）；4）协程适合 IO 密集型，多线程受 GIL 限制。<br>
+            <strong>追问：什么时候不该用 asyncio？</strong> CPU 密集型任务（计算时无法 await 让出）、使用不支持异步的阻塞库时。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Python 中深拷贝和浅拷贝有什么区别？什么场景用深拷贝？</div>
+          <div class="a">
+            <strong>参考：</strong>浅拷贝（copy.copy()）只复制最外层容器，内部元素仍是原对象的引用。修改内部可变元素会影响原对象。深拷贝（copy.deepcopy()）递归复制所有层级，完全独立。<br>
+            浅拷贝方式：list.copy()、切片 [:]、dict.copy()、copy.copy()。深拷贝只有 copy.deepcopy()。<br>
+            需要深拷贝的场景：1）嵌套可变结构（列表套列表、字典套列表）需要完全独立的副本时；2）缓存配置对象，修改副本不影响原值时。<br>
+            <strong>追问：不可变类型需要拷贝吗？</strong> 通常不需要。int/str/tuple 等不可变类型赋值即创建新引用。但如果元组内包含可变元素（如 tuple 中有 list），浅拷贝不会复制内部 list，深拷贝才会。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Python 的 __new__ 和 __init__ 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>__new__ 是静态方法（实际是类方法），负责创建并返回一个新实例。__init__ 是实例方法，负责初始化已创建的实例（不返回值）。__new__ 在 __init__ 之前执行。<br>
+            __new__ 的典型应用：1）单例模式（在 __new__ 中缓存实例）；2）不可变类型子类化（如 int/str/tuple，因为不可变对象在 __init__ 时已经创建完成）；3）控制实例创建过程。<br>
+            <strong>追问：什么时候必须用 __new__？</strong> 子类化不可变类型时。例如 <code>class PositiveInt(int): def __new__(cls, value): return super().__new__(cls, abs(value))</code>，因为 int 是不可变的，__init__ 时值已经无法修改。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Python 的内存管理是怎样的？循环引用怎么处理？</div>
+          <div class="a">
+            <strong>参考：</strong>Python 内存管理有三层机制：1）引用计数（主要机制），对象引用计数为 0 时立即释放；2）分代垃圾回收（gc 模块），解决循环引用问题，分为 0/1/2 三代，越老检查频率越低；3）内存池（pymalloc），小对象（&lt; 512B）使用内存池避免频繁调用系统 malloc。<br>
+            循环引用处理：gc 模块使用标记-清除算法。从 GC Root 出发遍历所有可达对象，不可达的对象（包括循环引用的孤立对象组）被清除。注意：实现了 __del__ 的循环引用对象可能无法自动回收（Python 3.4+ 已改善）。<br>
+            <strong>追问：如何避免内存泄漏？</strong> 1）避免不必要的全局变量和类变量缓存；2）使用 weakref 弱引用；3）及时关闭文件/连接；4）用 gc.collect() 手动触发回收。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Python · 面试知识复习库 · Last updated 2026-06-02
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>

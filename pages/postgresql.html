@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PostgreSQL - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🐘 PostgreSQL</h1>
+    <p class="subtitle">MVCC · JSONB · 高级查询 · 扩展 · 窗口函数</p>
+
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">MVCC 实现</a></li>
+          <li class="sub"><a href="#s1-2">事务隔离级别</a></li>
+          <li class="sub"><a href="#s1-3">索引类型</a></li>
+          <li class="sub"><a href="#s1-4">JSONB 类型及操作</a></li>
+          <li class="sub"><a href="#s1-5">窗口函数</a></li>
+          <li class="sub"><a href="#s1-6">CTE 递归查询</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">扩展机制</a></li>
+          <li class="sub"><a href="#s2-2">物化视图</a></li>
+          <li class="sub"><a href="#s2-3">PL/pgSQL 存储过程</a></li>
+          <li class="sub"><a href="#s2-4">与 MySQL 对比</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+
+        <!-- ============================== PART 1 ============================== -->
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="s1-1">1.1 MVCC 实现</h3>
+        <div class="diagram">
+          <div class="diagram-title">PostgreSQL MVCC 机制</div>
+          <div class="card">
+            <p>PostgreSQL 的 MVCC 与 MySQL InnoDB 有本质不同：PG 不使用 Undo Log，而是在<strong>每个元组 (Tuple)</strong> 上直接记录版本信息。</p>
+          </div>
+        </div>
+        <div class="card">
+          <h4>元组隐藏字段</h4>
+          <table>
+            <thead><tr><th>字段</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td><code>xmin</code></td><td>插入该元组的事务 ID（创建版本号）</td></tr>
+              <tr><td><code>xmax</code></td><td>删除/更新该元组的事务 ID（删除版本号），0 表示未删除</td></tr>
+              <tr><td><code>ctid</code></td><td>元组的物理位置（page, offset），类似行指针</td></tr>
+              <tr><td><code>cmin/cmax</code></td><td>命令序号，用于同一事务内的命令区分</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>UPDATE 操作流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">原始 Tuple xmin=100 xmax=0</div>
+            <div class="flow-arrow">UPDATE →</div>
+            <div class="flow-box flow-orange">原 Tuple xmax=200<br><span style="font-size:0.7rem">标记删除</span></div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-box flow-green">新 Tuple xmin=200 xmax=0<br><span style="font-size:0.7rem">新版本插入</span></div>
+          </div>
+          <p style="margin-top:0.5rem">PG 的 UPDATE 实际上是 DELETE + INSERT，旧版本保留在原数据页中。这会导致<strong>表膨胀 (Table Bloat)</strong>，需要 VACUUM 回收。</p>
+        </div>
+        <div class="card">
+          <h4>VACUUM 机制</h4>
+          <ul>
+            <li><strong>VACUUM</strong>：标记死元组空间为可复用，不回收磁盘空间，不阻塞读写</li>
+            <li><strong>VACUUM FULL</strong>：物理重写表，回收磁盘空间，但会<strong>锁表</strong></li>
+            <li><strong>Autovacuum</strong>：后台自动执行，由 <code>autovacuum_vacuum_threshold</code> 和 <code>autovacuum_vacuum_scale_factor</code> 控制触发条件</li>
+            <li><strong>死元组</strong>：xmax 不为 0 且对所有活跃事务不可见的元组</li>
+          </ul>
+          <div class="warn">如果 VACUUM 不及时，dead tuple 堆积导致表膨胀，查询需要扫描更多页面，性能下降。这是 PG 运维的重要关注点。</div>
+        </div>
+        <div class="card">
+          <h4>事务快照 (Snapshot)</h4>
+          <pre><code>-- 查看当前快照
+SELECT txid_current_snapshot();
+
+-- 返回格式: xmin:xmax:xip_list
+-- xmin: 最小活跃事务 ID
+-- xmax: 下一个将分配的事务 ID
+-- xip_list: 当前活跃事务 ID 列表</code></pre>
+          <ul>
+            <li><strong>可见性判断</strong>：元组 xmin < snapshot.xmin 且不在 xip_list 中 → 可见</li>
+            <li>元组 xmax = 0 或 xmax 是将来事务 → 未删除，可见</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-2">1.2 事务隔离级别</h3>
+        <div class="diagram">
+          <div class="diagram-title">PostgreSQL 事务隔离级别</div>
+          <table>
+            <thead><tr><th>隔离级别</th><th>脏读</th><th>不可重复读</th><th>幻读</th><th>实现方式</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">Read Committed</span>（默认）</td><td>防止</td><td>可能</td><td>可能</td><td>每条 SQL 获取新快照</td></tr>
+              <tr><td><span class="badge badge-green">Repeatable Read</span></td><td>防止</td><td>防止</td><td>防止*</td><td>事务开始时获取快照，全程使用</td></tr>
+              <tr><td><span class="badge badge-orange">Serializable</span></td><td>防止</td><td>防止</td><td>防止</td><td>SSI (Serializable Snapshot Isolation)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>PG 的特殊之处</h4>
+          <ul>
+            <li><strong>Read Committed</strong>：每条 SQL 看到的是该 SQL 开始时的快照，不是事务开始时。同一事务中两次 SELECT 可能看到不同结果</li>
+            <li><strong>Repeatable Read</strong>：PG 的 RR 真正防止了幻读（不像 MySQL InnoDB RR 仍有幻读）。遇到冲突会报 <code>could not serialize access due to concurrent update</code></li>
+            <li><strong>Serializable</strong>：使用 SSI 算法，基于快照隔离加序列化冲突检测，不加锁，性能比传统 S2PL 好得多</li>
+            <li><strong>无读锁</strong>：PG 所有隔离级别下 SELECT 都不加锁，依靠 MVCC 快照读</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-3">1.3 索引类型</h3>
+        <div class="diagram">
+          <div class="diagram-title">PostgreSQL 索引类型</div>
+          <table>
+            <thead><tr><th>索引类型</th><th>适用场景</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">B-tree</span></td><td>等值、范围、排序、LIKE 'abc%'</td><td>默认索引，最通用，支持 NULL</td></tr>
+              <tr><td><span class="badge badge-green">GIN</span></td><td>全文搜索、JSONB、数组、HStore</td><td>倒排索引，适合多值列，@>/? 等操作符</td></tr>
+              <tr><td><span class="badge badge-orange">GiST</span></td><td>地理空间、范围类型、全文搜索</td><td>通用搜索树，支持 <@/@>/&& 等操作符</td></tr>
+              <tr><td><span class="badge badge-purple">BRIN</span></td><td>物理有序的大表（时间序列、自增ID）</td><td>Block Range Index，极小索引，记录每组页面的 min/max</td></tr>
+              <tr><td><span class="badge badge-red">Hash</span></td><td>仅等值查询</td><td>比 B-tree 小，WAL 支持从 PG 10 开始</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>GIN 索引详解</h4>
+          <pre><code>-- JSONB 字段创建 GIN 索引
+CREATE INDEX idx_data ON my_table USING GIN (data);
+
+-- 支持的操作符
+-- @>  包含
+-- ?   键存在
+-- ?|  任一键存在
+-- ?&  所有键存在
+-- @?  JSONPath 匹配
+-- @@  JSONPath 匹配</code></pre>
+          <ul>
+            <li><strong>GIN (Generalized Inverted Index)</strong>：内部是 B-tree of keys → Posting List/Tree</li>
+            <li>支持 <code>gin_trgm_ops</code> 操作符实现模糊搜索 <code>LIKE '%keyword%'</code></li>
+            <li><code>fastupdate</code>：延迟批量写入提高写入性能</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>BRIN 索引</h4>
+          <pre><code>-- 适合时间序列数据
+CREATE INDEX idx_created ON logs USING BRIN (created_at)
+  WITH (pages_per_range = 32);</code></pre>
+          <ul>
+            <li>每个索引条目记录一组连续页面（默认 128 页）的 min/max 值</li>
+            <li>索引大小仅为 B-tree 的 1/100 ~ 1/1000</li>
+            <li>适合数据与物理存储顺序一致的场景（如时间序列）</li>
+          </ul>
+        </div>
+
+        <h3 id="s1-4">1.4 JSONB 类型及操作</h3>
+        <div class="diagram">
+          <div class="diagram-title">JSON vs JSONB</div>
+          <table>
+            <thead><tr><th>特性</th><th>JSON</th><th>JSONB</th></tr></thead>
+            <tbody>
+              <tr><td><strong>存储格式</strong></td><td>原始文本</td><td>二进制（分解的 key-value）</td></tr>
+              <tr><td><strong>写入速度</strong></td><td>快（原样存储）</td><td>稍慢（需解析）</td></tr>
+              <tr><td><strong>查询速度</strong></td><td>慢（每次解析）</td><td>快（预解析）</td></tr>
+              <tr><td><strong>索引支持</strong></td><td>不支持 GIN</td><td>支持 GIN 索引</td></tr>
+              <tr><td><strong>保留格式</strong></td><td>保留空格、键顺序</td><td>不保留，去重键</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>JSONB 操作符</h4>
+          <pre><code>-- 数据示例
+-- { "name": "张三", "age": 28, "tags": ["Java", "Redis"] }
+
+-- 获取值
+data->'name'       -- 返回 JSON: "张三"
+data->>'name'      -- 返回文本: 张三
+data#>'{address,city}'  -- 嵌套路径取 JSON
+data#>>'{address,city}' -- 嵌套路径取文本
+
+-- 包含/存在
+data @> '{"name": "张3"}'  -- 包含
+data ? 'name'               -- 键存在
+data ?| '["name","email"]'  -- 任一键存在
+data ?& '["name","age"]'    -- 所有键存在
+
+-- 修改
+data || '{"email": "z@x.com"}'  -- 合并
+data - 'age'                      -- 删除键
+data #- '{address,city}'          -- 按路径删除</code></pre>
+        </div>
+
+        <h3 id="s1-5">1.5 窗口函数</h3>
+        <div class="card">
+          <h4>窗口函数语法</h4>
+          <pre><code>函数名() OVER (
+  [PARTITION BY 分区列]
+  [ORDER BY 排序列 [ASC|DESC]]
+  [ROWS|RANGE 帧定义]
+)</code></pre>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">常用窗口函数</div>
+          <table>
+            <thead><tr><th>函数</th><th>作用</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr><td><code>ROW_NUMBER()</code></td><td>行号，无并列</td><td>ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC)</td></tr>
+              <tr><td><code>RANK()</code></td><td>排名，有并列会跳号</td><td>1, 2, 2, 4（跳过 3）</td></tr>
+              <tr><td><code>DENSE_RANK()</code></td><td>排名，有并列不跳号</td><td>1, 2, 2, 3（不跳过）</td></tr>
+              <tr><td><code>LAG(col, n)</code></td><td>前 n 行的值</td><td>LAG(salary, 1) OVER (ORDER BY id)</td></tr>
+              <tr><td><code>LEAD(col, n)</code></td><td>后 n 行的值</td><td>LEAD(salary, 1) OVER (ORDER BY id)</td></tr>
+              <tr><td><code>SUM() OVER</code></td><td>累计/滑动求和</td><td>SUM(amount) OVER (ORDER BY date ROWS UNBOUNDED PRECEDING)</td></tr>
+              <tr><td><code>AVG() OVER</code></td><td>滑动平均</td><td>AVG(price) OVER (ORDER BY date ROWS 6 PRECEDING) — 7日均值</td></tr>
+              <tr><td><code>NTILE(n)</code></td><td>分成 n 等份</td><td>NTILE(4) OVER (ORDER BY score) — 四分位</td></tr>
+              <tr><td><code>FIRST_VALUE / LAST_VALUE</code></td><td>窗口内首尾值</td><td>FIRST_VALUE(salary) OVER (PARTITION BY dept ORDER BY id)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>窗口帧 (Frame) 定义</h4>
+          <pre><code>-- ROWS: 按物理行
+ROWS BETWEEN 2 PRECEDING AND CURRENT ROW   -- 当前行及前2行
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW  -- 从头到当前行
+ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING  -- 当前行到末尾
+
+-- RANGE: 按值范围
+RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW</code></pre>
+        </div>
+
+        <h3 id="s1-6">1.6 CTE (Common Table Expression)</h3>
+        <div class="compare-row">
+          <div class="compare-box" style="border-color:var(--accent)">
+            <h4 style="color:var(--accent)">普通 CTE</h4>
+            <pre><code>WITH active_users AS (
+  SELECT id, name, email
+  FROM users
+  WHERE status = 'active'
+)
+SELECT u.name, COUNT(o.id)
+FROM active_users u
+JOIN orders o ON o.user_id = u.id
+GROUP BY u.name;</code></pre>
+            <ul>
+              <li>提高可读性，将复杂查询拆分为逻辑步骤</li>
+              <li>PG 12+ 普通 CTE 可被内联优化（非 MATERIALIZED）</li>
+            </ul>
+          </div>
+          <div class="compare-box" style="border-color:var(--accent3)">
+            <h4 style="color:var(--accent3)">递归 CTE</h4>
+            <pre><code>WITH RECURSIVE tree AS (
+  -- 基础查询（锚点）
+  SELECT id, name, parent_id, 1 AS depth
+  FROM categories
+  WHERE parent_id IS NULL
+
+  UNION ALL
+
+  -- 递归查询
+  SELECT c.id, c.name, c.parent_id, t.depth + 1
+  FROM categories c
+  JOIN tree t ON c.parent_id = t.id
+)
+SELECT * FROM tree ORDER BY depth;</code></pre>
+            <ul>
+              <li>递归遍历树形/层级结构</li>
+              <li>自动检测循环（防止无限递归）</li>
+              <li>常用于组织架构、商品分类、评论回复</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ============================== PART 2 ============================== -->
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+
+        <h3 id="s2-1">2.1 扩展机制</h3>
+        <div class="card">
+          <h4>PostgreSQL 的可扩展性</h4>
+          <p>PG 的扩展系统是其最大特色之一，通过 <code>CREATE EXTENSION</code> 安装功能模块，无需重新编译。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">常用扩展</div>
+          <table>
+            <thead><tr><th>扩展</th><th>功能</th><th>使用场景</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-blue">pg_stat_statements</span></td><td>SQL 执行统计（调用次数、耗时、行数）</td><td>慢查询分析、SQL 优化</td></tr>
+              <tr><td><span class="badge badge-green">PostGIS</span></td><td>地理空间数据类型和函数</td><td>LBS、地图应用、地理围栏</td></tr>
+              <tr><td><span class="badge badge-orange">pg_trgm</span></td><td>三元组模糊匹配</td><td>LIKE '%keyword%' 高效搜索</td></tr>
+              <tr><td><span class="badge badge-purple">pgvector</span></td><td>向量相似度搜索</td><td>AI 向量检索、RAG、推荐系统</td></tr>
+              <tr><td><span class="badge badge-red">TimescaleDB</span></td><td>时序数据库扩展</td><td>IoT、监控、日志数据</td></tr>
+              <tr><td><span class="badge badge-blue">pg_partman</span></td><td>自动分区管理</td><td>大表按时间自动分区</td></tr>
+              <tr><td><span class="badge badge-green">uuid-ossp</span></td><td>UUID 生成函数</td><td>分布式 ID 生成</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>pg_stat_statements 使用</h4>
+          <pre><code>-- 安装扩展
+CREATE EXTENSION pg_stat_statements;
+
+-- 查看最慢的 SQL
+SELECT query, calls, mean_exec_time, total_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+-- 重置统计
+SELECT pg_stat_statements_reset();</code></pre>
+        </div>
+        <div class="card">
+          <h4>pg_trgm 模糊搜索</h4>
+          <pre><code>-- 安装扩展
+CREATE EXTENSION pg_trgm;
+
+-- 创建 GIN 索引
+CREATE INDEX idx_name_trgm ON users USING GIN (name gin_trgm_ops);
+
+-- 现在 LIKE '%keyword%' 可以走索引！
+SELECT * FROM users WHERE name LIKE '%张三%';</code></pre>
+          <p>pg_trgm 将文本拆分为三元组（trigram），建立 GIN 索引，使中间匹配也能走索引。</p>
+        </div>
+
+        <h3 id="s2-2">2.2 物化视图</h3>
+        <div class="card">
+          <h4>物化视图 vs 普通视图</h4>
+          <table>
+            <thead><tr><th>特性</th><th>普通视图</th><th>物化视图</th></tr></thead>
+            <tbody>
+              <tr><td><strong>存储</strong></td><td>不存储数据，每次查询重新计算</td><td>存储查询结果到磁盘</td></tr>
+              <tr><td><strong>查询性能</strong></td><td>与底层查询一致</td><td>直接读取结果，极快</td></tr>
+              <tr><td><strong>数据实时性</strong></td><td>实时</td><td>需手动 REFRESH 更新</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>简化查询</td><td>复杂聚合报表、BI 查询</td></tr>
+            </tbody>
+          </table>
+          <pre><code>-- 创建物化视图
+CREATE MATERIALIZED VIEW mv_sales_summary AS
+SELECT
+  date_trunc('month', order_date) AS month,
+  product_id,
+  SUM(amount) AS total_amount,
+  COUNT(*) AS order_count
+FROM orders
+GROUP BY 1, 2;
+
+-- 创建索引（物化视图支持索引！）
+CREATE INDEX idx_mv_month ON mv_sales_summary (month);
+
+-- 刷新数据
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_summary;</code></pre>
+          <ul>
+            <li><code>CONCURRENTLY</code>：刷新时不锁定视图，允许查询（需要唯一索引）</li>
+            <li>可通过定时任务（pg_cron）自动刷新</li>
+          </ul>
+        </div>
+
+        <h3 id="s2-3">2.3 PL/pgSQL 存储过程</h3>
+        <div class="card">
+          <h4>PL/pgSQL 示例</h4>
+          <pre><code>-- 存储过程：转账
+CREATE OR REPLACE PROCEDURE transfer(
+  p_from INT, p_to INT, p_amount NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- 检查余额
+  IF (SELECT balance FROM accounts WHERE id = p_from) < p_amount THEN
+    RAISE EXCEPTION '余额不足';
+  END IF;
+
+  UPDATE accounts SET balance = balance - p_amount WHERE id = p_from;
+  UPDATE accounts SET balance = balance + p_amount WHERE id = p_to;
+
+  -- 记录日志
+  INSERT INTO transfer_log(from_id, to_id, amount, created_at)
+  VALUES (p_from, p_to, p_amount, NOW());
+
+  COMMIT;
+END;
+$$;</code></pre>
+        </div>
+        <div class="card">
+          <h4>PL/pgSQL 特性</h4>
+          <ul>
+            <li><strong>变量声明</strong>：<code>DECLARE v_name TEXT;</code></li>
+            <li><strong>条件控制</strong>：<code>IF ... THEN ... ELSIF ... ELSE ... END IF;</code></li>
+            <li><strong>循环</strong>：<code>LOOP / WHILE / FOR i IN 1..10 LOOP</code></li>
+            <li><strong>游标</strong>：<code>DECLARE cur CURSOR FOR SELECT ...;</code></li>
+            <li><strong>异常处理</strong>：<code>EXCEPTION WHEN ... THEN ...</code></li>
+            <li><strong>动态 SQL</strong>：<code>EXECUTE 'SELECT ...' USING var;</code></li>
+            <li><strong>返回结果</strong>：<code>RETURN QUERY SELECT ...</code></li>
+          </ul>
+        </div>
+
+        <h3 id="s2-4">2.4 PostgreSQL vs MySQL</h3>
+        <div class="diagram">
+          <div class="diagram-title">全面对比</div>
+          <table>
+            <thead><tr><th>维度</th><th>PostgreSQL</th><th>MySQL (InnoDB)</th></tr></thead>
+            <tbody>
+              <tr><td><strong>MVCC 实现</strong></td><td>元组上 xmin/xmax，UPDATE = DELETE + INSERT</td><td>Undo Log 版本链，UPDATE 原地修改</td></tr>
+              <tr><td><strong>表膨胀处理</strong></td><td>需要 VACUUM 回收死元组</td><td>Undo Log 自动清理，无膨胀问题</td></tr>
+              <tr><td><strong>RR 隔离级别</strong></td><td>真 RR，防止幻读（SSI）</td><td>RR 不防止幻读（Next-Key Lock 只部分解决）</td></tr>
+              <tr><td><strong>读操作</strong></td><td>SELECT 完全无锁（MVCC 快照）</td><td>SELECT 也无锁，但一致性读需走 Undo Log</td></tr>
+              <tr><td><strong>索引类型</strong></td><td>B-tree/GIN/GiST/BRIN/Hash</td><td>B-tree/Full-text</td></tr>
+              <tr><td><strong>JSON 支持</strong></td><td>JSONB + GIN 索引，功能强大</td><td>JSON 类型 + 虚拟列索引</td></tr>
+              <tr><td><strong>扩展性</strong></td><td>丰富的扩展生态（PostGIS/pgvector）</td><td>扩展有限，靠存储引擎插件</td></tr>
+              <tr><td><strong>SQL 标准</strong></td><td>高度符合 SQL 标准</td><td>兼容性较好，但有方言差异</td></tr>
+              <tr><td><strong>复制</strong></td><td>流复制 + 逻辑复制</td><td>binlog 主从复制，Group Replication</td></tr>
+              <tr><td><strong>生态</strong></td><td>学术背景，功能丰富</td><td>互联网生态最成熟，工具链最完善</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============================== PART 3 ============================== -->
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 的 MVCC 和 MySQL InnoDB 有什么区别？</div>
+          <div class="a"><strong>参考</strong>：PG 在元组上记录 xmin/xmax，UPDATE = DELETE + INSERT（新版本），旧版本留在原表需 VACUUM 清理。InnoDB 原地修改数据页，旧版本写入 Undo Log 通过版本链实现 MVCC。PG 无 Undo Log 但有表膨胀问题；InnoDB 无膨胀但 Undo Log 管理复杂。<br><strong>追问</strong>：PG SELECT 完全无锁，InnoDB 一致性读需构造 ReadView 并沿 Undo 版本链回溯。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 的窗口函数有哪些？和聚合函数有什么区别？</div>
+          <div class="a"><strong>参考</strong>：ROW_NUMBER/RANK/DENSE_RANK（排名）、LAG/LEAD（前后行）、SUM/AVG OVER（滑动聚合）、NTILE（分桶）。区别：聚合函数将多行合并为一行，窗口函数保留每一行并附加计算结果。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 有哪些索引类型？GIN 索引适合什么场景？</div>
+          <div class="a"><strong>参考</strong>：B-tree（默认，通用）、GIN（倒排，适合 JSONB/全文搜索/数组）、GiST（通用搜索树，地理空间/范围类型）、BRIN（块范围索引，时间序列大数据表极小索引）、Hash（仅等值查询）。GIN 索引适合多值列的包含查询（@>/? 操作符）。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">什么是 VACUUM？为什么 PostgreSQL 需要它？</div>
+          <div class="a"><strong>参考</strong>：PG 的 UPDATE 是 DELETE + INSERT，旧元组成为 dead tuple 占用空间。VACUUM 标记死元组空间可复用，VACUUM FULL 物理收缩表。Autovacuum 后台自动执行。不及时 VACUUM 会导致表膨胀、查询变慢。<br><strong>追问</strong>：VACUUM 不阻塞读写，VACUUM FULL 会锁表。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">CTE 递归查询怎么写？有什么应用场景？</div>
+          <div class="a"><strong>参考</strong>：<code>WITH RECURSIVE</code> 语法，锚点查询 UNION ALL 递归查询。应用：组织架构树遍历、商品分类层级、路径查找。PG 自动检测循环防止无限递归。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 的 JSONB 类型有什么优势？怎么索引？</div>
+          <div class="a"><strong>参考</strong>：JSONB 二进制存储，支持 GIN 索引，查询性能优于 JSON。操作符：-> 取 JSON、->> 取文本、@> 包含、? 键存在。GIN 索引支持 @>/? 等操作符。<br><strong>追问</strong>：JSONB 适合 Schema 灵活的场景，但大量 JSONB 查询建议迁移到关系列。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 的物化视图有什么用？怎么保持数据最新？</div>
+          <div class="a"><strong>参考</strong>：物化视图存储查询结果，适合复杂聚合报表（BI 查询快）。需手动 <code>REFRESH MATERIALIZED VIEW</code> 更新，<code>CONCURRENTLY</code> 选项不锁表。可通过 pg_cron 定时刷新。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PostgreSQL 和 MySQL 怎么选？</div>
+          <div class="a"><strong>参考</strong>：PG 适合：① 需要高级 SQL 功能（窗口函数/CTE/JSONB）；② GIS/向量搜索等扩展需求；③ 复杂数据分析。MySQL 适合：① 互联网 OLTP 场景；② 生态工具链成熟；③ 运维经验丰富。两者差距在缩小，很多场景都能胜任。</div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          PostgreSQL · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+
+      </div><!-- /.main-content -->
+    </div><!-- /.page-layout -->
+  </div><!-- /.container -->
+
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+
+</body>
+</html>

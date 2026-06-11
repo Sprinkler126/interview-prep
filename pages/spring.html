@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spring - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🌱 Spring</h1>
+    <p class="subtitle">IoC · AOP · Bean 生命周期 · 事务 · 设计模式</p>
+    <div class="page-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">IoC 容器</a></li>
+          <li class="sub"><a href="#s1-2">Bean 生命周期</a></li>
+          <li class="sub"><a href="#s1-3">Bean 作用域</a></li>
+          <li class="sub"><a href="#s1-4">AOP 原理</a></li>
+          <li class="sub"><a href="#s1-5">Spring 事务</a></li>
+          <li class="sub"><a href="#s1-6">循环依赖</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">事件机制</a></li>
+          <li class="sub"><a href="#s2-2">@Autowired 注入原理</a></li>
+          <li class="sub"><a href="#s2-3">Spring 中的设计模式</a></li>
+          <li class="sub"><a href="#s2-4">常见面试陷阱题</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </div>
+      <div class="main-content">
+
+        <!-- ==================== 第一部分 ==================== -->
+        <h2 id="part1">第一部分：技术原理</h2>
+
+        <!-- 1-1 IoC 容器 -->
+        <h3 id="s1-1">IoC 容器</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Spring IoC 容器体系</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#e3f2fd">BeanFactory（顶层接口）<br><small>延迟加载，调用 getBean() 时才创建</small></div>
+            </div>
+            <div class="arch-connector">↓ 继承 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#e8f5e9">HierarchicalBeanFactory（支持父子容器）</div>
+            </div>
+            <div class="arch-connector">↓ 继承 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="background:#fff3e0">ListableBeanFactory（可枚举 Bean）</div>
+            </div>
+            <div class="arch-connector">↓ 继承 ↓</div>
+            <div class="arch-row">
+              <div class="arch-box" style="background:#c8e6c9">ApplicationContext<br><small>预加载，功能更丰富</small></div>
+              <div class="arch-box" style="margin-left:1rem;background:#ffccbc">AbstractRefreshableApplicationContext<br><small>XML 配置</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>BeanFactory vs ApplicationContext</h4>
+          <table>
+            <thead>
+              <tr><th>特性</th><th>BeanFactory</th><th>ApplicationContext</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Bean 加载</td><td>延迟加载（getBean 时创建）</td><td>预加载（容器启动时创建）</td></tr>
+              <tr><td>国际化（i18n）</td><td>不支持</td><td>支持 MessageSource</td></tr>
+              <tr><td>事件发布</td><td>不支持</td><td>支持 ApplicationEvent</td></tr>
+              <tr><td>AOP 集成</td><td>需手动配置</td><td>自动集成</td></tr>
+              <tr><td>Environment</td><td>不支持</td><td>支持 Environment 抽象</td></tr>
+              <tr><td>常用实现</td><td>DefaultListableBeanFactory</td><td>ClassPathXmlApplicationContext / AnnotationConfigApplicationContext</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">Spring Boot 中默认使用 AnnotationConfigServletWebServerApplicationContext，它继承了 ApplicationContext，支持注解配置和嵌入式 Web 容器。</div>
+        </div>
+
+        <div class="card">
+          <h4>BeanDefinition 加载流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">读取配置<br><small>XML / 注解 / JavaConfig</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">解析为 BeanDefinition<br><small>Bean 定义信息</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">注册到 BeanDefinitionRegistry<br><small>ConcurrentHashMap</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">BeanFactoryPostProcessor<br><small>修改 BeanDefinition</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">实例化 Bean</div>
+          </div>
+          <pre><code>// BeanDefinition 核心属性
+public interface BeanDefinition {
+    String getBeanClassName();          // 类名
+    Scope getScope();                   // 作用域
+    boolean isLazyInit();               // 是否懒加载
+    String[] getDependsOn();            // 依赖的 Bean
+    ConstructorArgumentValues getConstructorArgumentValues();  // 构造参数
+    MutablePropertyValues getPropertyValues();  // 属性注入
+    String getInitMethodName();         // 初始化方法
+    String getDestroyMethodName();      // 销毁方法
+    boolean isPrimary();                // 是否主要候选
+}</code></pre>
+        </div>
+
+        <!-- 1-2 Bean 生命周期 -->
+        <h3 id="s1-2">Bean 生命周期</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">Bean 完整生命周期</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">实例化<br><small>createBeanInstance</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">属性填充<br><small>populateBean</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Aware 回调<br><small>BeanName/BeanFactory/ApplicationContext</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">BeanPostProcessor#postProcessBeforeInitialization</div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0">↓</div>
+          <div class="flow">
+            <div class="flow-box flow-pink">@PostConstruct</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">InitializingBean#afterPropertiesSet</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">自定义 init-method</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">BeanPostProcessor#postProcessAfterInitialization</div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0">↓</div>
+          <div class="flow">
+            <div class="flow-box flow-orange">Bean 初始化完成，放入容器</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">使用</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">@PreDestroy → DisposableBean#destroy → 自定义 destroy-method</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>各阶段详解</h4>
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>执行内容</th><th>接口/注解</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>实例化</strong></td><td>通过构造方法或工厂方法创建 Bean 实例</td><td>InstantiationAwareBeanPostProcessor</td></tr>
+              <tr><td><strong>属性填充</strong></td><td>注入依赖的 Bean 和 @Value 值</td><td>populateBean()</td></tr>
+              <tr><td><strong>Aware 回调</strong></td><td>注入容器信息</td><td>BeanNameAware / BeanFactoryAware / ApplicationContextAware</td></tr>
+              <tr><td><strong>BeanPostProcessor 前</strong></td><td>初始化前置处理</td><td>postProcessBeforeInitialization()</td></tr>
+              <tr><td><strong>@PostConstruct</strong></td><td>JSR-250 注解初始化方法</td><td>CommonAnnotationBeanPostProcessor</td></tr>
+              <tr><td><strong>InitializingBean</strong></td><td>afterPropertiesSet() 回调</td><td>InitializingBean 接口</td></tr>
+              <tr><td><strong>init-method</strong></td><td>自定义初始化方法</td><td>@Bean(initMethod = "init")</td></tr>
+              <tr><td><strong>BeanPostProcessor 后</strong></td><td>初始化后置处理（AOP 代理在此创建）</td><td>postProcessAfterInitialization()</td></tr>
+              <tr><td><strong>使用</strong></td><td>Bean 可正常使用</td><td>-</td></tr>
+              <tr><td><strong>销毁</strong></td><td>@PreDestroy → DisposableBean → destroy-method</td><td>DisposableBean / @Bean(destroyMethod)</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">面试关键点：AOP 代理是在 postProcessAfterInitialization 阶段创建的，这就是为什么 @PostConstruct 中获取的是原生对象而非代理对象。</div>
+        </div>
+
+        <!-- 1-3 Bean 作用域 -->
+        <h3 id="s1-3">Bean 作用域</h3>
+
+        <div class="card">
+          <h4>五种作用域</h4>
+          <table>
+            <thead>
+              <tr><th>作用域</th><th>说明</th><th>生命周期</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>singleton</strong></td><td>默认，容器中只有一个实例</td><td>容器创建时初始化，容器销毁时销毁</td><td>无状态 Bean（Service/DAO）</td></tr>
+              <tr><td><strong>prototype</strong></td><td>每次 getBean() 创建新实例</td><td>创建后容器不再管理，不调用销毁方法</td><td>有状态 Bean</td></tr>
+              <tr><td><strong>request</strong></td><td>每次 HTTP 请求创建一个实例</td><td>请求结束销毁</td><td>Web 应用</td></tr>
+              <tr><td><strong>session</strong></td><td>每个 HTTP Session 创建一个实例</td><td>Session 过期销毁</td><td>Web 应用</td></tr>
+              <tr><td><strong>application</strong></td><td>ServletContext 生命周期</td><td>应用关闭销毁</td><td>全局共享</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">常见陷阱：singleton Bean 注入 prototype Bean 时，prototype 的实例在 singleton 创建时就确定了，后续调用不会创建新实例。解决方案：1）使用 @Lookup 注解；2）注入 ObjectFactory/Provider；3）使用 ApplicationContext.getBean()。</div>
+        </div>
+
+        <!-- 1-4 AOP 原理 -->
+        <h3 id="s1-4">AOP 原理</h3>
+
+        <div class="card">
+          <h4>AOP 核心概念</h4>
+          <table>
+            <thead>
+              <tr><th>概念</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>切面（Aspect）</strong></td><td>横切关注点的模块化</td><td>@Aspect 类</td></tr>
+              <tr><td><strong>连接点（JoinPoint）</strong></td><td>程序执行的特定点</td><td>方法执行、异常处理</td></tr>
+              <tr><td><strong>切点（Pointcut）</strong></td><td>匹配连接点的表达式</td><td>@Pointcut("execution(* com.example.service.*.*(..))")</td></tr>
+              <tr><td><strong>通知（Advice）</strong></td><td>切面在连接点执行的动作</td><td>@Before / @After / @Around</td></tr>
+              <tr><td><strong>织入（Weaving）</strong></td><td>将切面应用到目标对象</td><td>编译期/运行期/类加载期</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>JDK 动态代理 vs CGLIB</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>JDK 动态代理</h4>
+              <ul>
+                <li>基于接口的代理</li>
+                <li>使用 <code>java.lang.reflect.Proxy</code></li>
+                <li>目标类必须实现接口</li>
+                <li>通过 <code>InvocationHandler</code> 拦截方法</li>
+                <li>性能较好（JDK 8+ 优化）</li>
+                <li>Spring 默认方式（有接口时）</li>
+              </ul>
+              <pre><code>// JDK 动态代理核心
+Object proxy = Proxy.newProxyInstance(
+    classLoader,
+    interfaces,
+    (proxy, method, args) -> {
+        // 前置增强
+        Object result = method.invoke(target, args);
+        // 后置增强
+        return result;
+    }
+);</code></pre>
+            </div>
+            <div class="compare-box">
+              <h4>CGLIB 代理</h4>
+              <ul>
+                <li>基于继承的代理</li>
+                <li>使用字节码生成技术（ASM）</li>
+                <li>目标类不能是 final 的</li>
+                <li>生成目标类的子类作为代理</li>
+                <li>创建代理较慢，调用较快</li>
+                <li>无接口时使用</li>
+              </ul>
+              <pre><code>// CGLIB 代理核心
+Enhancer enhancer = new Enhancer();
+enhancer.setSuperclass(targetClass);
+enhancer.setCallback(
+    (MethodInterceptor) (obj, method, args, proxy) -> {
+        // 前置增强
+        Object result = proxy.invokeSuper(obj, args);
+        // 后置增强
+        return result;
+    }
+);
+Object proxy = enhancer.create();</code></pre>
+            </div>
+          </div>
+          <div class="tip">Spring Boot 2.x 默认使用 CGLIB 代理（<code>spring.aop.proxy-target-class=true</code>），即使目标类实现了接口也会使用 CGLIB，避免类型转换问题。</div>
+        </div>
+
+        <div class="card">
+          <h4>五种通知类型</h4>
+          <table>
+            <thead>
+              <tr><th>通知</th><th>注解</th><th>执行时机</th><th>参数</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>前置通知</strong></td><td>@Before</td><td>方法执行前</td><td>JoinPoint</td></tr>
+              <tr><td><strong>后置通知</strong></td><td>@After</td><td>方法执行后（无论是否异常）</td><td>JoinPoint</td></tr>
+              <tr><td><strong>返回通知</strong></td><td>@AfterReturning</td><td>方法正常返回后</td><td>JoinPoint, returning</td></tr>
+              <tr><td><strong>异常通知</strong></td><td>@AfterThrowing</td><td>方法抛出异常后</td><td>JoinPoint, throwing</td></tr>
+              <tr><td><strong>环绕通知</strong></td><td>@Around</td><td>方法执行前后</td><td>ProceedingJoinPoint</td></tr>
+            </tbody>
+          </table>
+          <pre><code>@Aspect
+@Component
+public class LogAspect {
+    @Around("execution(* com.example.service.*.*(..))")
+    public Object around(ProceedingJoinPoint pjp) throws Throwable {
+        long start = System.currentTimeMillis();
+        try {
+            Object result = pjp.proceed();
+            return result;
+        } finally {
+            long cost = System.currentTimeMillis() - start;
+            log.info("{}.{} cost {}ms",
+                pjp.getTarget().getClass().getSimpleName(),
+                pjp.getSignature().getName(), cost);
+        }
+    }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>切点表达式</h4>
+          <table>
+            <thead>
+              <tr><th>表达式</th><th>说明</th><th>示例</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>execution()</code></td><td>匹配方法执行</td><td><code>execution(* com.example.service.*.*(..))</code></td></tr>
+              <tr><td><code>within()</code></td><td>匹配类型内的方法</td><td><code>within(com.example.service.UserService)</code></td></tr>
+              <tr><td><code>@annotation()</code></td><td>匹配注解标注的方法</td><td><code>@annotation(com.example.annotation.Log)</code></td></tr>
+              <tr><td><code>args()</code></td><td>匹配参数类型</td><td><code>args(String, Integer)</code></td></tr>
+              <tr><td><code>bean()</code></td><td>匹配 Bean 名称</td><td><code>bean(userService)</code></td></tr>
+            </tbody>
+          </table>
+          <p>execution 表达式格式：<code>修饰符? 返回值类型 声明类型? 方法名(参数) 异常?</code></p>
+          <p><code>*</code> 匹配任意，<code>..</code> 匹配任意参数或包层级。</p>
+        </div>
+
+        <!-- 1-5 Spring 事务 -->
+        <h3 id="s1-5">Spring 事务</h3>
+
+        <div class="card">
+          <h4>七种事务传播行为</h4>
+          <table>
+            <thead>
+              <tr><th>传播行为</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>REQUIRED</strong>（默认）</td><td>当前有事务就加入，没有就新建事务</td></tr>
+              <tr><td><strong>SUPPORTS</strong></td><td>当前有事务就加入，没有就以非事务方式执行</td></tr>
+              <tr><td><strong>MANDATORY</strong></td><td>当前必须有事务，否则抛出异常</td></tr>
+              <tr><td><strong>REQUIRES_NEW</strong></td><td>总是新建事务，挂起当前事务</td></tr>
+              <tr><td><strong>NOT_SUPPORTED</strong></td><td>以非事务方式执行，挂起当前事务</td></tr>
+              <tr><td><strong>NEVER</strong></td><td>以非事务方式执行，当前有事务则抛出异常</td></tr>
+              <tr><td><strong>NESTED</strong></td><td>当前有事务则创建嵌套事务（保存点），没有则新建</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">面试高频：REQUIRED vs REQUIRES_NEW vs NESTED。REQUIRED 加入当前事务，内外一起回滚；REQUIRES_NEW 独立事务，内层回滚不影响外层；NESTED 嵌套事务，内层回滚不影响外层（通过 SavePoint 实现）。</div>
+        </div>
+
+        <div class="card">
+          <h4>事务失效场景（高频面试题）</h4>
+          <table>
+            <thead>
+              <tr><th>场景</th><th>原因</th><th>解决</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>方法非 public</td><td>Spring AOP 只能代理 public 方法</td><td>改为 public</td></tr>
+              <tr><td>自调用（this 调用）</td><td>绕过了代理对象，直接调用原生对象</td><td>注入自身 / AopContext.currentProxy()</td></tr>
+              <tr><td>异常被 catch</td><td>Spring 默认只回滚 RuntimeException 和 Error</td><td>手动抛出 / rollbackFor=Exception.class</td></tr>
+              <tr><td>异常类型不匹配</td><td>抛出的是 checked 异常</td><td>@Transactional(rollbackFor=Exception.class)</td></tr>
+              <tr><td>propagation 设置错误</td><td>如设置为 NOT_SUPPORTED</td><td>检查传播行为配置</td></tr>
+              <tr><td>数据库引擎不支持</td><td>MySQL MyISAM 不支持事务</td><td>使用 InnoDB</td></tr>
+              <tr><td>Bean 未被 Spring 管理</td><td>未加 @Service/@Component</td><td>添加注解或配置 Bean</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 自调用问题示例
+@Service
+public class OrderService {
+    public void createOrder() {
+        // this 调用，不走代理，事务不生效！
+        this.updateStock();
+    }
+
+    @Transactional
+    public void updateStock() {
+        // 事务不生效
+    }
+}
+
+// 解决方案 1：注入自身
+@Autowired
+private OrderService self;
+
+public void createOrder() {
+    self.updateStock(); // 通过代理对象调用
+}
+
+// 解决方案 2：AopContext
+public void createOrder() {
+    ((OrderService) AopContext.currentProxy()).updateStock();
+}</code></pre>
+        </div>
+
+        <!-- 1-6 循环依赖 -->
+        <h3 id="s1-6">循环依赖</h3>
+
+        <div class="diagram">
+          <div class="diagram-title">三级缓存解决循环依赖</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box" style="background:#c8e6c9">一级缓存<br>singletonObjects<br><small>完整 Bean 实例</small></div>
+              <div class="arch-box" style="margin-left:1rem;background:#bbdefb">二级缓存<br>earlySingletonObjects<br><small>提前暴露的半成品 Bean</small></div>
+              <div class="arch-box" style="margin-left:1rem;background:#fff9c4">三级缓存<br>singletonFactories<br><small>Bean 工厂 ObjectFactory</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>循环依赖解决流程（A 依赖 B，B 依赖 A）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">创建 A<br><small>实例化 A</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">A 放入三级缓存<br><small>ObjectFactory</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">A 属性注入<br><small>发现依赖 B</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">创建 B<br><small>实例化 B</small></div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0">↓</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">B 放入三级缓存</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">B 属性注入<br><small>发现依赖 A</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">从三级缓存获取 A<br><small>得到 A 的早期引用</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">B 初始化完成<br><small>放入一级缓存</small></div>
+          </div>
+          <div style="text-align:center;margin:0.5rem 0">↓</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">A 注入 B 完成</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">A 初始化完成<br><small>放入一级缓存</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>为什么需要三级缓存？</h4>
+          <ul>
+            <li><strong>一级缓存</strong>：存储完全初始化好的 Bean，避免重复创建</li>
+            <li><strong>二级缓存</strong>：存储提前暴露的半成品 Bean，解决循环依赖</li>
+            <li><strong>三级缓存</strong>：存储 Bean 工厂，延迟生成代理对象。如果 A 被 AOP 代理，需要在属性注入前就暴露代理对象，三级缓存的 ObjectFactory 可以在需要时调用 getEarlyBeanReference() 生成代理</li>
+          </ul>
+          <div class="warn">不能解决的循环依赖：1）构造器注入的循环依赖（实例化阶段就需要对方，无法提前暴露）；2）prototype 作用域的循环依赖（不放入缓存）。@Async 的循环依赖也需要特殊处理。</div>
+        </div>
+
+        <!-- ==================== 第二部分 ==================== -->
+        <h2 id="part2">第二部分：场景化讲解</h2>
+
+        <!-- 2-1 事件机制 -->
+        <h3 id="s2-1">事件机制</h3>
+
+        <div class="card">
+          <h4>Spring 事件机制</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">定义事件<br><small>继承 ApplicationEvent</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">发布事件<br><small>applicationContext.publishEvent()</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">监听事件<br><small>@EventListener / ApplicationListener</small></div>
+          </div>
+          <pre><code>// 1. 定义事件
+public class OrderCreatedEvent extends ApplicationEvent {
+    private final String orderId;
+    public OrderCreatedEvent(Object source, String orderId) {
+        super(source);
+        this.orderId = orderId;
+    }
+}
+
+// 2. 发布事件
+@Service
+public class OrderService {
+    @Autowired
+    private ApplicationEventPublisher publisher;
+
+    public void createOrder(String orderId) {
+        // 创建订单逻辑...
+        publisher.publishEvent(new OrderCreatedEvent(this, orderId));
+    }
+}
+
+// 3. 监听事件（推荐使用 @EventListener）
+@Component
+public class OrderEventListener {
+    @EventListener
+    public void onOrderCreated(OrderCreatedEvent event) {
+        // 发送通知、更新统计等
+    }
+
+    @EventListener
+    @Async  // 异步监听
+    public void onOrderCreatedAsync(OrderCreatedEvent event) {
+        // 异步处理
+    }
+}</code></pre>
+          <div class="tip">@TransactionalEventListener 可以在事务提交后执行监听逻辑，避免事务未提交就处理事件导致的数据不一致问题。</div>
+        </div>
+
+        <!-- 2-2 @Autowired 注入原理 -->
+        <h3 id="s2-2">@Autowired 注入原理</h3>
+
+        <div class="card">
+          <h4>@Autowired 注入流程</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">按类型查找<br><small>byType</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">找到多个？<br><small>是 → 按名称匹配</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">@Qualifier 指定<br><small>按限定符匹配</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">@Primary 标记<br><small>选择主要候选</small></div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>注解</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>@Autowired</strong></td><td>按类型注入，找到多个按字段名匹配</td></tr>
+              <tr><td><strong>@Qualifier</strong></td><td>配合 @Autowired 指定 Bean 名称</td></tr>
+              <tr><td><strong>@Primary</strong></td><td>多个候选时优先选择</td></tr>
+              <tr><td><strong>@Resource</strong></td><td>JSR-250，先按名称再按类型（不推荐）</td></tr>
+              <tr><td><strong>@Inject</strong></td><td>JSR-330，按类型注入，需 javax.inject 依赖</td></tr>
+            </tbody>
+          </table>
+          <pre><code>// 多个实现时的注入方式
+@Autowired
+@Qualifier("redisCacheService")  // 指定 Bean 名称
+private CacheService cacheService;
+
+// 或者使用 @Primary
+@Primary
+@Service("redisCacheService")
+public class RedisCacheService implements CacheService { }
+
+// 推荐使用构造器注入（Spring 官方推荐）
+@Service
+public class OrderService {
+    private final CacheService cacheService;
+
+    // 单构造器时 @Autowired 可省略
+    public OrderService(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
+}</code></pre>
+        </div>
+
+        <!-- 2-3 设计模式 -->
+        <h3 id="s2-3">Spring 中的设计模式</h3>
+
+        <div class="card">
+          <h4>设计模式在 Spring 中的应用</h4>
+          <table>
+            <thead>
+              <tr><th>设计模式</th><th>Spring 中的应用</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>工厂模式</strong></td><td>BeanFactory / ApplicationContext</td><td>Bean 的创建和管理</td></tr>
+              <tr><td><strong>单例模式</strong></td><td>Bean 默认 singleton 作用域</td><td>DefaultSingletonBeanRegistry</td></tr>
+              <tr><td><strong>代理模式</strong></td><td>AOP（JDK 动态代理 / CGLIB）</td><td>方法增强和拦截</td></tr>
+              <tr><td><strong>模板方法</strong></td><td>JdbcTemplate / RestTemplate / RedisTemplate</td><td>封装固定流程，子类实现变化部分</td></tr>
+              <tr><td><strong>观察者模式</strong></td><td>ApplicationEvent + ApplicationListener</td><td>事件发布和监听</td></tr>
+              <tr><td><strong>适配器模式</strong></td><td>HandlerAdapter</td><td>将不同类型的 Handler 统一调用</td></tr>
+              <tr><td><strong>策略模式</strong></td><td>Resource / InstantiationStrategy</td><td>多种实现策略可切换</td></tr>
+              <tr><td><strong>装饰器模式</strong></td><td>BeanWrapper / TransactionAwareCacheDecorator</td><td>增强对象功能</td></tr>
+              <tr><td><strong>责任链模式</strong></td><td>HandlerInterceptor / Filter</td><td>请求处理链</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2-4 常见面试陷阱题 -->
+        <h3 id="s2-4">常见面试陷阱题</h3>
+
+        <div class="card">
+          <h4>@Transactional 加在 private 方法上会怎样？</h4>
+          <p><strong>答：</strong>事务不会生效。Spring AOP 默认使用 JDK 动态代理或 CGLIB，只能代理 public 方法。private 方法无法被代理，@Transactional 注解会被忽略，不会抛异常也不会报错。</p>
+        </div>
+
+        <div class="card">
+          <h4>Spring Bean 的初始化是线程安全的吗？</h4>
+          <p><strong>答：</strong>Bean 的创建过程（实例化、属性注入、初始化）是线程安全的，由 Spring 容器在单线程中完成。但 Bean 实例本身不一定线程安全——如果 Bean 有可变的成员变量，多线程并发访问时可能出现线程安全问题。Spring 推荐 Bean 设计为无状态的。</p>
+        </div>
+
+        <div class="card">
+          <h4>ApplicationContext 和 BeanFactory 的区别？为什么不直接用 BeanFactory？</h4>
+          <p><strong>答：</strong>ApplicationContext 继承了 BeanFactory，功能更丰富：支持国际化（MessageSource）、事件发布（ApplicationEvent）、AOP 自动集成、Environment 抽象、资源加载等。BeanFactory 是延迟加载，ApplicationContext 是预加载（容器启动时创建所有单例 Bean），能更快发现配置错误。实际开发中几乎都使用 ApplicationContext。</p>
+        </div>
+
+        <!-- ==================== 第三部分 ==================== -->
+        <h2 id="part3">第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">请详细介绍一下 Spring Bean 的完整生命周期。</div>
+          <div class="a">
+            <strong>参考：</strong>Bean 生命周期包括：1）实例化：通过构造方法或工厂方法创建 Bean 实例；2）属性填充：注入 @Autowired 依赖和 @Value 值；3）Aware 回调：依次调用 BeanNameAware、BeanFactoryAware、ApplicationContextAware；4）BeanPostProcessor 前置处理；5）@PostConstruct 标注的方法；6）InitializingBean#afterPropertiesSet；7）自定义 init-method；8）BeanPostProcessor 后置处理（AOP 代理在此创建）；9）Bean 就绪，放入容器；10）使用；11）销毁：@PreDestroy → DisposableBean#destroy → 自定义 destroy-method。关键点：AOP 代理在第 8 步创建，所以 @PostConstruct 中获取的是原生对象。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Spring 是如何解决循环依赖的？为什么需要三级缓存而不是两级？</div>
+          <div class="a">
+            <strong>参考：</strong>Spring 通过三级缓存解决 singleton 的属性注入循环依赖。一级缓存存完整 Bean，二级缓存存提前暴露的半成品 Bean，三级缓存存 ObjectFactory。当创建 A 时发现依赖 B，将 A 的 ObjectFactory 放入三级缓存后去创建 B，B 创建时从三级缓存获取 A 的早期引用。为什么不能用两级缓存？因为如果 A 需要 AOP 代理，代理对象应该在初始化后创建（postProcessAfterInitialization），但循环依赖需要在属性注入阶段就暴露对象。三级缓存的 ObjectFactory 的 getEarlyBeanReference() 方法可以在需要时提前创建代理，如果不需要代理则返回原对象，既保证了正确性又避免了过早创建代理。注意：构造器注入和 prototype 作用域的循环依赖无法解决。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">@Transactional 的传播行为 REQUIRED、REQUIRES_NEW、NESTED 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>REQUIRED（默认）：当前有事务就加入，没有就新建。内外方法在同一事务中，任一异常都会整体回滚。REQUIRES_NEW：总是新建事务，挂起当前事务。内层事务独立提交或回滚，不影响外层事务。NESTED：如果当前有事务，创建嵌套事务（通过 SavePoint 实现），内层回滚只回滚到保存点，不影响外层。如果没有事务则新建。实际场景：REQUIRED 用于大多数业务方法；REQUIRES_NEW 用于日志记录等需要独立提交的场景；NESTED 用于部分失败不影响整体的场景。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Spring AOP 的实现原理是什么？JDK 动态代理和 CGLIB 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>Spring AOP 在运行期通过代理模式实现。JDK 动态代理基于 java.lang.reflect.Proxy，通过 InvocationHandler 拦截方法调用，要求目标类实现接口。CGLIB 基于 ASM 字节码生成库，生成目标类的子类作为代理，不要求实现接口但目标类不能是 final 的。区别：JDK 代理创建快，调用稍慢（反射）；CGLIB 创建慢（生成字节码），调用快（直接调用）。Spring Boot 2.x 默认使用 CGLIB 代理。Spring 5 引入了基于 AspectJ 的编译期织入作为补充。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Spring 事务失效有哪些常见场景？如何避免？</div>
+          <div class="a">
+            <strong>参考：</strong>事务失效场景：1）方法非 public：AOP 只能代理 public 方法；2）自调用：通过 this.method() 调用绕过了代理，解决：注入自身或使用 AopContext；3）异常被 catch：Spring 默认只回滚 RuntimeException，解决：加 rollbackFor=Exception.class；4）异常类型不匹配：抛出 checked 异常不回滚；5）传播行为配置错误：如 NOT_SUPPORTED；6）数据库不支持事务：MySQL MyISAM；7）Bean 未被 Spring 管理。最佳实践：始终加 rollbackFor=Exception.class，避免自调用，使用构造器注入。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring 中使用了哪些设计模式？请举例说明。</div>
+          <div class="a">
+            <strong>参考：</strong>1）工厂模式：BeanFactory 创建和管理 Bean；2）单例模式：Bean 默认 singleton，通过三级缓存管理；3）代理模式：AOP 通过 JDK 动态代理或 CGLIB 实现方法增强；4）模板方法：JdbcTemplate 封装了获取连接、执行 SQL、关闭连接的固定流程，子类只需实现 SQL 逻辑；5）观察者模式：ApplicationEvent + ApplicationListener 实现事件驱动；6）适配器模式：Spring MVC 的 HandlerAdapter 适配不同类型的 Handler（Controller 方法、HttpRequestHandler 等）；7）策略模式：Resource 接口有 ClassPathResource、FileSystemResource 等多种实现。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>@Autowired 和 @Resource 有什么区别？</div>
+          <div class="a">
+            <strong>参考：</strong>@Autowired 是 Spring 注解，按类型注入（byType），找到多个候选时按字段名匹配，可配合 @Qualifier 指定名称。@Resource 是 JSR-250 标准注解，先按名称（byName）再按类型（byType）注入。区别：1）来源不同：@Autowired 是 Spring 特有，@Resource 是 Java 标准；2）注入策略不同：@Autowired 先类型后名称，@Resource 先名称后类型；3）@Autowired 支持 required=false 允许 null，@Resource 不支持。推荐使用构造器注入（Spring 官方推荐），可以保证依赖不为空且便于单元测试。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring 的 BeanPostProcessor 有什么作用？有哪些常见的实现？</div>
+          <div class="a">
+            <strong>参考：</strong>BeanPostProcessor 是 Spring 的扩展点，在 Bean 初始化前后进行处理。postProcessBeforeInitialization 在 @PostConstruct 之前执行，postProcessAfterInitialization 在初始化之后执行（AOP 代理在此创建）。常见实现：1）AutowiredAnnotationBeanPostProcessor：处理 @Autowired 注入；2）CommonAnnotationBeanPostProcessor：处理 @Resource、@PostConstruct、@PreDestroy；3）AbstractAutoProxyCreator：创建 AOP 代理；4）ApplicationContextAwareProcessor：注入 ApplicationContext；5）ScheduledAnnotationBeanPostProcessor：处理 @Scheduled 定时任务。通过实现 BeanPostProcessor 可以在不修改业务代码的情况下增强 Bean 功能。
+          </div>
+        </div>
+
+        <div class="qa">
+          <div class="q>Spring 中 singleton Bean 注入 prototype Bean 会有什么问题？如何解决？</div>
+          <div class="a">
+            <strong>参考：</strong>问题：singleton Bean 在容器启动时创建并注入 prototype Bean 的实例，之后每次调用 singleton Bean 的方法时，使用的都是同一个 prototype 实例，prototype 的"每次创建新实例"特性失效。解决方案：1）@Lookup 注解：在 singleton Bean 中添加 @Lookup 方法，Spring 会通过 CGLIB 重写该方法，每次调用时从容器获取新的 prototype 实例；2）注入 ObjectFactory&lt;PrototypeBean&gt;，每次调用 getObject() 获取新实例；3）注入 ApplicationContext，每次调用 getBean() 获取新实例。推荐使用 @Lookup 方式，代码最简洁。
+          </div>
+        </div>
+
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
+          <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
+          Spring · 面试知识复习库 · Last updated 2026-06-11
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => {
+      const id = a.getAttribute('href')?.replace('#', '');
+      if (id) { const el = document.getElementById(id); if (el) sections.push({ el, link: a }); }
+    });
+    if (!sections.length) return;
+    function update() {
+      let current = sections[0];
+      const offset = 120;
+      for (const s of sections) { if (s.el.getBoundingClientRect().top <= offset) current = s; }
+      links.forEach(a => a.classList.remove('active'));
+      if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+  </script>
+</body>
+</html>
