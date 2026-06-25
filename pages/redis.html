@@ -29,6 +29,7 @@
           <li class="sub"><a href="#s1-3">持久化机制</a></li>
           <li class="sub"><a href="#s1-4">内存淘汰策略</a></li>
           <li class="sub"><a href="#s1-5">单线程与IO多路复用</a></li>
+          <li class="sub"><a href="#s1-5b">渐进式 rehash 与编码转换</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">缓存策略与缓存问题</a></li>
           <li class="sub"><a href="#s2-2">分布式锁</a></li>
@@ -254,6 +255,60 @@
           </ul>
         </div>
         <div class="tip">Redis 6.0+ 引入<strong>多线程 IO</strong>（<code>io-threads</code>）：网络读写多线程，<strong>命令执行仍是单线程</strong>。不是多线程执行命令！</div>
+
+        <h3 id="s1-5b">1.6 渐进式 rehash 与对象编码转换</h3>
+        <div class="card">
+          <h4>设计起点：为什么 Redis 要「渐进式」rehash？</h4>
+          <p>Redis 的 dict（hashtable）会随数据增长触发 <code>rehash</code> 扩容（负载因子过高）。传统一次性 rehash 要把<strong>全部键值对</strong>从旧表 ht[0] 迁到新表 ht[1]，如果字典有上百万个 key，这一次集中迁移会<strong>阻塞主线程数秒</strong>——对 Redis 这种内存数据库是灾难性的。Redis 的解决方案：<strong>把 rehash 摊平到每次字典操作上</strong>，每次只迁移一小部分，让长任务变成"看不见"的背景工作。</p>
+          <div class="tip">渐进式 rehash 的哲学：将一个长阻塞操作拆成无数个 O(1) 微操作，附着在正常读写上顺带完成。这是 Redis 「绝不阻塞主线程」设计理念的一个缩影。</div>
+        </div>
+        <div class="card">
+          <h4>渐进式 rehash 实现机制</h4>
+          <div class="diagram">
+            <div class="diagram-title">dict 双 hashtable 结构</div>
+            <div class="flow">
+              <div class="flow-box flow-blue">ht[0]<br><small>旧表，正在搬出</small></div>
+              <div class="flow-arrow">+</div>
+              <div class="flow-box flow-purple">ht[1]<br><small>新表，正在搬入</small></div>
+              <div class="flow-arrow">+</div>
+              <div class="flow-box flow-green">rehashidx<br><small>迁移进度指针</small></div>
+            </div>
+          </div>
+          <ol>
+            <li><strong>触发扩容</strong>：负载因子 = used/size 超过阈值（如 1，有 BGSAVE 时为 5）时，分配 ht[1]，<code>rehashidx = 0</code></li>
+            <li><strong>每次操作顺带迁移</strong>：增删改查时，执行 <code>rehashidx</code> 所指桶的全部 key 搬到 ht[1]，<code>rehashidx++</code>（每次最多搬 1 个桶，或空桶最多访问 10*N 个空桶）</li>
+            <li><strong>期间读写规则</strong>：读在 ht[0]、ht[1] 都查；写在 ht[1]（保证新数据在新表）；删除两者都查</li>
+            <li><strong>定时辅助</strong>：另有定时任务每次 1ms 帮忙迁多几桶，防止长期空闲的字典一直占着两个表</li>
+            <li><strong>完成</strong>：ht[0] 全部迁完，释放 ht[0]，令 ht[0]=ht[1]，ht[1]=null，rehashidx=-1</li>
+          </ol>
+          <div class="warn">渐进式 rehash 期间字典同时占用两份哈希表内存，<strong>内存使用会短暂翻倍</strong>。大字典扩容时要预留内存，否则可能 OOM。</div>
+        </div>
+        <div class="card">
+          <h4>对象编码转换：为什么 Redis 同一类型有多种底层编码？</h4>
+          <p>设计起点：<strong>时间换空间，空间换时间</strong>。数据量小时，紧凑编码（listpack/intset）省内存、缓存友好；数据量大或需要复杂操作时，转为高性能结构（hashtable/skiplist）保证性能。Redis 在每次操作后自动检测阈值，按需「升级」编码，对用户透明。</p>
+          <table>
+            <thead><tr><th>类型</th><th>小数据编码</th><th>大数据编码</th><th>转换阈值（默认）</th><th>设计动机</th></tr></thead>
+            <tbody>
+              <tr><td>String</td><td>int / embstr</td><td>raw (SDS)</td><td>&gt;44字节转 raw</td><td>embstr 头与数据连续内存，一次 malloc，缓存友好</td></tr>
+              <tr><td>Hash</td><td>listpack</td><td>hashtable</td><td>hash-max-listpack-entries 128 / value 64</td><td>小哈希紧凑存，大哈希要 O(1) 查找</td></tr>
+              <tr><td>List</td><td>listpack(节点内)</td><td>quicklist</td><td>list-max-listpack-size -2(8KB)</td><td>小列表压一节点，长列表分多个节点防压缩过大</td></tr>
+              <tr><td>Set</td><td>intset / listpack</td><td>hashtable</td><td>set-max-intset-entries 512 / listpack 128</td><td>纯整数集合连续内存，混合类型转哈希</td></tr>
+              <tr><td>ZSet</td><td>listpack</td><td>skiplist+hashtable</td><td>zset-max-listpack-entries 128 / value 64</td><td>小有序集省内存，大集合要范围查+点查双高效</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>编码转换的「只升不降」特性</h4>
+          <p>编码转换<strong>只会从小转大（升级）</strong>，不会从大转回小（降级）。即使删除元素使数据量重新低于阈值，编码也保持不变。</p>
+          <pre><code>// 例如 ZSet 从 listpack 升为 skiplist 后
+ZADD bigzset ...  // 触发转 skiplist
+ZREM bigzset ...  // 删到只剩 2 个元素
+OBJECT ENCODING bigzset  // 仍是 "skiplist"，不会降回 listpack
+
+// 原因：避免反复转换抖动；
+// 想降级需手动重建: RENAME newkey oldkey 或 zunionstore</code></pre>
+          <div class="tip">面试要点：编码选择是 Redis 内存与性能平衡的核心手段。理解「为什么用 embstr、为什么 ZSet 要两套结构」能体现对 Redis 设计哲学的掌握。</div>
+        </div>
 
         <!-- ============================== PART 2 ============================== -->
         <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>

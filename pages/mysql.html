@@ -26,8 +26,10 @@
           <li><a href="#part1">第一部分：技术原理</a></li>
           <li class="sub"><a href="#s1-1">MySQL 整体架构</a></li>
           <li class="sub"><a href="#s1-2">InnoDB 存储引擎架构</a></li>
+          <li class="sub"><a href="#s1-2b">Change Buffer 设计动机</a></li>
           <li class="sub"><a href="#s1-3">三种日志机制</a></li>
           <li class="sub"><a href="#s1-4">索引原理</a></li>
+          <li class="sub"><a href="#s1-4b">B+树设计动机与索引下推</a></li>
           <li class="sub"><a href="#s1-5">事务与 MVCC</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">锁机制</a></li>
@@ -184,6 +186,53 @@
             <li><strong>脏页刷新</strong>：Buffer Pool 中被修改但未写入磁盘的页，通过后台线程异步刷盘（<code>innodb_io_capacity</code> 控制刷盘速度）</li>
             <li><strong>Change Buffer</strong>：当修改非唯一二级索引页且该页不在 Buffer Pool 时，先缓存到 Change Buffer，后台合并（merge）到磁盘，减少随机 IO</li>
           </ul>
+        </div>
+
+        <h3 id="s1-2b">1.2b Change Buffer 设计动机</h3>
+        <div class="card">
+          <h4>为什么需要 Change Buffer？</h4>
+          <p><strong>设计起点</strong>：聚簇索引的修改通常是<strong>顺序且局部</strong>的（按主键定位页），而非唯一二级索引的修改往往是<strong>随机 IO</strong>——更新一条记录可能命中磁盘上任意位置的索引页。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">DML 修改二级索引列</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">目标索引页不在 Buffer Pool？</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">随机读磁盘（costly!）</div>
+          </div>
+          <p style="margin-top:1rem">Change Buffer 的解法：<strong>先在内存缓存这次变更，不立即读磁盘</strong>，等该页因其他查询被读入 Buffer Pool 时再"合并"（merge），把多次随机 IO 合并成一次顺序写。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">DML 命中不在内存的二级索引页</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">变更记录存入 Change Buffer</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">该页被读入 / 后台 merge</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">合并变更一次性落盘</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>为什么只对"非唯一"二级索引生效？</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 非唯一二级索引</h4>
+              <ul>
+                <li>插入新值时<strong>不需要检查唯一性</strong></li>
+                <li>变更可以"延迟合并"——记录追加到索引页任意位置即可</li>
+                <li>因此可以安全缓存，后台 merge</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">❌ 唯一索引 / 聚簇索引</h4>
+              <ul>
+                <li>必须<strong>立即读磁盘</strong>判断是否违反唯一约束</li>
+                <li>不能延迟——否则并发插入可能写入重复值</li>
+                <li>聚簇索引还要更新完整数据行，必须即时落盘定位</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>面试易错点</strong>：Change Buffer 不是缓存"数据"，而是缓存"对索引页的修改操作"。merge 发生在该页被读入内存时，或后台线程定期触发。崩溃恢复靠 redo log 保证不丢失。</div>
+          <div class="tip"><strong>适用场景</strong>：写多读少的非唯一二级索引。若索引页很快被读（读多写少），Change Buffer 几乎用不上反而有合并开销，可通过 <code>innodb_change_buffering</code> 调整策略。</div>
         </div>
 
         <h3 id="s1-3">1.3 三种日志机制</h3>
@@ -350,6 +399,79 @@ WHERE a=1 AND c=3       -- ⚠️ 只用 a</code></pre>
           </table>
         </div>
         <div class="tip"><strong>强制/忽略索引</strong>：<code>SELECT * FROM t FORCE INDEX(idx_name)</code> 可强制使用指定索引；<code>IGNORE INDEX(idx_name)</code> 忽略索引。生产慎用，先用 EXPLAIN 分析。</div>
+
+        <h3 id="s1-4b">1.4b B+树设计动机 与 索引下推 ICP</h3>
+        <div class="card">
+          <h4>为什么数据库索引用 B+ 树而不是 B 树 / Hash / 红黑树？</h4>
+          <p><strong>设计起点</strong>：数据库索引存在磁盘上，核心瓶颈是<strong>磁盘 IO 次数 ≈ 树高</strong>。一切设计都围绕"降低树高 + 适配磁盘页"展开。</p>
+          <table>
+            <thead><tr><th>数据结构</th><th>每个节点存储</th><th>树高(千万级)</th><th>范围查询</th><th>磁盘友好度</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">红黑树</span></td><td>1 个 key + 2 指针</td><td>约 23 层</td><td>❌ 需中序遍历回溯</td><td>❌ 二叉，每层只存 1 个 key，树太高</td></tr>
+              <tr><td><span class="badge badge-orange">Hash</span></td><td>哈希桶</td><td>O(1) 一次</td><td>❌ 不支持范围/排序</td><td>⚠️ 仅等值查询，无法 ORDER BY</td></tr>
+              <tr><td><span class="badge badge-blue">B 树</span></td><td>key + data + 指针</td><td>约 4 层</td><td>⚠️ 中序遍历，跨节点回溯</td><td>⚠️ 节点存数据→扇出低→树偏高</td></tr>
+              <tr><td><span class="badge badge-green">B+ 树</span></td><td>非叶子只存 key+指针</td><td>约 3 层</td><td>✅ 叶子双向链表顺序扫</td><td>✅ 扇出极高，树矮，IO 少</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>三个关键优势</strong>：① 非叶子节点不存数据 → 单页存更多 key → 扇出大 → 树更矮 → IO 更少；② 叶子链表 → 范围查询只需定位起点后顺序扫描，无需回溯父节点；③ 数据按页组织 → 完美匹配磁盘预读。</div>
+        </div>
+
+        <div class="card">
+          <h4>B 树 vs B+ 树：数据存放位置对比</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">B 树（每个节点都存数据）</h4>
+              <pre style="text-align:center;color:var(--text-dim);font-size:0.8rem">    [20|data] [40|data] [60|data]
+     /      |       |        \
+[10|d][15|d] [25|d][30|d] [45|d] [65|d][70|d]
+
+↑ 单页既存 key 又存 data → 存 key 数量少
+↑ 范围查询要在树上来回跳转回溯</pre>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">B+ 树（数据只存叶子）</h4>
+              <pre style="text-align:center;color:var(--text-dim);font-size:0.8rem">    [20]  [40]  [60]     ← 只存 key
+   /     |      |      \
+[10,15,20]→[25,30,40]→[45,50,60]→[65,70,80]
+
+↑ 非叶子腾出空间存更多 key → 扇出大
+↑ 叶子链表 → 范围扫描一气呵成</pre>
+            </div>
+          </div>
+          <div class="warn"><strong>面试追问</strong>：为什么 InnoDB 选 B+ 树而 Memory 引擎选 Hash？Memory 是内存引擎无磁盘 IO，Hash 的 O(1) 等值查询优势放大；而 InnoDB 面向磁盘，B+ 树的"低树高 + 范围查询 + 顺序 IO"才是关键。</div>
+        </div>
+
+        <div class="card">
+          <h4>索引下推（Index Condition Pushdown, ICP）</h4>
+          <p><strong>设计起点</strong>：5.6 之前，二级索引回表前只能用索引的"最左匹配"部分过滤，剩余 WHERE 条件要回表后才能判断，导致大量无谓回表。ICP 把<strong>索引覆盖部分的 WHERE 条件下推到存储引擎层</strong>，在回表前先过滤。</p>
+          <p><strong>场景</strong>：联合索引 <code>idx_name_age(name, age)</code>，查询 <code>SELECT * FROM user WHERE name LIKE '张%' AND age = 20;</code></p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">❌ 无 ICP（5.6 之前）</h4>
+              <div class="flow">
+                <div class="flow-box flow-blue">用 name LIKE '张%' 取二级索引</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box flow-orange">全部回表（含 age≠20 的）</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box flow-pink">Server 层再过滤 age=20</div>
+              </div>
+              <p style="margin-top:0.5rem"><span class="badge badge-red">问题</span> 匹配"张X"的有 1000 条，但 age=20 只有 5 条 → <strong>浪费 995 次回表</strong></p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 有 ICP（5.6+）</h4>
+              <div class="flow">
+                <div class="flow-box flow-blue">用 name LIKE '张%' 取二级索引</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box flow-green">引擎层用索引里的 age 过滤</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box flow-purple">仅 5 条回表</div>
+              </div>
+              <p style="margin-top:0.5rem"><span class="badge badge-green">优化</span> age 在联合索引里 → 回表前就过滤 → <strong>回表次数 1000→5</strong></p>
+            </div>
+          </div>
+          <div class="tip"><strong>EXPLAIN 判断</strong>：启用 ICP 时 Extra 显示 <code>Using index condition</code>；未启用则显示 <code>Using where</code>。ICP 对<strong>联合索引 + 范围/模糊查询</strong>场景收益最大。</div>
+          <div class="warn"><strong>ICP 限制</strong>：仅适用于二级索引；条件必须能用到索引列；对子查询的 condition 不下推；<code>name LIKE '张%'</code> 用到了范围扫描所以 age 部分原本无法用索引定位，但 ICP 让它在回表前过滤。</div>
+        </div>
 
         <h3 id="s1-5">1.5 事务与 MVCC</h3>
         <div class="card">

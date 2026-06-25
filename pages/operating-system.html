@@ -33,6 +33,7 @@
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">IO 模型</a></li>
           <li class="sub"><a href="#s2-2">epoll 原理</a></li>
+          <li class="sub"><a href="#s2-2b">零拷贝 Zero-Copy</a></li>
           <li class="sub"><a href="#s2-3">用户态与内核态</a></li>
           <li class="sub"><a href="#s2-4">文件系统</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
@@ -316,6 +317,109 @@
               </ul>
             </div>
           </div>
+        </div>
+
+        <h3 id="s2-2b">2.2b 零拷贝 Zero-Copy — 高性能 IO 的核心</h3>
+        <div class="card">
+          <h4>什么是零拷贝？解决什么问题？</h4>
+          <p><strong>设计出发点</strong>：传统文件传输（如读到内存再发到网络）要经过 4 次上下文切换 + 4 次数据拷贝，CPU 和内存带宽浪费严重。"零拷贝"并非真的零拷贝，而是<strong>减少 CPU 拷贝次数和上下文切换</strong>，把数据搬运的活交给 DMA（直接内存访问）硬件去做。</p>
+          <p class="warn" style="margin-top:0.5rem">面试高频考点：Kafka、Netty、RocketMQ 的高吞吐都依赖零拷贝。理解零拷贝是串联起 OS、Kafka、Netty 三个知识点的"桥梁概念"。</p>
+        </div>
+
+        <div class="card">
+          <h4>传统 read + write：4 次拷贝 + 4 次上下文切换</h4>
+          <div class="diagram">
+            <div class="diagram-title">传统文件传输流程（数据反复在内核态/用户态间搬运）</div>
+            <div style="font-family:'SF Mono',monospace;font-size:0.82rem;line-height:2;text-align:center;">
+              <div style="color:var(--text-dim)">应用层&nbsp;&nbsp;&nbsp;&nbsp;: <span style="color:var(--accent)">read()</span> <span style="color:var(--accent4)">[用户态 buffer]</span> → <span style="color:var(--accent)">write()</span> <span style="color:var(--accent4)">[用户态 buffer]</span></div>
+              <div style="color:var(--text-dim)">&nbsp;&nbsp;&nbsp;&nbsp;⬇&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;① DMA 磁盘→内核 &nbsp;&nbsp;② CPU 内核→用户 &nbsp;&nbsp;③ CPU 用户→内核 &nbsp;&nbsp;④ DMA 内核→网卡</div>
+              <div style="color:var(--accent3)">内核态&nbsp;&nbsp;&nbsp;&nbsp;: [内核 Page Cache] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [内核 Socket 缓冲]</div>
+              <div style="color:var(--text-dim)">硬件&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span style="color:var(--accent5)">[磁盘]</span> ←DMA→ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ←DMA→ <span style="color:var(--accent5)">[网卡]</span></div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>4 次数据拷贝</strong>：①DMA 磁盘→内核缓冲 ②CPU 内核缓冲→用户缓冲 ③CPU 用户缓冲→Socket缓冲 ④DMA Socket缓冲→网卡</li>
+            <li><strong>4 次上下文切换</strong>：read 调用/返回 + write 调用/返回</li>
+            <li><strong>痛点</strong>：数据在内核态和用户态之间来回"倒腾"，CPU 既要做拷贝又要做计算，效率低下</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>三种零拷贝方案对比</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">① mmap + write</h4>
+              <ul>
+                <li><strong>原理</strong>：把内核缓冲区映射到用户空间，<strong>省去 CPU 内核→用户的拷贝</strong></li>
+                <li><strong>拷贝次数</strong>：3 次（DMA 磁盘→内核，CPU 内核→Socket，DMA Socket→网卡）</li>
+                <li><strong>切换次数</strong>：4 次</li>
+                <li><strong>用途</strong>：RocketMQ CommitLog 读取</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">② sendfile（推荐）</h4>
+              <ul>
+                <li><strong>原理</strong>：一次系统调用，数据全程在内核态流转，<strong>完全不经过用户态</strong></li>
+                <li><strong>拷贝次数</strong>：3 次（Linux 2.1）/ 2 次（Linux 2.4+ 带 SG-DMA）</li>
+                <li><strong>切换次数</strong>：2 次（仅一次系统调用）</li>
+                <li><strong>用途</strong>：Kafka 消息发送、Nginx 静态文件</li>
+              </ul>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:0.8rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">③ sendfile + SG-DMA</h4>
+              <ul>
+                <li><strong>原理</strong>：网卡支持 Scatter-Gather DMA 时，内核只传递"描述符"（数据在哪、多长），<strong>由网卡 DMA 直接从内核缓冲区取数据</strong></li>
+                <li><strong>拷贝次数</strong>：2 次（DMA 磁盘→内核，DMA 内核→网卡），<strong>零 CPU 拷贝</strong></li>
+                <li><strong>切换次数</strong>：2 次</li>
+                <li><strong>这是真正的"零 CPU 拷贝"</strong></li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent5)">
+              <h4 style="color:var(--accent5)">④ splice（管道）</h4>
+              <ul>
+                <li><strong>原理</strong>：两个 fd 之间通过内核管道缓冲区零拷贝移动数据</li>
+                <li><strong>拷贝次数</strong>：2 次（DMA 磁盘→管道，DMA 管道→网卡）</li>
+                <li><strong>切换次数</strong>：2 次</li>
+                <li><strong>用途</strong>：需要中间处理（如 SSL）的场景</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>sendfile 数据流可视化</h4>
+          <div class="diagram">
+            <div class="diagram-title">sendfile() — 数据全程不经过用户态</div>
+            <div class="flow" style="flex-direction:column;gap:0.3rem">
+              <div class="flow-box flow-blue" style="width:100%">① 应用调用 sendfile(fd_in, fd_out) → 陷入内核（1 次切换）</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-green" style="width:100%">② DMA 将磁盘数据拷贝到内核 Page Cache</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-purple" style="width:100%">③ 内核把 Page Cache 描述符传给 Socket 缓冲（仅拷贝描述符，非数据）</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-orange" style="width:100%">④ 网卡 SG-DMA 直接从 Page Cache 读取并发送</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-pink" style="width:100%">⑤ sendfile 返回 → 回到用户态（1 次切换）</div>
+            </div>
+          </div>
+          <div class="tip"><strong>对比总结</strong>：传统 4 次拷贝 + 4 次切换 → sendfile 2 次拷贝 + 2 次切换。CPU 不再搬运数据，可以专注计算，这就是 Kafka 单机能扛百万 QPS 的底层原因之一。</div>
+        </div>
+
+        <div class="card">
+          <h4>零拷贝的实际应用</h4>
+          <table>
+            <thead><tr><th>系统</th><th>使用方式</th><th>收益</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Kafka</strong></td><td>Producer 写用 mmap，Consumer 读用 sendfile</td><td>高吞吐的核心原因之一</td></tr>
+              <tr><td><strong>RocketMQ</strong></td><td>CommitLog 用 mmap 写入，读用 mmap</td><td>顺序写 + 零拷贝</td></tr>
+              <tr><td><strong>Netty</strong></td><td><code>FileRegion</code> 封装 sendfile；<code>CompositeByteBuf</code> 合并缓冲区</td><td>减少内存拷贝</td></tr>
+              <tr><td><strong>Nginx</strong></td><td><code>sendfile on;</code> 配置项</td><td>静态文件传输加速</td></tr>
+              <tr><td><strong>Java NIO</strong></td><td><code>FileChannel.transferTo()</code> 对应 sendfile</td><td>大文件传输优化</td></tr>
+            </tbody>
+          </table>
+          <div class="warn" style="margin-top:0.5rem"><strong>零拷贝的代价</strong>：① 用户态无法对数据做加工（数据不经过用户空间）—— 需要加密/压缩的场景不能用 sendfile；② mmap 有页缺失开销和映射开销，小文件不一定划算。</div>
         </div>
 
         <h3 id="s2-3">2.3 用户态与内核态</h3>

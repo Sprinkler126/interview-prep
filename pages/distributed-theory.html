@@ -26,6 +26,10 @@
           <li class="sub"><a href="#s1-3">一致性哈希</a></li>
           <li class="sub"><a href="#s1-4">分布式 ID 方案</a></li>
           <li class="sub"><a href="#s1-5">幂等性设计</a></li>
+          <li class="sub"><a href="#s1-6">一致性模型</a></li>
+          <li class="sub"><a href="#s1-7">逻辑时钟</a></li>
+          <li class="sub"><a href="#s1-8">Quorum 与 NWR</a></li>
+          <li class="sub"><a href="#s1-9">PACELC 定理</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">分布式事务理论</a></li>
           <li class="sub"><a href="#s2-2">Raft 协议简述</a></li>
@@ -275,6 +279,261 @@ if redis.call("GET", KEYS[1]) == ARGV[1] then
 else
     return 0
 end</code></pre>
+        </div>
+
+        <!-- 1-6 一致性模型 -->
+        <h3 id="s1-6">一致性模型</h3>
+
+        <div class="card">
+          <h4>为什么需要一致性模型？</h4>
+          <p>分布式系统为了高可用和容灾会<strong>复制数据</strong>到多个节点，而并发读写 + 复制延迟使得"数据是否一致"变得模糊。一致性模型就是一组<strong>契约/规则</strong>，明确告诉开发者：在什么条件下，读操作能看到什么样的数据。</p>
+          <div class="tip">一致性模型的本质是<strong>对开发者暴露多少并发与复制的细节</strong>。模型越强，开发者越好写正确程序，但系统性能/可用性越低；模型越弱，系统越快，但开发者需要自己处理更多异常情况。</div>
+        </div>
+
+        <div class="card">
+          <h4>一致性强度阶梯（从强到弱）</h4>
+          <div class="layer-stack">
+            <div class="layer" style="border-left:4px solid var(--badge-red)">
+              <strong>线性一致性（Linearizability）</strong> — 最强。所有操作有全局总序，且读总是返回最新写入值；操作看起来像在"请求和响应之间的某个瞬间"原子完成。<span class="badge badge-red">最强</span>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--badge-orange)">
+              <strong>顺序一致性（Sequential Consistency）</strong> — 所有操作有全局总序，但读不一定返回最新值；只要每个进程内操作顺序保持即可。<span class="badge badge-orange">强</span>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--badge-purple)">
+              <strong>因果一致性（Causal Consistency）</strong> — 有因果关系的操作全局有序，无因果（并发）的操作顺序可不一致。<span class="badge badge-purple">中</span>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--badge-blue)">
+              <strong>读己之所写 / 单调读等会话模型</strong> — 同一客户端内的保证，跨客户端不保证。<span class="badge badge-blue">弱</span>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--badge-green)">
+              <strong>最终一致性（Eventual Consistency）</strong> — 最弱。停止写入后，最终所有副本收敛一致；中间可读到任意旧值。<span class="badge badge-green">最弱</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>线性一致性 vs 顺序一致性：对比图解</h4>
+          <p>关键区别：线性一致性要求读必须看到<strong>最新</strong>写（实时性 Real-time），顺序一致性<strong>不要求</strong>实时性，只要所有节点看到的操作顺序相同。</p>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>线性一致（合法）</h4>
+              <pre><code>时间轴 →
+Client A: [write x=1]
+Client B:        [read x=1] ✓ 读到最新值
+
+全局顺序: W(x=1) → R(x=1)
+约束: 读必须在写完成后
+      才能看到该写</code></pre>
+            </div>
+            <div class="compare-box">
+              <h4>顺序一致但不线性一致</h4>
+              <pre><code>时间轴 →
+Client A: [write x=1]
+Client B:        [read x=0] ✓ 顺序一致
+                  (写已返回但读到旧值)
+
+全局顺序: R(x=0) → W(x=1)
+约束: 允许读排在"更早完成"的写前面
+      只要全局顺序大家都一致</code></pre>
+            </div>
+          </div>
+          <div class="warn">线性一致性的代价：需要全局协调（如 Raft/Paxos 跑共识），延迟高；ZooKeeper/etcd/Spanner 提供线性一致性。最终一致系统（Dynamo/Cassandra）默认不提供。</div>
+        </div>
+
+        <div class="card">
+          <h4>各模型代表实现</h4>
+          <table>
+            <thead>
+              <tr><th>一致性模型</th><th>代表系统</th><th>实现手段</th><th>代价</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>线性一致性</td><td>etcd、ZooKeeper、Spanner</td><td>共识算法（Raft/Paxos）+ Quorum</td><td>每次读写都要多数派确认，延迟高</td></tr>
+              <tr><td>顺序一致性</td><td>ZooKeeper（读默认）</td><td>全局序号 + FIFO 客户端请求</td><td>比线性一致略低，仍需协调</td></tr>
+              <tr><td>因果一致性</td><td>COPS、MongoDB 因果会话</td><td>向量时钟/版本依赖跟踪</td><td>需跟踪因果依赖元数据</td></tr>
+              <tr><td>最终一致性</td><td>Dynamo、Cassandra、Redis复制</td><td>异步复制 + 反熵（读修复/ hinted handoff）</td><td>中间状态不一致，需冲突解决</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1-7 逻辑时钟 -->
+        <h3 id="s1-7">逻辑时钟</h3>
+
+        <div class="card">
+          <h4>设计起点：为什么不用物理时间？</h4>
+          <p>分布式系统中各机器的物理时钟<strong>无法完美同步</strong>（时钟漂移 + NTP 误差），且消息传递有延迟，我们无法用时间戳精确判断两个事件"谁先谁后"。Lamport 的洞察：<strong>真正重要的不是物理时间先后，而是因果关系</strong>——只有存在因果关系时，事件的顺序才有意义，并发事件没有先后。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">物理时钟不可靠<br><small>时钟漂移/NTP误差</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">无法判断真实先后<br><small>"同时"是相对的</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">改用因果关系定序<br><small>逻辑时钟</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Lamport 时钟（标量时钟）</h4>
+          <p>每个节点维护一个单调递增的计数器 <code>C</code>：</p>
+          <ul>
+            <li><strong>本地事件：</strong><code>C = C + 1</code></li>
+            <li><strong>发送消息：</strong><code>C = C + 1</code>，将 <code>C</code> 附在消息上发出</li>
+            <li><strong>接收消息（带时间戳 m）：</strong><code>C = max(C, m) + 1</code></li>
+          </ul>
+          <pre><code>// 节点 A 发送：C=3，消息带 [3]
+// 节点 B 接收：本地 C=1 → max(1,3)+1 = 4
+
+// 性质：如果 a → b（a 因果先于 b），则 C(a) < C(b)
+// 但反过来不成立：C(a) < C(b) 不一定有因果关系（可能是并发的）</code></pre>
+          <div class="tip">Lamport 时钟保证<strong>因果序 ⇒ 时钟序</strong>，但不能区分"并发"和"因果先后"——这是它的局限，于是有了向量时钟。</div>
+        </div>
+
+        <div class="card">
+          <h4>向量时钟（Vector Clock）</h4>
+          <p>每个节点维护一个向量 <code>V[1..N]</code>，记录<strong>所有节点</strong>各自的事件计数，从而能精确判断并发与因果。</p>
+          <ul>
+            <li><strong>本地事件：</strong><code>V[i] = V[i] + 1</code>（i 为本节点编号）</li>
+            <li><strong>发送消息：</strong><code>V[i]++</code>，将整个 V 附在消息上</li>
+            <li><strong>接收消息（带向量 Vm）：</strong><code>V[j] = max(V[j], Vm[j])</code> 对所有 j，再 <code>V[i]++</code></li>
+          </ul>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>判断规则</h4>
+              <ul>
+                <li><strong>V(a) &lt; V(b) 全分量为真</strong> ⇒ a 因果先于 b</li>
+                <li><strong>V(a) &gt; V(b) 全分量为真</strong> ⇒ b 因果先于 a</li>
+                <li><strong>既非 &lt; 也非 &gt;</strong>（有分量大、有分量小）⇒ a、b <strong>并发</strong></li>
+              </ul>
+            </div>
+            <div class="compare-box">
+              <h4>对比 Lamport</h4>
+              <ul>
+                <li><strong>Lamport：</strong>O(1) 空间，只能保留因果序的必要条件，<strong>不能检测并发</strong></li>
+                <li><strong>向量时钟：</strong>O(N) 空间，<strong>能精确判断并发</strong>，用于冲突检测（Dynamo 用它做版本冲突检测）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>向量时钟实例：检测并发冲突</h4>
+          <pre><code>节点A   节点B   节点C
+  |       |       |
+ e1:[1,0,0]       |
+  |--发消息给B--→ |
+            e2:[2,2,0]   ← B 收到后 max+1
+             |\发消息
+             | \---→ e3(C):[2,2,1]
+ e4(A):[3,2,1]
+
+// 比较 e4(A)=[3,2,1] 与 e3(C)=[2,2,1]
+// 3>2, 2=2, 1=1 → e4 全分量≥e3 且不全等 → e3 因果先于 e4（不并发）
+//
+// 若出现 [3,0,1] vs [0,2,0]：有大有小 → 并发冲突 → 需要冲突解决</code></pre>
+          <div class="warn">向量时钟的代价：空间随节点数线性增长。大规模系统中常用 <strong>Dotted Version Vector</strong> 或 <strong>区间时钟</strong> 优化。</div>
+        </div>
+
+        <!-- 1-8 Quorum 与 NWR -->
+        <h3 id="s1-8">Quorum 与 NWR</h3>
+
+        <div class="card">
+          <h4>设计起点：复制系统如何权衡一致性与性能？</h4>
+          <p>数据复制到 N 个副本后，写操作要不要等所有副本？读要不要问所有副本？<strong>Quorum（法定人数）机制</strong>的核心思想：不需要全部副本确认，只要<strong>读写集合有交集</strong>，就能保证读到最新写——通过数学不等式灵活调节一致性强度与性能。</p>
+        </div>
+
+        <div class="card">
+          <h4>NWR 公式</h4>
+          <ul>
+            <li><strong>N</strong>：副本总数</li>
+            <li><strong>W</strong>：写操作需要确认的副本数（Write Quorum）</li>
+            <li><strong>R</strong>：读操作需要查询的副本数（Read Quorum）</li>
+          </ul>
+          <div class="diagram">
+            <div class="diagram-title">核心约束：W + R &gt; N</div>
+            <pre><code>   ┌─────────── 写集合 W ───────────┐
+   │ ●  ●  ●  ●                     │
+   └────────×────────×──────────────┘
+            ↓ 交集 ↓
+   ┌────────×────────×──────────────┐
+   │       ●  ●  ●                  │
+   └─────────── 读集合 R ───────────┘
+   ←───────────── N 个副本──────────→
+
+   W + R > N  ⇒  读写集合必有交集 ⇒ 读集合中至少 1 个副本含最新写</code></pre>
+          </div>
+          <div class="tip">W+R&gt;N 保证强一致；W+R≤N 则可能读到旧值（弱一致）。常用组合：W=R=N/2+1（多数派），天然满足 W+R&gt;N。</div>
+        </div>
+
+        <div class="card">
+          <h4>常见 NWR 配置策略</h4>
+          <table>
+            <thead>
+              <tr><th>配置</th><th>W+R vs N</th><th>一致性</th><th>性能</th><th>适用场景</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>W=All, R=1</td><td>W+R=N+1&gt;N</td><td>强一致</td><td>写慢读快</td><td>读多写少</td></tr>
+              <tr><td>W=1, R=All</td><td>W+R=N+1&gt;N</td><td>强一致</td><td>写快读慢</td><td>写多读少</td></tr>
+              <tr><td>W=R=Majority</td><td>&gt;N</td><td>强一致</td><td>均衡</td><td>共识系统（Raft/ZAB）</td></tr>
+              <tr><td>W=1, R=1</td><td>W+R=2≤N(N&gt;2)</td><td>弱一致</td><td>读写都快</td><td>高吞吐缓存</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">即使 W+R&gt;N，也只能保证<strong>读到最近已确认的写</strong>；若要严格线性一致，读还需<strong>读修复 / 租约</strong>等机制防止读到 stale leader。</div>
+        </div>
+
+        <div class="card">
+          <h4>与 Raft/Paxos 的关系</h4>
+          <p>Raft 和 Paxos 本质上是<strong>W=R=多数派</strong>的 Quorum 系统：写需多数派确认才算提交（W=N/2+1），选主也需多数派投票。这种多数派 Quorum 天然满足 W+R&gt;N，从而保证：已提交的数据，后续任意多数派读必然至少有一个副本含该数据。</p>
+          <pre><code>// Raft 的 Quorum 本质
+// N=5 集群：majority = 3
+// 写提交：需 3 个副本确认（W=3）
+// 选主：  需 3 票（R=3 的精神）
+// W+R = 3+3 = 6 > 5 = N  ✓ 满足强一致约束</code></pre>
+        </div>
+
+        <!-- 1-9 PACELC 定理 -->
+        <h3 id="s1-9">PACELC 定理</h3>
+
+        <div class="card">
+          <h4>设计起点：CAP 之外的隐藏权衡</h4>
+          <p>CAP 只回答了<strong>网络分区（P）时</strong>选 C 还是 A，但绝大多数时间<strong>没有分区</strong>！无分区时系统仍有权衡：<strong>延迟（Latency）与一致性（Consistency）</strong>之间的取舍。PACELC 补全了 CAP 遗漏的这一维度。</p>
+          <div class="diagram">
+            <div class="diagram-title">PACELC 全称与读法</div>
+            <pre><code>PACELC = if Partition: choose A or C
+         Else (no partition): choose L or C
+
+即：
+  有分区时(P)：在 Availability 与 Consistency 间取舍
+  无分区时(E)：在 Latency 与 Consistency 间取舍</code></pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>PACELC 象限：真实系统的定位</h4>
+          <table>
+            <thead>
+              <tr><th>系统</th><th>分区时(P)</th><th>无分区时(E)</th><th>记法</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>DynamoDB/Cassandra</td><td>选 A</td><td>选 L</td><td>PA/EL</td><td>高可用低延迟，最终一致</td></tr>
+              <tr><td>MongoDB(已提交读)</td><td>选 A</td><td>选 C</td><td>PA/EC</td><td>无分区时强一致，分区时优先可用</td></tr>
+              <tr><td>BigTable/HBase</td><td>选 C</td><td>选 C</td><td>PC/EC</td><td>始终强一致，延迟可能较高</td></tr>
+              <tr><td>Spanner</td><td>选 C</td><td>选 C</td><td>PC/EC</td><td>用 TrueTime 做外部一致，延迟高</td></tr>
+              <tr><td>MongoDB(默认)</td><td>选 A</td><td>选 L</td><td>PA/EL</td><td>默认配置追求性能</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>为什么无分区时要权衡 L 与 C？</h4>
+          <div class="compare-row">
+            <div class="compare-box">
+              <h4>选 C（强一致，高延迟）</h4>
+              <p>每次写都要等多数派副本同步确认，读也要协调，<strong>延迟随副本数和跨地域距离上升</strong>。但开发者心智负担小，数据强一致。</p>
+            </div>
+            <div class="compare-box">
+              <h4>选 L（低延迟，弱一致）</h4>
+              <p>本地副本直接返回（异步复制），<strong>延迟低、吞吐高</strong>，但短暂读到旧值。适合社交信息流、计数器等可容忍不一致的场景。</p>
+            </div>
+          </div>
+          <div class="tip">面试要点：CAP 是 PACELC 的特例。谈系统设计时，不仅要谈分区时的取舍，还要谈<strong>常态下延迟与一致性的取舍</strong>，这体现对分布式权衡的深入理解。</div>
         </div>
 
         <!-- ==================== 第二部分 ==================== -->

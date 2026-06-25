@@ -21,6 +21,7 @@
           <li class="sub"><a href="#p1-2">核心概念</a></li>
           <li class="sub"><a href="#p1-3">存储机制</a></li>
           <li class="sub"><a href="#p1-4">副本机制 ISR</a></li>
+          <li class="sub"><a href="#p1-4b">ISR 设计动机 与 HW vs Leader Epoch</a></li>
           <li class="sub"><a href="#p1-5">Producer 机制</a></li>
           <li class="sub"><a href="#p1-6">Consumer 机制</a></li>
           <li class="sub"><a href="#p1-7">事务与 Exactly-Once</a></li>
@@ -222,6 +223,99 @@
           <p><strong>问题</strong>：旧版本中，Follower 重新加入 ISR 时可能截断自己已有的数据（HW 不够精确）。</p>
           <p><strong>解决</strong>：引入 Leader Epoch 计数器。每次 Leader 变更 epoch+1，Follower 用 epoch 向 Leader 请求正确的截断点，避免不必要的数据丢失。</p>
           <p class="tip">这是一个典型的<strong>"用元数据替代启发式"</strong>的改进思路——旧版本靠 HW 推断，新版本直接记录精确的 Leader 变更历史。</p>
+        </div>
+
+        <h3 id="p1-4b">1.4b ISR 设计动机 与 HW vs Leader Epoch</h3>
+        <div class="card">
+          <h4>为什么 Kafka 自创 ISR 而不是直接用"同步/异步"复制？</h4>
+          <p><strong>设计起点</strong>：副本同步策略本质上是在<strong>一致性（不丢已确认消息）</strong>与<strong>可用性（不被慢副本拖垮）</strong>间取舍。传统两种方案都有硬伤。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">方案A：全同步复制</h4>
+              <ul>
+                <li>所有副本确认才算写入成功</li>
+                <li><span class="badge badge-red">代价</span> 任一副本慢/宕机就拖垮整体吞吐</li>
+                <li>等价 CAP 中的 CP，牺牲可用性</li>
+                <li>消息中间件追求高吞吐，不可接受</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">方案B：全异步复制</h4>
+              <ul>
+                <li>Leader 写本地立即返回，副本后台追赶</li>
+                <li><span class="badge badge-red">代价</span> Leader 宕机时未同步消息丢失</li>
+                <li>等价 CAP 中的 AP，牺牲一致性</li>
+                <li>金融/订单等场景不可接受丢数据</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 方案C：ISR 动态同步集合</h4>
+              <ul>
+                <li>只要求 ISR <strong>内</strong>的副本同步，acks=all</li>
+                <li>ISR 是<strong>动态伸缩</strong>的：跟不上就踢出，追上再加入</li>
+                <li>慢副本不拖累，但"已确认"消息必在 ISR 内</li>
+                <li>在吞吐与可靠性间取得平衡</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：ISR 本质是把"哪些副本算同步"从<strong>静态配置</strong>变为<strong>运行时动态判定</strong>。配合 <code>acks=all</code> + <code>min.insync.replicas</code>：ISR 缩到小于 min 时拒绝写入，保证最低持久性。</div>
+        </div>
+
+        <div class="card">
+          <h4>ISR 的动态伸缩机制</h4>
+          <div class="flow">
+            <div class="flow-box flow-green">Follower 正常同步<br><small>LEO 紧跟 Leader</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-blue">滞留超过 replica.lag.time.max.ms<br><small>默认 30s 未追上 Leader LEO</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">踢出 ISR<br><small>降级为 OSR（异步副本）</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">追上 Leader LEO<br><small>重新加入 ISR</small></div>
+          </div>
+          <ul>
+            <li><strong>ISR (In-Sync Replicas)</strong>：与 Leader 保持同步的副本，含 Leader 自身</li>
+            <li><strong>OSR (Out-of-Sync Replicas)</strong>：被踢出的落后副本，不参与 acks=all 判定</li>
+            <li><strong>AR = ISR + OSR</strong>：分区全部副本集合</li>
+            <li><strong>判定标准演变</strong>：早期按"落后条数"(replica.lag.max.messages) 判定，大流量下易误踢；现按"滞后时间"判定，更稳定</li>
+          </ul>
+          <div class="warn"><strong>易错点</strong>：ISR 缩到只剩 Leader 时，<code>acks=all</code> 退化为单机写入——容错降为 0。生产环境务必设 <code>min.insync.replicas=2</code>，此时 ISR&lt;2 直接拒绝写入，宁可不可用也不丢数据。</div>
+        </div>
+
+        <div class="card">
+          <h4>HW vs Leader Epoch — 高水位的两个时代</h4>
+          <p><strong>设计起点</strong>：HW（高水位）= ISR 中所有副本 LEO 的最小值，消费者只能读 HW 之前。问题在于<strong>HW 本身也是一个需要复制的值</strong>，其更新有延迟，Follower 重启后基于"过期的 HW"做截断会引发两类故障。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ HW 模式：数据丢失场景</h4>
+              <pre style="font-size:0.78rem;color:var(--text-dim)">T1: Leader HW=5, Follower LEO=6 已收到 m6
+T2: Follower 宕机重启，向 Leader 同步
+T3: Follower 依据本地 HW=5 截断 m6
+    （此时 Leader 的 HW 可能还没更新到6）
+T4: Leader 宕机，Follower 当选新 Leader
+T5: m6 永久丢失 ❌（已被截断）</pre>
+              <p><span class="badge badge-red">根因</span> Follower 用<strong>自己可能过期的 HW</strong>决定截断点，而非 Leader 的真实进度</p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ Leader Epoch 模式</h4>
+              <pre style="font-size:0.78rem;color:var(--text-dim)">T1: Leader(epoch=2) HW=5
+T2: Follower 重启，先发 OffsetForLeaderEpoch
+    请求(epoch=2) → Leader 返回 LEO=6
+T3: Follower 精确截断到 6，保留 m6 ✅
+T4: Leader 宕机，新 Leader 当选 epoch=3
+T5: m6 完整保留，无丢失 ✅</pre>
+              <p><span class="badge badge-green">解法</span> 用<strong>元数据(epoch)</strong>向 Leader 查询精确截断点，取代对本地 HW 的猜测</p>
+            </div>
+          </div>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">副本重启</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">发送 OffsetForLeaderEpoch(epoch)</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Leader 返回该 epoch 的 LEO</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">精确截断，避免误删</div>
+          </div>
+          <div class="tip"><strong>设计思想</strong>：这是"用权威元数据替代本地启发式推断"的经典改进——旧版靠 HW 猜，新版直接问 Leader。Leader Epoch 文件 <code>(offset, epoch)</code> 记录每次 Leader 切换的起点 offset，是 2.4+ 副本恢复的核心依据。</div>
         </div>
 
         <h3 id="p1-5">1.5 Producer 机制</h3>

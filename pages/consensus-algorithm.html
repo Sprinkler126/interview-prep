@@ -23,7 +23,9 @@
           <li><a href="#part1">第一部分：技术原理</a></li>
           <li class="sub"><a href="#s1-1">共识问题定义</a></li>
           <li class="sub"><a href="#s1-2">Paxos 算法</a></li>
+          <li class="sub"><a href="#s1-2b">Paxos 设计哲学</a></li>
           <li class="sub"><a href="#s1-3">Raft 协议</a></li>
+          <li class="sub"><a href="#s1-3b">Raft 安全性可视化</a></li>
           <li class="sub"><a href="#s1-4">ZAB 协议</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">Gossip 协议</a></li>
@@ -119,6 +121,82 @@
           </ul>
         </div>
 
+        <h3 id="s1-2b">Paxos 设计哲学 — 为什么是这个机制</h3>
+        <div class="card">
+          <h4>Paxos 要解决什么问题？</h4>
+          <p><strong>设计起点</strong>：在异步网络中，消息可能<strong>延迟、丢失、乱序</strong>，节点可能宕机重启。在这样的环境下，如何让一群节点对一个值达成<strong>不可反悔的一致</strong>？</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-red">异步网络<br><small>延迟/丢失/乱序</small></div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-box flow-orange">节点宕机重启<br><small>可能恢复也可能永久失效</small></div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-box flow-purple">并发提案<br><small>多个 Proposer 同时发起</small></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">如何达成<strong>一致且不可变</strong>的决定？</div>
+          </div>
+          <p style="margin-top:1rem">FLP 不可能定理告诉我们：异步网络中不可能同时满足<strong>安全性 + 终止性 + 容错性</strong>。Paxos 的选择是：保证安全性（绝不选错值），放松终止性（允许活锁，实践中靠 Leader 解决）。</p>
+        </div>
+
+        <div class="card">
+          <h4>两阶段 Prepare/Accept 背后的哲学</h4>
+          <table>
+            <thead><tr><th>设计决策</th><th>解决的问题</th><th>哲学</th></tr></thead>
+            <tbody>
+              <tr><td><strong>提案编号 n</strong>（全局唯一递增）</td><td>区分新旧提案，打破"先后"歧义</td><td>用<strong>序号替代时间</strong>（逻辑时钟思想）</td></tr>
+              <tr><td><strong>Prepare 阶段</strong>：问"你们见过更大的提案吗？"</td><td>抢占优先权，阻止旧提案被接受</td><td><strong>先锁后写</strong>：多数派 Promise = 获得锁</td></tr>
+              <tr><td><strong>Promise 返回已接受的最大提案</strong></td><td>新 Proposer 必须沿用已选定的值</td><td><strong>尊重历史</strong>：已被多数接受的值不能被覆盖</td></tr>
+              <tr><td><strong>多数派 Quorum</strong></td><td>容忍少数节点故障</td><td>两个多数派必相交 → <strong>不可能两个值都通过</strong></td></tr>
+              <tr><td><strong>Accept 阶段</strong>：带 n 和 value 请求接受</td><td>正式写入并确认</td><td>Prepare 已铺路，Accept 只需多数同意</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h4>为什么多数派交叉保证安全性？</h4>
+          <div class="diagram">
+            <div class="diagram-title">Quorum 交集性质 — Paxos 安全性的数学基石</div>
+            <pre style="text-align:center;color:var(--text-dim);font-size:0.85rem;line-height:1.9">
+   5 个 Acceptor: A1 A2 A3 A4 A5
+
+   提案X获多数派: {A1,A2,A3}          提案Y获多数派: {A3,A4,A5}
+        ┌──┬──┬──┐                            ┌──┬──┬──┐
+        │A1│A2│A3│                            │A3│A4│A5│
+        └──┴──┴──┘                            └──┴──┴──┘
+              └──────── 交集 A3 ────────┘
+              ↑ A3 一定见过 X 和 Y，只会接受编号更大的
+              → 不可能 X 和 Y 都被多数派接受
+</pre>
+          </div>
+          <div class="tip"><strong>核心洞察</strong>：任何两个多数派集合必有交集（N=5 时交集至少 1 个）。交集节点遵守"只接受编号更大的提案"承诺，因此一旦某值被多数派选定，后续任何被选定的值必然与之相同——这就是<strong>安全性</strong>的保证。</div>
+        </div>
+
+        <div class="card">
+          <h4>Paxos 的"难"与 Raft 的"易" — 为什么要有 Raft？</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">Paxos 的困境</h4>
+              <ul>
+                <li>只对<strong>单个值</strong>达成共识，工程上需要 Multi-Paxos 扩展</li>
+                <li>Multi-Paxos 没有标准实现，细节留给工程补全</li>
+                <li>角色/流程抽象，<strong>难以理解和实现</strong></li>
+                <li>缺乏明确的 Leader 选举和日志模型</li>
+                <li>"正确但难懂"——Google Chubby 作者都说难</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Raft 的设计目标</h4>
+              <ul>
+                <li><strong>可理解性优先</strong>：为教学和工程而设计</li>
+                <li>把共识拆成三个清晰子问题：Leader 选举、日志复制、安全性</li>
+                <li>强 Leader 模型：所有请求经 Leader，简化心智模型</li>
+                <li>明确的日志模型和状态转换</li>
+                <li>"同样正确但易懂易实现"</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>面试金句</strong>：Raft 不是"更好的 Paxos"，而是"为可理解性重新设计的 Paxos"——安全性等价，但通过强 Leader 和问题分解大幅降低了实现和理解门槛。这是<strong>工程哲学</strong>的差异，而非算法能力的差异。</div>
+        </div>
+
         <!-- 1-3 Raft 协议 -->
         <h3 id="s1-3">Raft 协议</h3>
 
@@ -210,6 +288,111 @@ function handleRequestVote(candidateTerm, candidateLastLogIdx, candidateLastLogT
               </ul>
             </div>
           </div>
+        </div>
+
+        <h3 id="s1-3b">Raft 安全性深度可视化</h3>
+        <div class="card">
+          <h4>四大安全性保证 — 一图总览</h4>
+          <div class="layer-stack">
+            <div class="layer" style="border-left:4px solid var(--accent3)">
+              <strong>① 选举安全 Election Safety</strong><br>
+              <small>每个 Term 最多一个 Leader（一 Term 一票制）→ 不可能出现两个同 Term 的 Leader</small>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--accent)">
+              <strong>② Leader 完整性 Leader Completeness</strong><br>
+              <small>已提交的日志一定出现在所有后续 Leader 的日志中 → 新 Leader 不会丢已提交数据</small>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--accent2)">
+              <strong>③ 日志匹配 Log Matching</strong><br>
+              <small>同一 index + 同一 term → 该 index 之前的所有日志完全一致 → 日志一致性归纳证明</small>
+            </div>
+            <div class="layer" style="border-left:4px solid var(--accent4)">
+              <strong>④ 状态机安全 State Machine Safety</strong><br>
+              <small>同一 index 不会有两个节点提交不同命令 → 所有节点状态机序列一致</small>
+            </div>
+          </div>
+          <div class="tip"><strong>依赖链</strong>：①选举安全 → ②Leader完整性 → ③日志匹配 → ④状态机安全。上层保证是下层保证的<strong>前提</strong>，环环相扣。</div>
+        </div>
+
+        <div class="card">
+          <h4>Leader 完整性 — 为什么选举限制如此关键？</h4>
+          <p><strong>核心问题</strong>：新选出的 Leader 如果日志比某些节点旧，可能丢掉已提交的日志。Raft 用<strong>选举限制</strong>保证：只有日志最新的节点才能当选。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 选举限制规则</h4>
+              <p>投票时比较 <code>(lastLogTerm, lastLogIndex)</code>：</p>
+              <ul>
+                <li>候选人 lastLogTerm &gt; 我的 → 投票</li>
+                <li>term 相同，候选人 lastLogIndex ≥ 我的 → 投票</li>
+                <li>否则拒绝（候选人日志比我旧）</li>
+              </ul>
+              <p><span class="badge badge-green">效果</span> 已提交日志的持有者一定能当选</p>
+            </div>
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ 如果没有选举限制</h4>
+              <pre style="font-size:0.8rem;color:var(--text-dim)">节点A: [t1,t2,____]  (有 t1,t2)
+节点B: [t1,t2,t3,t4] (有已提交的 t3,t4)
+节点C: [t1,t2,____]  (落后)
+
+若无限制，C 可能靠多数票(A+C)当选
+→ C 的日志缺少 t3,t4
+→ 后续覆盖 B 的已提交数据 ❌</pre>
+              <p><span class="badge badge-red">后果</span> 已提交日志被覆盖，违反线性一致性</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>日志匹配 — 归纳法证明一致性</h4>
+          <div class="diagram">
+            <div class="diagram-title">AppendEntries 的 prevLog 校验机制</div>
+            <pre style="text-align:center;color:var(--text-dim);font-size:0.82rem;line-height:1.9">
+Leader 日志:  [t1|cmd1] [t2|cmd2] [t3|cmd3] [t4|cmd4]
+                                       ↑
+                              要复制这条(index=4, term=4)
+                              prevLogIndex=3, prevLogTerm=3
+
+Follower 校验:
+  ① 自己 index=3 的 term 是否 == 3?
+     ├─ 是 → 日志在 index=3 处匹配 → 之后追加 index=4
+     └─ 否 → 日志不一致 → Leader 递减 nextIndex 重试
+
+归纳基础: prevLog 匹配 → 该 index 及之前全部相同
+归纳步骤: 每次追加都校验 prev → 链式保证全段一致
+</pre>
+          </div>
+          <ul>
+            <li><strong>归纳基础</strong>：空日志（index=0）天然匹配</li>
+            <li><strong>归纳步骤</strong>：若 prevLogIndex/prevLogTerm 匹配，则追加后该 index 也匹配</li>
+            <li><strong>结论</strong>：若两个日志在某个 index 的 term 相同，则该 index 之前<strong>所有条目都相同</strong></li>
+            <li><strong>冲突修复</strong>：Leader 维护每个 Follower 的 nextIndex，不一致时递减重试，直到找到匹配点后覆盖冲突日志</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>提交规则 — 为什么不能提交旧 Term 的日志？</h4>
+          <p><strong>Raft 的关键安全规则</strong>：Leader 只能提交<strong>当前 Term</strong>的日志条目。旧 Term 的日志只能随着当前 Term 日志的提交而"被间接提交"。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 正确：只提交当前 Term</h4>
+              <pre style="font-size:0.8rem;color:var(--text-dim)">Leader(term=4) 要提交 index=3(term=2)
+→ 不能直接提交 term=2 的条目
+→ 先把当前 term=4 的条目复制到多数
+→ 提交 term=4 的条目
+→ term=2 的条目随之被提交 ✅</pre>
+              <p>避免"幽灵提交"：旧 Term 日志可能被新 Leader 覆盖</p>
+            </div>
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ 错误：直接提交旧 Term</h4>
+              <pre style="font-size:0.8rem;color:var(--text-dim)">Leader(term=4) 直接提交 index=3(term=2)
+→ 多数派已复制
+→ 但新 Leader(term=5) 可能没有该条目
+→ 新 Leader 覆盖 index=3
+→ 已"提交"的条目消失 ❌</pre>
+              <p>图 8 问题：Raft 论文中的经典反例</p>
+            </div>
+          </div>
+          <div class="warn"><strong>面试高频</strong>：Raft 论文 Figure 8 问题——旧版本 Raft 存在用旧 Term 日志计数来判断提交的 bug，会导致已提交日志被覆盖。修复方案：Leader 上任后立即提交一条当前 Term 的空操作（no-op），确保之前所有日志被间接提交。</div>
         </div>
 
         <!-- 1-4 ZAB 协议 -->
