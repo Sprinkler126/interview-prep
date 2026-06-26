@@ -87,6 +87,63 @@
             <li><strong>Virtual Host</strong>：虚拟隔离空间，类似 namespace</li>
           </ul>
         </div>
+        <div class="card">
+          <h4>设计动机：为什么 AMQP 要把 Exchange 和 Queue 分开？</h4>
+          <p><strong>设计起点</strong>：传统消息队列（如 JMS）是"<strong>生产者直接发到 Queue</strong>"的直连模型——生产者必须知道目标 Queue 名字。这带来两个痛点：① 新增消费者要改生产者代码；② 同一条消息想发给多个不同规则的消费者，生产者要写多份发送逻辑。AMQP 的解法是<strong>把"路由"和"存储"拆成两个独立组件</strong>，用 Binding 解耦。</p>
+          <div class="arch-container" style="margin-top:1rem">
+            <div class="arch-row">
+              <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>Producer</strong>
+                <div class="arch-label">只关心"发到哪个 Exchange"<br>不关心消息最终去哪</div>
+              </div>
+              <div class="arch-connector">→</div>
+              <div class="arch-box" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                <strong>Exchange</strong>
+                <div class="arch-label">路由引擎<br>按 type + binding 决定去向</div>
+              </div>
+              <div class="arch-connector">→</div>
+              <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Queue</strong>
+                <div class="arch-label">消息缓冲<br>消费者订阅</div>
+              </div>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">JMS 直连模型的痛点</h4>
+              <ul>
+                <li>新增消费者要改生产者代码（硬编码 Queue 名）</li>
+                <li>同一消息多规则分发，生产者写 N 份逻辑</li>
+                <li>路由规则和发送代码耦合，难灵活调整</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ AMQP 解耦的收益</h4>
+              <ul>
+                <li><strong>生产者零感知消费者</strong>：只发到 Exchange，新增 Queue 绑定即可</li>
+                <li><strong>路由规则可热配</strong>：改 Binding 不重启生产者</li>
+                <li><strong>4 种 Exchange 覆盖典型场景</strong>：Direct 点对点、Fanout 广播、Topic 通配、Headers 属性</li>
+                <li><strong>多级路由</strong>：Exchange 可绑到 Exchange 形成路由拓扑</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：Exchange/Queue 分离的本质是"<strong>关注点分离</strong>"——生产者关注"发什么"，Exchange 关注"怎么路由"，Queue 关注"怎么缓冲、谁消费"。对比 Kafka 的"Topic+Partition 直连"模型：Kafka 牺牲了路由灵活性换取高吞吐（写入直接落 Partition，无中间路由层），RabbitMQ 牺牲吞吐换取路由灵活性。这是两者定位差异的根源。</div>
+        </div>
+        <div class="card">
+          <h4>设计动机：为什么 RabbitMQ 用 Erlang 而不是 Java/C++？</h4>
+          <p><strong>设计起点</strong>：RabbitMQ 诞生于 2007 年，作者选择 Erlang 不是赶时髦，而是 Erlang 的<strong>三大特性恰好匹配消息中间件的需求</strong>。</p>
+          <table>
+            <thead><tr><th>Erlang 特性</th><th>对应 MQ 需求</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Actor 模型 + 轻量进程</strong></td><td>每个连接/Queue 一个进程，百万级并发不爆内存</td></tr>
+              <tr><td><strong>消息传递天然异步</strong></td><td>进程间通信就是发消息，与 MQ 语义同构</td></tr>
+              <tr><td><strong>OTP 的 Supervisor 树</strong></td><td>进程崩溃自动重启，<code>let it crash</code> 哲学适合高可用</td></tr>
+              <tr><td><strong>BEAM 虚拟机软实时</strong></td><td>毫秒级 GC 暂停，消息投递延迟稳定</td></tr>
+              <tr><td><strong>热代码升级</strong></td><td>不停机打补丁，运维友好</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>代价</strong>：① Erlang 人才稀缺，二次开发门槛高；② BEAM 调度是单 Erlang VM 多核，水平扩展靠多节点镜像，不如 JVM 生态成熟；③ 与大数据生态（Flink/Spark）集成不如 Kafka 顺畅。这也是为什么"大数据场景选 Kafka，业务消息选 RabbitMQ"。</div>
+        </div>
 
         <div class="card">
           <h4>🔄 版本演进</h4>

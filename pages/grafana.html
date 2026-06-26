@@ -125,6 +125,43 @@
         </div>
 
         <!-- 1-4 变量与模板 -->
+        <h3 id="s1-3b">1.3b 可观测三支柱 — Grafana 的统一展示哲学</h3>
+        <div class="card">
+          <h4>设计起点：Metrics / Logs / Traces 为什么是三支柱？</h4>
+          <p><strong>可观测性 (Observability)</strong> 是云原生面试高频词。它由三大支柱组成，<strong>各自回答不同问题</strong>，缺一不可。Grafana 的核心价值正是<strong>把三者统一在一个界面</strong>，通过"指标发现问题 → 跳转日志定位 → 链路追踪看调用关系"实现闭环排查。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">可观测三支柱对比</div>
+          <table>
+            <thead><tr><th>支柱</th><th>回答什么</th><th>特征</th><th>典型工具</th><th>Grafana 数据源</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Metrics 指标</strong></td><td>"系统怎么样"（聚合数值）</td><td>低基数、可聚合、擅告警</td><td>Prometheus</td><td>Prometheus/CloudWatch</td></tr>
+              <tr><td><strong>Logs 日志</strong></td><td>"发生了什么"（事件记录）</td><td>高基数、带上下文、擅定位</td><td>ELK / Loki</td><td>Loki/Elasticsearch</td></tr>
+              <tr><td><strong>Traces 链路</strong></td><td>"请求经过了哪"（调用关系）</td><td>跨服务、带耗时、擅找瓶颈</td><td>Jaeger/SkyWalking</td><td>Jaeger/Zipkin/Tempo</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>三者协作的排查闭环</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">① Metrics 告警<br><span style="font-size:0.7rem">P99 延迟突增</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">② Logs 定位<br><span style="font-size:0.7rem">查该时段错误日志</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">③ Traces 看链路<br><span style="font-size:0.7rem">哪一跳最慢</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">④ 修复 + Exemplars<br><span style="font-size:0.7rem">指标关联 trace</span></div>
+          </div>
+          <ul>
+            <li><strong>Exemplars</strong>：Prometheus 2.26+ 可在指标上关联 trace ID，Grafana 点击指标点直接跳转链路</li>
+            <li><strong>Tempo / Loki / Prometheus</strong>：Grafana 出品的"三件套"，原生集成，trace ID 可联动 logs 和 metrics</li>
+            <li><strong>告警用 Metrics，定位用 Logs，找瓶颈用 Traces</strong>——这是排查问题的标准三步</li>
+          </ul>
+          <div class="warn"><strong>易错点</strong>：监控 (Monitoring) ≠ 可观测性 (Observability)。监控是"看已知问题"，可观测性是"能探索未知问题"。黑盒系统只靠预置告警不算可观测，需能临时下钻探索。</div>
+          <div class="tip"><strong>面试金句</strong>：Metrics 告诉你"有问题"，Logs 告诉你"什么问题"，Traces 告诉你"问题在哪"。Grafana 的价值是把三支柱统一在一个 UI，Exemplars 把它们串联起来。能讲清三支柱协作体现对可观测性的系统理解。</div>
+        </div>
+
+        <!-- 1-4 变量与模板 -->
         <h3 id="s1-4">变量与模板</h3>
 
         <div class="card">

@@ -28,6 +28,7 @@
           <li class="sub"><a href="#s1-2">架构设计</a></li>
           <li class="sub"><a href="#s1-3">Region 管理</a></li>
           <li class="sub"><a href="#s1-4">LSM Tree 存储</a></li>
+          <li class="sub"><a href="#s1-4b">二级索引方案</a></li>
           <li class="sub"><a href="#s1-5">读写流程</a></li>
           <li class="sub"><a href="#s1-6">RowKey 设计</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
@@ -238,6 +239,48 @@ RowKey: "user:1001"
             </tbody>
           </table>
           <div class="warn">Major Compaction 期间会产生大量 IO，可能导致读写延迟升高。生产环境建议关闭自动 Major Compaction，改为低峰期手动触发。</div>
+        </div>
+        <div class="card">
+          <h4>设计动机：为什么 HBase 用 LSM-Tree 而不是 B+Tree？</h4>
+          <p><strong>设计起点</strong>：HBase 定位是<strong>海量数据的高吞吐写入</strong>（如 IoT 时序、用户行为日志，每秒百万级写入）。B+Tree 的写入是<strong>随机写</strong>（要找到对应页再改），数据量大了之后随机 IO 是磁盘杀手。LSM-Tree 把写入变成<strong>顺序写内存 + 顺序写磁盘</strong>，写入吞吐比 B+Tree 高 1~2 个数量级。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">B+Tree (MySQL) — 读写均衡</h4>
+              <ul>
+                <li><strong>写入</strong>：找页（随机 IO）→ 改页 → 落盘，<strong>写放大=1</strong></li>
+                <li><strong>读取</strong>：3-4 次 IO 定位，<strong>读放大=树高</strong></li>
+                <li>适合：读写均衡的 OLTP</li>
+                <li>痛点：海量写入时随机 IO 瓶颈</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ LSM-Tree (HBase) — 写优读次</h4>
+              <ul>
+                <li><strong>写入</strong>：写 MemStore（内存）→ Flush HFile（顺序写），<strong>无随机 IO</strong></li>
+                <li><strong>读取</strong>：合并 MemStore + 多 HFile + BlockCache，<strong>读放大高</strong></li>
+                <li>适合：写多读少 + 海量数据</li>
+                <li>代价：Compaction 写放大、读放大</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试金句</strong>：HBase 选 LSM 是因为定位"写多读少海量数据"。B+Tree 随机写在 SSD 上也有上限（磁头/FTL 映射），LSM 顺序写能把 SSD 写吞吐吃满。代价是读取需合并多 HFile——所以 HBase 不擅长复杂查询，只擅长按 RowKey 读写 + 范围扫。</div>
+          <div class="warn"><strong>易错点</strong>：LSM 不是"读慢"而是"读有放大"——点查（按 RowKey）配合 BlockCache + Bloom Filter 仍很快。慢的是<strong>扫描多个 HFile 合并</strong>，Compaction 后 HFile 数减少，读性能会回升。</div>
+        </div>
+
+        <h3 id="s1-4b">1.4b 二级索引方案 — HBase 的查询短板与解法</h3>
+        <div class="card">
+          <h4>设计起点：HBase 只能按 RowKey 查，怎么办？</h4>
+          <p>HBase 只支持按 RowKey 的 GET 和 Scan，<strong>没有 MySQL 那样的二级索引</strong>。但业务经常要按非 RowKey 列查询（如按手机号查用户）。HBase 社区给出了几种二级索引方案，各有取舍。</p>
+          <table>
+            <thead><tr><th>方案</th><th>原理</th><th>优势</th><th>劣势</th></tr></thead>
+            <tbody>
+              <tr><td><strong>协处理器维护索引表</strong></td><td>Observer 在写入时同步写一张"索引表"（索引列值作 RowKey → 原表 RowKey）</td><td>实时一致</td><td>写放大（写两次），RegionServer 崩溃可能索引不一致</td></tr>
+              <tr><td><strong>Phoenix 二级索引</strong></td><td>Apache Phoenix 在 HBase 之上提供 SQL + 二级索引（底层就是协处理器）</td><td>SQL 接口，易用</td><td>依赖 Phoenix，全局索引写慢，本地索引有限制</td></tr>
+              <tr><td><strong>Elasticsearch 异步索引</strong></td><td>写 HBase 后异步同步到 ES，查询走 ES 拿 RowKey 再回 HBase</td><td>ES 搜索能力强，灵活</td><td>最终一致，需维护 ES 集群</td></tr>
+              <tr><td><strong>二级索引 HBase (Lily/华为)</strong></td><td>用独立索引 RegionServer 维护索引</td><td>解耦主表</td><td>架构复杂</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>面试要点</strong>：HBase 二级索引是它的痛点，<strong>没有官方标准方案</strong>。生产常见做法是<strong>HBase + ES 组合</strong>——HBase 存海量明细，ES 存索引做检索，查到 RowKey 后回 HBase 取详情。这也是 HBase 不适合替代 MySQL 的根本原因。</div>
         </div>
 
         <h3 id="s1-5">1.5 读写流程</h3>

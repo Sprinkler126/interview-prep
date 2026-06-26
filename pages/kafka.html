@@ -354,8 +354,28 @@ T5: m6 完整保留，无丢失 ✅</pre>
 
         <h3 id="p1-6">1.6 Consumer 机制</h3>
         <div class="card">
-          <h4>Pull 模式</h4>
-          <p>Kafka 采用 Pull：消费者主动拉取。优势：消费者掌控速率，不会被压垮。劣势：无消息时空轮询（通过 long poll <code>fetch.max.wait.ms</code> 缓解）。</p>
+          <h4>Pull 模式 — 为什么 Kafka 选 Pull 而不是 Push？</h4>
+          <p><strong>设计起点</strong>：Kafka 定位是<strong>高吞吐日志管道</strong>，下游消费者能力差异巨大（Flink 毫秒级、Spark 批处理、Hadoop 离线同步数小时）。如果用 Push，Broker 必须为每个消费者维护推送节奏，慢消费者要么被压垮，要么需要复杂的背压协商。Pull 把"消费多快"的决定权完全交给消费者，<strong>谁慢谁自己降速</strong>，Broker 只做被动的数据存储。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ Pull 的收益</h4>
+              <ul>
+                <li>消费者按自己能力拉，<strong>不会被压垮</strong></li>
+                <li>批量拉取天然支持，配合 Zero-Copy 吞吐极致</li>
+                <li>日志天然支持<strong>回放</strong>（指定 offset 重新消费），契合 Kafka "持久化日志"定位</li>
+                <li>Broker 无需维护推送状态，实现简单</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">⚠️ Pull 的代价与缓解</h4>
+              <ul>
+                <li>无消息时会<strong>空轮询</strong> → 用 long poll 缓解：<code>fetch.min.bytes</code> + <code>fetch.max.wait.ms</code>，没攒够数据就阻塞等待</li>
+                <li>延迟略高于 Push → 但 Kafka 定位是高吞吐非超低延迟，可接受</li>
+                <li>消费者需自行管理 offset → Kafka 提供 auto-commit + 手动 commit 两种</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>对比 RabbitMQ Push</strong>：RabbitMQ 定位低延迟业务消息，用 Push + <code>prefetch</code> 流控，有消息立即送达（μs 级）。两者选择反映的是<strong>定位差异</strong>：高吞吐日志选 Pull，低延迟业务选 Push。RocketMQ 则折中——表面 Push，底层长轮询 Pull。</div>
         </div>
         <div class="card">
           <h4>Rebalance 策略演进</h4>
@@ -407,6 +427,45 @@ T5: m6 完整保留，无丢失 ✅</pre>
               </div>
             </div>
           </div>
+        </div>
+        <div class="card">
+          <h4>幂等 Producer 原理 — 单 Partition 内不重</h4>
+          <p><strong>设计起点</strong>：网络抖动会导致 Producer 重试，同一条消息可能被写入多次。幂等 Producer 让 Broker 能识别"这是重发的旧消息"而非"新消息"。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">Producer 启动</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Broker 分配 PID<br><span style="font-size:0.7rem">Producer ID</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">每条消息带 SeqNumber<br><span style="font-size:0.7rem">单调递增</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Broker 比对去重<br><span style="font-size:0.7rem">SeqNum ≤ 已提交则丢弃</span></div>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li><strong>PID + SeqNumber</strong>：Broker 缓存每个 PID 每个 Partition 的最新 SeqNumber，重发的旧消息 SeqNumber 较小，直接丢弃</li>
+            <li><strong>限制</strong>：PID 只在单次会话有效，Producer 重启会换新 PID；只保证<strong>单 Partition 内</strong>有序+不重，跨 Partition 需事务</li>
+            <li><strong>乱序问题</strong>：重试可能乱序。幂等开启时限制 <code>max.in.flight.requests.per.connection ≤ 5</code>，Broker 重排序保证最终有序</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>事务原理 — 跨 Partition 原子写入</h4>
+          <p><strong>设计起点</strong>：流处理"消费 A → 处理 → 写入 B"需要原子性，要么 A 的 offset 提交和 B 的写入都成功，要么都失败。事务通过<strong>两阶段提交</strong>+ TransactionCoordinator 实现。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">initTransactions<br><span style="font-size:0.7rem">向 TC 注册 PID+epoch</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">beginTransaction</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">send × N<br><span style="font-size:0.7rem">消息标记未提交</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">sendOffsetsToTransaction<br><span style="font-size:0.7rem">把消费 offset 也纳入事务</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-pink">commitTransaction<br><span style="font-size:0.7rem">TC 写 COMMIT 标记</span></div>
+          </div>
+          <ul style="margin-top:0.8rem">
+            <li><strong>TransactionCoordinator (TC)</strong>：每个 Producer 对应一个 TC，TC 在 <code>__transaction_state</code> Topic 记录事务状态</li>
+            <li><strong>两阶段</strong>：① Mark prepared（写入各 Partition 但标记未提交）② 写 COMMIT/ABORT 标记到 <code>__consumer_offsets</code></li>
+            <li><strong>Consumer 可见性</strong>：<code>isolation.level=read_committed</code> 的消费者只读到已 COMMIT 的消息，未提交的被过滤</li>
+          </ul>
+          <div class="tip"><strong>面试要点</strong>：Kafka 事务本质是把"消息写入"和"消费 offset 提交"绑成一个原子操作。没有真正的"跨系统"事务，<strong>Exactly-Once 是端到端概念</strong>——Producer 幂等防重发，事务防跨 Partition 不一致，Consumer 幂等防重复消费的副作用。三者缺一不可。</div>
         </div>
 
         <!-- ================= PART 2 ================= -->

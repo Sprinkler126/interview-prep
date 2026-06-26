@@ -75,6 +75,51 @@
             <li><strong>ZooKeeper</strong>：管理集群元数据，包括 Broker 注册、Topic ownership、Namespace 配置、BookKeeper 集群信息等。Pulsar 正在逐步引入 etcd 作为替代方案。</li>
           </ul>
         </div>
+        <div class="card">
+          <h4>设计动机：BookKeeper 的 Quorum 写入模型 vs Kafka ISR</h4>
+          <p><strong>设计起点</strong>：消息持久化要解决"写多少副本才算成功"。Kafka 用 ISR 动态同步集合（acks=all 等所有 ISR 确认），BookKeeper 用<strong>Bookie 级别的 Quorum 写入</strong>——写入时指定 <code>write-quorum</code>（写几个 Bookie）和 <code>ack-quorum</code>（几个确认即成功），两者解耦。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">Broker 写入 Entry</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">并行写 N 个 Bookie<br><span style="font-size:0.7rem">write-quorum=N</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">ack-quorum 个确认<br><span style="font-size:0.7rem">即返回成功</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">Ensemble 选择 Bookie<br><span style="font-size:0.7rem">可跨 Ledger 轮换</span></div>
+          </div>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ BookKeeper Quorum 的优势</h4>
+              <ul>
+                <li><strong>写入与副本数解耦</strong>：write-quorum=3, ack-quorum=2 → 2 个确认即成功，吞吐高</li>
+                <li><strong> Ledger 级 Bookie 选择</strong>：每个 Ledger 可选不同 Bookie 集，<strong>数据天然分散全集群</strong>，无热点 Bookie</li>
+                <li><strong>Bookie 故障不影响写入</strong>：新 Ledger 自动避开故障 Bookie，老 Ledger 由 Fencing 保证一致性</li>
+                <li><strong>支持不同 Ledger 用不同冗余策略</strong>：关键 Topic 高冗余，普通 Topic 低冗余</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">对比 Kafka ISR</h4>
+              <ul>
+                <li>Kafka 副本绑定在 Partition，扩容需 Rebalance 迁移整个 Partition</li>
+                <li>ISR 全确认（acks=all）才成功，慢副本拖累吞吐（除非被踢出 ISR）</li>
+                <li>Partition 数据集中在少数 Broker，易出现热点</li>
+                <li>优势：副本同步是<strong>顺序追平</strong>，消费读 Leader 即可，延迟低</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：BookKeeper 的核心创新是"<strong>把副本选择从 Partition 粒度降到 Ledger 粒度</strong>"——Topic 数据被切分成多个 Ledger，每个 Ledger 独立选 Bookie，数据自动分散全集群。这就是 Pulsar "扩容无需数据迁移"的底层原理：新 Bookie 上线后，新 Ledger 自动用它，老 Ledger 不动。</div>
+        </div>
+        <div class="card">
+          <h4>Cursor 机制 — 消费进度的独立管理</h4>
+          <p><strong>设计起点</strong>：Kafka 把消费 offset 存在 <code>__consumer_offsets</code> Topic 里，与消息存储耦合。Pulsar 把消费进度独立成 <strong>Cursor</strong>，每个 Subscription 一个 Cursor，直接由 BookKeeper 持久化，与消息存储解耦。</p>
+          <ul>
+            <li><strong>Cursor 记录</strong>：当前 Subscription 消费到哪个 Ledger 的哪个 EntryID</li>
+            <li><strong>独立持久化</strong>：Cursor 自己也是 BookKeeper 上的 Ledger，崩溃恢复不丢进度</li>
+            <li><strong>支持多种确认</strong>：Individual ack（单条）、Cumulative ack（累计到某位置），灵活</li>
+            <li><strong>支持 reset</strong>：可重置 Cursor 到任意时间点或位置，实现消息回溯</li>
+          </ul>
+          <div class="warn"><strong>对比 Kafka</strong>：Kafka 只支持 offset 级别的回溯，Pulsar 通过 Cursor 支持时间维度回溯（<code>resetCursor</code> 到指定 timestamp），更灵活。</div>
+        </div>
 
         <h3 id="p1-2">2. 存算分离</h3>
         <div class="diagram">

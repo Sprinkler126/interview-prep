@@ -60,6 +60,8 @@
       <div class="toc-title">📑 目录</div>
       <ul>
         <li><a href="#overview">全景定位：消息队列在架构中的角色</a></li>
+        <li><a href="#semantics">投递语义：At-Most-Once / At-Least-Once / Exactly-Once</a></li>
+        <li><a href="#pullpush">消费模型：Pull vs Push 的设计取舍</a></li>
         <li><a href="#summary">一句话速查表</a></li>
         <li><a href="#vs1">Kafka vs RabbitMQ — 高吞吐 vs 灵活路由</a></li>
         <li><a href="#vs2">Kafka vs RocketMQ — 开源标杆 vs 金融级</a></li>
@@ -133,6 +135,197 @@
         <h4 style="color:var(--accent4);">📈 削峰</h4>
         <p>秒杀场景瞬时流量 10 万 QPS，数据库只能扛 5000。MQ 先承接流量，消费者按能力匀速消费，保护下游。</p>
       </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Delivery Semantics -->
+    <!-- ============================================================ -->
+    <h2 id="semantics"><span class="icon">🎯</span>投递语义：三种消息保证级别</h2>
+
+    <div class="card">
+      <h4>设计起点：可靠性与性能的取舍</h4>
+      <p>消息投递本质上要回答一个问题——"一条消息从 Producer 到 Consumer，到底能保证什么？"。答案有三种级别，级别越高，性能代价越大。面试中"如何保证不丢、不重、恰好一次"几乎是必问题。</p>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-title">三种投递语义对比</div>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>At-Most-Once (最多一次)</th>
+            <th>At-Least-Once (至少一次) ⭐</th>
+            <th>Exactly-Once (恰好一次)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>消息丢失</td>
+            <td><span class="score s-mid">允许</span></td>
+            <td><span class="score s-high">不丢</span></td>
+            <td><span class="score s-high">不丢</span></td>
+          </tr>
+          <tr>
+            <td>消息重复</td>
+            <td><span class="score s-high">不重</span></td>
+            <td><span class="score s-mid">可能重</span></td>
+            <td><span class="score s-high">不重</span></td>
+          </tr>
+          <tr>
+            <td>实现难度</td>
+            <td><span class="score s-high">最简单</span></td>
+            <td><span class="score s-mid">中等</span></td>
+            <td><span class="score s-low">最难</span></td>
+          </tr>
+          <tr>
+            <td>性能开销</td>
+            <td><span class="score s-high">最低</span></td>
+            <td><span class="score s-mid">中等</span></td>
+            <td><span class="score s-low">最高</span></td>
+          </tr>
+          <tr>
+            <td>典型实现</td>
+            <td>acks=0 + 自动提交</td>
+            <td>acks=all + 手动提交</td>
+            <td>事务 + 幂等 + 2PC</td>
+          </tr>
+          <tr>
+            <td>适用场景</td>
+            <td>监控指标、日志（丢一两条无碍）</td>
+            <td>订单、通知（业务幂等即可）</td>
+            <td>金融交易、计费（一分钱不能错）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>各 MQ 实现投递语义的关键机制</h4>
+      <table>
+        <thead><tr><th>环节</th><th>Kafka</th><th>RocketMQ</th><th>RabbitMQ</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>生产端防丢</strong></td>
+            <td><code>acks=all</code> + 幂等 Producer (PID+SeqNumber)</td>
+            <td>同步发送 + 重试</td>
+            <td>Publisher Confirm (异步回调)</td>
+          </tr>
+          <tr>
+            <td><strong>Broker 防丢</strong></td>
+            <td>多副本 ISR + <code>min.insync.replicas</code></td>
+            <td>同步刷盘 + 主从同步</td>
+            <td>Exchange/Queue/Message 三重持久化</td>
+          </tr>
+          <tr>
+            <td><strong>消费端防丢</strong></td>
+            <td>关闭 auto-commit，处理完手动提交</td>
+            <td>返回 CONSUME_SUCCESS 后才 ack</td>
+            <td>手动 ACK，失败 <code>basicNack(requeue=false)</code></td>
+          </tr>
+          <tr>
+            <td><strong>Exactly-Once</strong></td>
+            <td>事务 (跨 Partition 原子) + 幂等消费</td>
+            <td>事务消息 (半消息+回查)</td>
+            <td>⚠️ 无原生事务，需业务幂等</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="tip"><strong>面试金句</strong>：Exactly-Once 从来不是"真的只发一次"，而是"可能发多次，但<strong>对外的可见效果</strong>等于一次"——靠的是幂等性 + 事务/2PC 把多次重复折叠成一次。</div>
+    </div>
+
+    <div class="card">
+      <h4>幂等性的三种实现方式（消费端去重）</h4>
+      <div class="compare-row">
+        <div class="compare-box" style="border-color:var(--accent)">
+          <h4 style="color:var(--accent)">① 唯一键去重表</h4>
+          <p>消费前查 Redis/DB 去重表，已处理则跳过</p>
+          <p class="warn" style="margin-top:0.3rem">需设过期时间，否则表无限膨胀</p>
+        </div>
+        <div class="compare-box" style="border-color:var(--accent3)">
+          <h4 style="color:var(--accent3)">② 业务状态机</h4>
+          <p>利用业务自身的状态约束（订单已支付不能再支付）</p>
+          <p class="tip" style="margin-top:0.3rem">最自然，依赖业务设计合理</p>
+        </div>
+      </div>
+      <div class="compare-box" style="border-color:var(--accent4); margin-top:1rem;">
+        <h4 style="color:var(--accent4)">③ 数据库唯一约束</h4>
+        <p>利用 DB 的 UNIQUE INDEX 兜底，重复插入直接抛异常被捕获。适合"插入型"操作，如流水号 + UNIQUE 索引。</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Pull vs Push -->
+    <!-- ============================================================ -->
+    <h2 id="pullpush"><span class="icon">🔄</span>消费模型：Pull vs Push 的设计取舍</h2>
+
+    <div class="card">
+      <h4>设计起点：谁来掌控消费节奏？</h4>
+      <p>这是 MQ 最底层的一个设计抉择：<strong>是 Broker 主动推（Push），还是 Consumer 主动拉（Pull）</strong>。两者没有绝对优劣，取决于"谁更了解消费能力"。</p>
+    </div>
+
+    <div class="vs-card">
+      <div class="vs-header">
+        <div class="vs-side vs-left" style="color:#34d399;">Pull 模式 (Kafka/Pulsar)</div>
+        <div class="vs-vs">VS</div>
+        <div class="vs-side vs-right" style="color:#fb923c;">Push 模式 (RabbitMQ/RocketMQ 长轮询)</div>
+      </div>
+      <div class="vs-body">
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">消费者掌控速率，不会被压垮</span></div>
+          <div class="dim-label">节奏控制</div>
+          <div class="dim-val right">Broker 推送，需流控保护消费者</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">空消息时需 long poll / 阻塞等待</div>
+          <div class="dim-label">空轮询</div>
+          <div class="dim-val right"><span class="highlight">有消息立即推，实时性好</span></div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left"><span class="highlight">批量拉取天然支持，高吞吐</span></div>
+          <div class="dim-label">批量</div>
+          <div class="dim-val right">单条推送，批量需上层封装</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">消费者可按需回放（指定 offset）</div>
+          <div class="dim-label">回放能力</div>
+          <div class="dim-val right">消息消费即删，回放困难</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">Broker 简单，无需维护推送状态</div>
+          <div class="dim-label">Broker 复杂度</div>
+          <div class="dim-val right">需维护每个消费者的推送位置/确认状态</div>
+        </div>
+        <div class="vs-row">
+          <div class="dim-val left">延迟略高（取决于轮询间隔）</div>
+          <div class="dim-label">延迟</div>
+          <div class="dim-val right"><span class="highlight">μs~ms 级，延迟低</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>为什么 Kafka 选 Pull，RabbitMQ 选 Push？</h4>
+      <div class="compare-row">
+        <div class="compare-box" style="border-color:var(--accent3)">
+          <h4 style="color:var(--accent3)">Kafka 选 Pull 的理由</h4>
+          <ul>
+            <li>Kafka 定位是<strong>高吞吐日志管道</strong>，消费者能力差异大（Flink 快、Hadoop 慢）</li>
+            <li>Pull 让慢消费者自己降速，不会拖垮 Broker</li>
+            <li>日志天然要支持<strong>回放</strong>（重新训练模型），Pull+持久化日志完美契合</li>
+            <li>批量拉取配合 Zero-Copy，吞吐极致</li>
+          </ul>
+        </div>
+        <div class="compare-box" style="border-color:var(--accent4)">
+          <h4 style="color:var(--accent4)">RabbitMQ 选 Push 的理由</h4>
+          <ul>
+            <li>RabbitMQ 定位是<strong>低延迟业务消息</strong>，要 ms 级送达</li>
+            <li>消息消费即删，不需要回放，Push 更直接</li>
+            <li>用 <code>prefetch (QoS)</code> + Credit 流控保护消费者，避免压垮</li>
+            <li>Push 模式开发体验好，"注册回调即可"</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tip"><strong>RocketMQ 的折中</strong>：表面是 Push（<code>MessageListenerConcurrently</code>），底层是<strong>长轮询 Pull</strong>——Consumer 发请求，Broker 没消息就 hold 5 秒，有消息立即返回。兼顾了 Push 的实时性和 Pull 的可控性。这是面试常考的"RocketMQ Push 是真 Push 吗"。</div>
     </div>
 
     <!-- ============================================================ -->

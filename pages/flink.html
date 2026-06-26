@@ -232,6 +232,41 @@
           </div>
         </div>
         <div class="card">
+          <h4>设计动机：为什么用 Chandy-Lamport 而不是"暂停-快照"?</h4>
+          <p><strong>设计起点</strong>：流处理要保证故障后状态一致，必须定期做"全局快照"。最朴素的想法是"<strong>暂停所有算子 → 同步快照 → 恢复</strong>"，但这会<strong>中断整个流处理</strong>，秒级停顿在 7×24 实时风控等场景不可接受。Chandy-Lamport 算法的巧妙之处：用<strong>随数据流动的 Barrier 标记</strong>把快照"摊平"到正常数据流中，<strong>不暂停处理</strong>就能拿到一致的全局状态。</p>
+          <div class="diagram" style="margin-top:1rem">
+            <div class="diagram-title">Barrier 随数据流传播</div>
+            <pre style="font-family:'SF Mono',monospace;font-size:0.82rem;line-height:1.8;text-align:center;color:var(--text-dim);">
+  Source ──[d1][d2]──Barrier_n──[d3][d4]──→  Operator
+   ↓ 快照本地状态          ↑ 收到 Barrier_n 后：
+   ↓ (Source offset)       ① 对齐所有输入的 Barrier
+                          ② 快照本地 State
+                          ③ 向下游广播 Barrier_n
+                          ④ 继续处理 Barrier 后的数据
+        </pre>
+          </div>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ 朴素"暂停-快照"</h4>
+              <ul>
+                <li>全局停顿，业务感知明显</li>
+                <li>快照期间无数据处理，延迟飙升</li>
+                <li>实现简单但不可用于生产</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ Chandy-Lamport Barrier</h4>
+              <ul>
+                <li><strong>不停顿</strong>：算子边处理数据边等 Barrier</li>
+                <li><strong>全局一致</strong>：所有算子快照同一 Barrier 之前的状态</li>
+                <li><strong>异步持久化</strong>：State 快照后异步写 State Backend，不阻塞处理</li>
+                <li><strong>代价</strong>：Barrier 对齐时需缓存其他输入的数据（背压下问题，催生 Unaligned）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：Chandy-Lamport 是 1985 年的理论算法，Flink 把它工程化落地。核心思想是"<strong>用标记而非停顿来实现一致性快照</strong>"——这是分布式快照的通用范式，Spark Structured Streaming、Flink、Kafka 事务都借鉴了类似思路。</div>
+        </div>
+        <div class="card">
           <h4>Aligned vs Unaligned Checkpoint（1.14+）</h4>
           <div class="compare-row">
             <div class="compare-box" style="border-color:var(--accent)">
@@ -373,6 +408,29 @@
             <li><strong>State Backend</strong>：大状态用 RocksDB + 增量 Checkpoint</li>
             <li><strong>反压</strong>：增加并行度、优化算子逻辑、增加网络缓冲区</li>
           </ul>
+        </div>
+        <div class="card">
+          <h4>反压 (Backpressure) 机制详解</h4>
+          <p><strong>设计起点</strong>：流处理是<strong>流水线</strong>，上游产出速度 &gt; 下游处理速度时，数据会在网络缓冲区堆积，最终反向传导阻塞上游——这就是反压。Flink 用<strong>基于 Credit 的流控</strong>解决，类似 TCP 滑动窗口。</p>
+          <div class="diagram">
+            <div class="diagram-title">Credit-Based 反压传导</div>
+            <pre style="font-family:'SF Mono',monospace;font-size:0.82rem;line-height:1.8;text-align:center;color:var(--text-dim);">
+  上游 Operator ──→ 网络缓冲 ──→ 下游 Operator (慢)
+       ↑                                │
+       │  下游声明 Credit=2 (只能再收2个)  │
+       │←─────────────────────────────────┘
+       │  上游只发 2 个，发完等新 Credit
+       │←─────────────────────────────────┘
+  上游也被阻塞 → 反压传导到 Source → 整条流水线降速
+        </pre>
+          </div>
+          <ul>
+            <li><strong>Credit 机制</strong>：下游告诉上游"我还能收几个 buffer"，上游按 Credit 发送，避免无脑堆积</li>
+            <li><strong>反压的连锁反应</strong>：一个慢算子会反压到所有上游，最终 Source 也降速</li>
+            <li><strong>排查</strong>：Flink Web UI 的 BackPressure 面板，红色算子即瓶颈</li>
+            <li><strong>解决</strong>：① 增加瓶颈算子并行度；② 优化算子逻辑（异步 IO、批量写）；③ 检查数据倾斜（某 key 数据过多）；④ 增加网络缓冲（治标不治本）</li>
+          </ul>
+          <div class="warn"><strong>反压 vs Checkpoint 超时</strong>：反压时 Barrier 排在数据后面迟迟到不了，导致 Aligned Checkpoint 超时失败。这就是 1.14 引入 <strong>Unaligned Checkpoint</strong> 的动机——Barrier 超越缓冲数据，背压下也能快速完成快照。</div>
         </div>
 
         <!-- ================= PART 3 ================= -->

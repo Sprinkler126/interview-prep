@@ -876,6 +876,68 @@ min_examined_row_limit = 100              # 扫描超过 100 行才记录</code>
           </div>
         </div>
 
+        <h3 id="s2-5">2.5 "双一"配置与 MySQL 8.0 新特性</h3>
+        <div class="card">
+          <h4>"双一"配置 — 金融级可靠性的基线</h4>
+          <p><strong>设计起点</strong>：默认配置下，MySQL 在崩溃时可能丢数据（redo log 不强制刷盘、binlog 不强制落盘）。"双一"指两个参数都设为 1，是<strong>金融场景的最低可靠性要求</strong>。</p>
+          <table>
+            <thead><tr><th>参数</th><th>默认</th><th>"双一"值</th><th>含义</th><th>代价</th></tr></thead>
+            <tbody>
+              <tr><td><code>innodb_flush_log_at_trx_commit</code></td><td>1</td><td><strong>1</strong></td><td>每次事务提交都 fsync redo log 到磁盘</td><td>每次提交多一次 fsync，TPS 下降</td></tr>
+              <tr><td><code>sync_binlog</code></td><td>1</td><td><strong>1</strong></td><td>每次事务提交都 fsync binlog 到磁盘</td><td>每次提交多一次 fsync</td></tr>
+            </tbody>
+          </table>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ 非双一的丢数据场景</h4>
+              <ul>
+                <li><code>innodb_flush_log_at_trx_commit=0</code>：每秒刷盘，崩溃丢 1 秒数据</li>
+                <li><code>sync_binlog=0</code>：OS 决定刷盘，崩溃丢 binlog → 从库丢数据</li>
+                <li>非双一组合：崩溃恢复时 redo/binlog 不一致，需两阶段提交回滚</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 双一配置的收益</h4>
+              <ul>
+                <li>redo log + binlog 都强制落盘，崩溃不丢已提交事务</li>
+                <li>配合半同步复制 + min.insync.replicas，主从都不丢</li>
+                <li>性能优化：用<strong>组提交 (group commit)</strong> 把多个事务的 fsync 合并成一次，缓解双一的性能损失</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试金句</strong>：双一是"宁可慢也不丢"的取舍。组提交 (binlog_group_commit_sync_delay) 是缓解双一性能损失的关键——把并发事务的 fsync 合并，N 个事务一次 fsync。</div>
+        </div>
+        <div class="card">
+          <h4>MySQL 8.0 关键新特性</h4>
+          <table>
+            <thead><tr><th>特性</th><th>解决的问题</th><th>价值</th></tr></thead>
+            <tbody>
+              <tr><td><strong>原子 DDL</strong></td><td>5.7 DDL 中途崩溃留下脏元数据</td><td>DDL 写入 binlog 一个原子事务，崩溃可回滚</td></tr>
+              <tr><td><strong>Instant DDL</strong> (8.0.12+)</td><td>加列要重建表，小时级锁表</td><td>只改元数据，秒级完成（仅限加列末尾/重命名列）</td></tr>
+              <tr><td><strong>隐藏列 / 不可见索引</strong></td><td>想测试索引效果又怕影响生产</td><td>索引可设 invisible，优化器忽略但结构保留</td></tr>
+              <tr><td><strong>函数索引</strong></td><td><code>WHERE f(col)</code> 无法走索引</td><td>对 <code>(LOWER(name))</code> 建索引，函数查询可命中</td></tr>
+              <tr><td><strong>降序索引</strong></td><td>5.7 降序索引实际仍正向存储</td><td>8.0 真正反向存储，<code>ORDER BY ... DESC</code> 加速</td></tr>
+              <tr><td><strong>并行查询</strong> (8.0.14+)</td><td>单 SQL 单线程，OLAP 慢</td><td>set 语句可并行扫描分区</td></tr>
+              <tr><td><strong>caching_sha2_password</strong></td><td>mysql_native_password 弱</td><td>默认更强的认证插件，SHA-256 + cache</td></tr>
+              <tr><td><strong>资源组 (Resource Group)</strong></td><td>大查询拖垮小查询</td><td>按线程绑 CPU/限优先级，隔离 OLAP/OLTP</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>易错点</strong>：8.0 移除了 Query Cache（5.7 已 deprecated）。不要再说"开 Query Cache 优化"——高并发下其锁竞争反而拖累性能，这是 8.0 移除它的根本原因。</div>
+        </div>
+        <div class="card">
+          <h4>在线 DDL 三种算法</h4>
+          <table>
+            <thead><tr><th>算法</th><th>锁级别</th><th>原理</th><th>典型耗时</th></tr></thead>
+            <tbody>
+              <tr><td><code>COPY</code> (旧)</td><td>EXCLUSIVE（表级写锁）</td><td>建临时表 → 拷数据 → 改名</td><td>小时级，阻塞写</td></tr>
+              <tr><td><code>INPLACE</code> (5.6+)</td><td>SHARED（可读不可写）</td><td>原表上修改，不拷全表（部分操作）</td><td>分钟级</td></tr>
+              <tr><td><code>INSTANT</code> (8.0.12+) ⭐</td><td>无锁</td><td>只改数据字典元数据</td><td>秒级</td></tr>
+            </tbody>
+          </table>
+          <p><strong>使用</strong>：<code>ALTER TABLE t ADD COLUMN c INT, ALGORITHM=INSTANT, LOCK=NONE;</code></p>
+          <div class="tip">大表 DDL 推荐用 <strong>pt-online-schema-change</strong> 或 <strong>gh-ost</strong>（GitHub 开源）——通过 binlog 增量同步+影子表，实现零锁表在线变更，8.0 INSTANT 不能覆盖的场景靠它们兜底。</div>
+        </div>
+
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
 

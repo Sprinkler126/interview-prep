@@ -29,6 +29,7 @@
           <li class="sub"><a href="#s1-6">服务发现</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">存储（TSDB / 远程存储）</a></li>
+          <li class="sub"><a href="#s2-1b">监控方法论 USE/RED</a></li>
           <li class="sub"><a href="#s2-2">Exporter 机制</a></li>
           <li class="sub"><a href="#s2-3">与 Grafana 集成</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
@@ -342,6 +343,77 @@ scrape_configs:
             <li>默认保留 15 天，可通过 <code>--storage.tsdb.retention.time</code> 调整</li>
             <li>适合单机短期存储，不适合长期数据保留</li>
           </ul>
+        </div>
+        <div class="card">
+          <h4>设计动机：为什么 Prometheus 单机 TSDB 不做集群？</h4>
+          <p><strong>设计起点</strong>：Prometheus 团队坚持"<strong>single-machine, reliable</strong>"——单机简单可靠，集群引入分布式复杂度（一致性、网络分区）违背其"运维简单"哲学。长期存储和水平扩展交给 Thanos/VictoriaMetrics 等远程方案。这是典型的"<strong>做一件事并做好</strong>"的 Unix 哲学。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 单机 TSDB 的收益</h4>
+              <ul>
+                <li>无分布式协调，<strong>运维简单</strong>（一个二进制即可）</li>
+                <li>本地磁盘查询<strong>低延迟</strong>（无网络跳数）</li>
+                <li>高可用靠<strong>双实例 + 远程存储</strong>（而非集群）</li>
+                <li>适合单集群/单数据中心监控</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">代价与解法</h4>
+              <ul>
+                <li>❌ 单机存储上限 → Thanos 上传 S3 长期存储</li>
+                <li>❌ 单机吞吐上限 → 分片（federation/多实例）</li>
+                <li>❌ 跨集群查询 → Thanos Query / Mimir 全局视图</li>
+                <li>❌ 高可用 → 部署两个 Prometheus + Alertmanager 集群</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：Prometheus 的"单机论"是刻意设计，不是缺陷。理解这点能解释为什么有 Thanos/VictoriaMetrics/Mimir 这么多远程存储方案——它们都是在不破坏 Prometheus 简单性的前提下补足水平扩展。</div>
+        </div>
+
+        <h3 id="s2-1b">2.1b 监控方法论 — USE / RED / 四黄金信号</h3>
+        <div class="card">
+          <h4>设计起点：监控什么指标才有意义？</h4>
+          <p>新人常犯的错是"什么指标都监控"，仪表盘堆满却抓不住重点。监控方法论告诉你<strong>该看哪些核心指标</strong>——这是 SRE 面试的高频考点。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">三大监控方法论</div>
+          <table>
+            <thead><tr><th>方法论</th><th>对象</th><th>核心指标</th><th>记忆口诀</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>USE 方法</strong> (Utilization/Saturation/Errors)</td>
+                <td>资源（硬件/基础设施）</td>
+                <td>使用率 / 饱和度 / 错误</td>
+                <td>CPU 利用率、磁盘 IO 队列长度、网卡丢包数</td>
+              </tr>
+              <tr>
+                <td><strong>RED 方法</strong> (Rate/Errors/Duration)</td>
+                <td>服务（用户请求路径）</td>
+                <td>请求率 / 错误率 / 延迟</td>
+                <td>QPS、5xx 比例、P99 延迟</td>
+              </tr>
+              <tr>
+                <td><strong>四黄金信号</strong> (Google SRE)</td>
+                <td>服务（综合）</td>
+                <td>延迟 / 流量 / 错误 / 饱和度</td>
+                <td>RED + 饱和度，最全面</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>应用场景对照</h4>
+          <table>
+            <thead><tr><th>监控对象</th><th>用哪个</th><th>具体指标</th></tr></thead>
+            <tbody>
+              <tr><td>CPU / 内存 / 磁盘 / 网络</td><td><strong>USE</strong></td><td>使用率%、IO 队列、丢包</td></tr>
+              <tr><td>HTTP API 服务</td><td><strong>RED</strong></td><td>QPS、错误率、P99</td></tr>
+              <tr><td>数据库</td><td><strong>USE + RED</strong></td><td>连接池使用率 + 慢查询 + QPS</td></tr>
+              <tr><td>消息队列</td><td><strong>四黄金</strong></td><td>生产/消费速率 + 积压(饱和度) + 错误 + 延迟</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>易错点</strong>：延迟要分<strong>成功和失败</strong>统计。失败请求的延迟往往很高（如超时），混在一起会让"成功延迟"看起来很差。Google SRE 强调：<code>request_duration{status="200"}</code> 和 <code>{status="5xx"}</code> 分开看。</div>
+          <div class="tip"><strong>面试金句</strong>：资源用 USE，服务用 RED，综合用四黄金信号。这是 SRE 给监控做减法的标准框架，能体现你不只是"堆指标"而是"懂监控设计"。</div>
         </div>
 
         <div class="card">

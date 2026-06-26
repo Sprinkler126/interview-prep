@@ -81,6 +81,32 @@
           </ul>
         </div>
         <div class="card">
+          <h4>设计取舍：为什么 RocketMQ 自研 NameServer 而不用 ZooKeeper？</h4>
+          <p><strong>设计起点</strong>：RocketMQ 早期版本其实依赖 ZooKeeper，但 Alibaba 团队在生产实践中发现 ZK 的几个硬伤，遂自研轻量级 NameServer。这体现了"<strong>不为了用成熟组件而用，按实际痛点取舍</strong>"的工程思想。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">ZooKeeper 的痛点</h4>
+              <ul>
+                <li><strong>CP 系统，选举时不可用</strong>：ZK Leader 选举期间整个集群无法服务，对 MQ 这种 AP 倾向系统是痛点</li>
+                <li><strong>Watch 机制重</strong>：每次节点变化触发 Watch，海量 Topic + Broker 时回调风暴</li>
+                <li><strong>运维复杂</strong>：要单独维护一套 ZK 集群（JVM 调优、ZAB 协议、数据快照）</li>
+                <li><strong>写入瓶颈</strong>：所有写都过 Leader，元数据频繁更新时压力大</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ NameServer 的解法</h4>
+              <ul>
+                <li><strong>完全无状态</strong>：节点互不通信，每个节点独立存全量路由，挂了用别的</li>
+                <li><strong>AP 倾向</strong>：Broker 注册是<strong>推</strong>给所有 NS，NS 间不复制；短暂不一致靠心跳过期收敛</li>
+                <li><strong>极简实现</strong>：就是一个内存 HashMap + 定时清理过期 Broker，几 MB 内存</li>
+                <li><strong>客户端容错</strong>：Producer/Consumer 拉路由时轮询所有 NS，任一可用即可</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>权衡代价</strong>：NameServer 牺牲了<strong>强一致性</strong>——某 NS 可能短暂持有过期路由（Broker 已宕机但心跳未过期），客户端可能拿到失效地址，需配合发送失败重试 + 客户端定时刷新路由弥补。这是用"最终一致"换"轻量+高可用"的典型取舍。</div>
+          <div class="tip"><strong>面试加分</strong>：能说出"RocketMQ 放弃 ZK 是因为 ZK 是 CP 系统与 MQ 的 AP 需求冲突"会非常加分。Kafka 早期也用 ZK，4.0 起用 KRaft 替代，思路与 RocketMQ 不谋而合——都是"去外部元数据依赖"。</div>
+        </div>
+        <div class="card">
           <h4>Topic 与 MessageQueue</h4>
           <p>一个 Topic 对应多个 MessageQueue（类似 Kafka 的 Partition），分布在不同的 Broker 上。MessageQueue 是消息路由和负载均衡的最小单位。Producer 通过轮询或哈希选择 Queue 发送，Consumer 以 Queue 为单位分配消费。</p>
           <div class="flow">
@@ -309,6 +335,32 @@
             <li><strong>Key 查询</strong>：通过 IndexFile 的哈希索引定位消息</li>
           </ul>
           <p class="tip">这种设计类似于数据库的"堆表 + 二级索引"：CommitLog 是堆表（按写入顺序存储），ConsumeQueue 和 IndexFile 是二级索引（按查询需求构建）。</p>
+        </div>
+        <div class="card">
+          <h4>设计动机：为什么 RocketMQ 用"CommitLog 混合存储"而 Kafka 用"Partition 独立存储"？</h4>
+          <p><strong>设计起点</strong>：消息存储的核心矛盾是"<strong>写入要快（顺序写）</strong>"和"<strong>消费要快（按 Topic-Queue 定位）</strong>"。Kafka 和 RocketMQ 给出了截然不同的解法，体现了各自的定位差异。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Kafka：Partition 独立存储</h4>
+              <ul>
+                <li>每个 Partition 一个独立日志文件，写入直接落在对应 Partition</li>
+                <li><strong>优势</strong>：消费时直接顺序读对应 Partition 文件，无需中间索引，零开销</li>
+                <li><strong>劣势</strong>：Topic+Partition 数量多时，<strong>并发写多个文件</strong>，磁盘随机写严重（多个 Partition 抢磁头）</li>
+                <li><strong>定位</strong>：Kafka 单集群 Topic 数通常少（数十个），每个 Partition 流量大，随机写影响小</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">RocketMQ：CommitLog 混合存储</h4>
+              <ul>
+                <li><strong>所有 Topic 的消息混在一个 CommitLog 文件</strong>，写入永远只 append 一个文件</li>
+                <li><strong>优势</strong>：无论多少 Topic，写入都是<strong>单文件顺序写</strong>，吞吐稳定不退化</li>
+                <li><strong>劣势</strong>：消费时需先查 ConsumeQueue 拿到 CommitLog 偏移量，多一次索引查找</li>
+                <li><strong>定位</strong>：阿里电商场景 Topic 数动辄上万（每业务线多个），混合存储保证 Topic 多时写入不退化</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：这是 RocketMQ 与 Kafka 在<strong>海量 Topic 场景下</strong>性能差异的关键。Kafka 在 Topic 数 &lt;100 时吞吐无敌；RocketMQ 在 Topic 数 &gt;1000 时仍稳定。ConsumeQueue 的 20 字节小条目设计让索引几乎全内存，消费端额外开销极小。</div>
+          <div class="warn"><strong>易错点</strong>：CommitLog 混合存储意味着<strong>删除某个 Topic 的消息</strong>很麻烦——消息物理上和其他 Topic 混在一起，只能靠文件过期整体删除，不能单独清理某 Topic。这是 RocketMQ 不擅长"按 Topic 精细控制保留"的根因。</div>
         </div>
         <div class="card">
           <h4>刷盘策略</h4>

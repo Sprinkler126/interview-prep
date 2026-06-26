@@ -28,6 +28,7 @@
           <li class="sub"><a href="#s1-2">核心数据结构</a></li>
           <li class="sub"><a href="#s1-3">持久化机制</a></li>
           <li class="sub"><a href="#s1-4">内存淘汰策略</a></li>
+          <li class="sub"><a href="#s1-4b">过期Key删除策略</a></li>
           <li class="sub"><a href="#s1-5">单线程与IO多路复用</a></li>
           <li class="sub"><a href="#s1-5b">渐进式 rehash 与编码转换</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
@@ -229,6 +230,56 @@
             <p class="tip" style="margin-top:0.5rem">Morris 计数器 + 衰减时间，近似统计访问频率</p>
           </div>
         </div>
+        <div class="card">
+          <h4>设计动机：为什么 Redis 的 LRU/LFU 是"近似"而非精确？</h4>
+          <p><strong>设计起点</strong>：精确 LRU 需要维护全局双向链表，每次访问都要移动节点到头部——这是 O(1) 但<strong>每次操作都有额外开销</strong>，且链表节点本身占内存。Redis 的核心卖点是"<strong>单线程极致性能</strong>"，不能为淘汰策略拖慢每条命令。Redis 的解法：<strong>随机采样</strong>——淘汰时随机抽 N 个 key（<code>maxmemory-samples</code>，默认 5），从中选最该淘汰的，近似 LRU/LFU。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">精确 LRU 的代价</h4>
+              <ul>
+                <li>每次 GET/SET 都要移动链表节点 → 全局锁/指针操作</li>
+                <li>链表节点元数据占额外内存（每个 key +16~24 字节）</li>
+                <li>与 Redis 单线程模型冲突：增加每命令延迟</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 采样近似 LRU 的收益</h4>
+              <ul>
+                <li>访问时<strong>只更新 lru 字段</strong>（每个 key 已有 24bit 时间戳字段）</li>
+                <li>淘汰时随机采样 5 个选最旧的，开销恒定且小</li>
+                <li>采样数调大（如 10）更接近精确 LRU，但淘汰更慢</li>
+                <li>实测 5 个采样已接近精确 LRU 效果（Redis 官方基准）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：Redis 的淘汰策略本质是"<strong>用精度换性能</strong>"——单线程不能为淘汰拖慢命令。这也是为什么 Redis 没有"真正"的 LRU，而是 approximate LRU。LFU 用 Morris 计数器（概率计数）也是同样思路。</div>
+        </div>
+
+        <h3 id="s1-4b">1.4b 过期 Key 删除策略 — 惰性 + 定期 的组合</h3>
+        <div class="card">
+          <h4>设计起点：过期 key 怎么清理才不阻塞主线程？</h4>
+          <p>Redis 给 key 设 TTL 后，到期要清理。两种朴素方案都有硬伤：① <strong>定时删除</strong>（每个 key 一个定时器）→ 大量 key 同时过期时定时器风暴，阻塞主线程；② <strong>惰性删除</strong>（访问时才查是否过期）→ 不访问的 key 永不清理，内存泄漏。Redis 的解法：<strong>惰性 + 定期 组合</strong>。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">① 惰性删除（主防线）</h4>
+              <ul>
+                <li>每次 GET/SET 等<strong>访问时</strong>检查 TTL，过期则删除返回 nil</li>
+                <li>优势：不额外占用 CPU</li>
+                <li>劣势：永不被访问的 key 持续占内存</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">② 定期删除（兜底）</h4>
+              <ul>
+                <li>后台定时随机采样 <code>active_expire_cycle</code>，每次抽 20 个 key，删除过期的</li>
+                <li>若过期比例 &gt;25%，继续抽，直到时间片用完（25ms）</li>
+                <li>自适应：过期 key 多时多清理，少时快速结束</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>内存兜底</strong>：如果惰性+定期都没清理干净，内存涨到 <code>maxmemory</code> 触发<strong>内存淘汰策略</strong>（noeviction/allkeys-lru 等）。三道防线层层兜底，保证内存不爆。</div>
+          <div class="tip"><strong>面试要点</strong>：Redis 的清理哲学是"<strong>绝不主动做大量工作阻塞主线程</strong>"——过期删除摊平到每次访问 + 短时间片的定期任务。理解这点就能理解 Redis 所有"近似/惰性"设计的统一思想。</div>
+        </div>
 
         <h3 id="s1-5">1.5 单线程模型与 IO 多路复用</h3>
         <div class="diagram">
@@ -255,6 +306,32 @@
           </ul>
         </div>
         <div class="tip">Redis 6.0+ 引入<strong>多线程 IO</strong>（<code>io-threads</code>）：网络读写多线程，<strong>命令执行仍是单线程</strong>。不是多线程执行命令！</div>
+        <div class="card">
+          <h4>设计动机：为什么 6.0 才引入多线程 IO？为什么命令执行仍单线程？</h4>
+          <p><strong>设计起点</strong>：Redis 早年单线程够用，因为瓶颈在<strong>内存操作</strong>（纳秒级），单核能扛 10 万 QPS。但随着网络从 1G → 10G → 25G，<strong>网络 IO（read/write socket + 协议解析）成了新瓶颈</strong>——单线程处理网络包来不及。6.0 的多线程 IO 就是针对这个瓶颈。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 为什么只多线程化 IO？</h4>
+              <ul>
+                <li>网络 IO 是<strong>纯等待</strong>，多线程能并行处理多个连接的读写</li>
+                <li>协议解析（RESP 协议）也是 CPU 密集，可并行</li>
+                <li>这两步不涉及共享数据结构，无锁竞争</li>
+                <li>实测 10G 网络下，多线程 IO 提升 ~1 倍吞吐</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">为什么命令执行仍单线程？</h4>
+              <ul>
+                <li>命令操作<strong>共享数据结构</strong>（dict/skiplist），多线程需加锁</li>
+                <li>加锁引入竞争和上下文切换，反而拖慢简单命令</li>
+                <li>保持单线程 = <strong>无需锁，命令原子性天然保证</strong></li>
+                <li>多线程命令的收益（CPU 利用）在内存操作场景不显著</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>易错点</strong>：6.0 多线程默认<strong>关闭</strong>，需 <code>io-threads 4</code>（建议 CPU 核数的一半）+ <code>io-threads-do-reads yes</code> 开启。且对小数据包收益不明显，适合大 value（如大 Hash/List）场景。</div>
+          <div class="tip"><strong>面试金句</strong>：Redis 的线程模型演进体现"<strong>精准优化瓶颈</strong>"——单线程够用时不动，网络成瓶颈就只多线程化网络，命令执行仍单线程保持无锁优势。这是工程优化的范本：哪里慢优化哪里，不盲目全多线程。</div>
+        </div>
 
         <h3 id="s1-5b">1.6 渐进式 rehash 与对象编码转换</h3>
         <div class="card">

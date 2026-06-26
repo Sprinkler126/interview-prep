@@ -23,6 +23,9 @@
           <li><a href="#part1">第一部分：技术原理</a></li>
           <li class="sub"><a href="#s1-1">整体架构</a></li>
           <li class="sub"><a href="#s1-2">Pod 生命周期</a></li>
+          <li class="sub"><a href="#s1-2b">调度器原理与调度约束</a></li>
+          <li class="sub"><a href="#s1-2c">QoS 等级与 Pod 驱逐</a></li>
+          <li class="sub"><a href="#s1-2d">Operator 与 CRD</a></li>
           <li class="sub"><a href="#s1-3">控制器</a></li>
           <li class="sub"><a href="#s1-4">Service 类型</a></li>
           <li class="sub"><a href="#s1-5">Ingress</a></li>
@@ -176,6 +179,136 @@ startupProbe:
   failureThreshold: 30
   periodSeconds: 10</code></pre>
           <div class="tip">Startup Probe 用于启动慢的应用（如 Java 应用）。在 Startup Probe 成功之前，Liveness 和 Readiness Probe 不会执行，避免应用还在启动就被误杀。</div>
+        </div>
+
+        <!-- 1-3 控制器 -->
+        <h3 id="s1-2b">1.2b 调度器原理与调度约束</h3>
+        <div class="card">
+          <h4>设计动机：调度器怎么决定 Pod 落到哪个 Node？</h4>
+          <p><strong>设计起点</strong>：K8s 调度的本质是"<strong>把 Pod 的资源需求与 Node 的资源供给匹配</strong>"。Scheduler 监听未调度的 Pod，经过<strong>过滤 + 打分</strong>两阶段选出最优 Node。理解调度约束是面试高频点。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">未调度 Pod</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">① Filter 过滤<br><span style="font-size:0.7rem">剔除不满足硬性条件的 Node</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">② Score 打分<br><span style="font-size:0.7rem">对剩余 Node 按策略打分</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">选最高分 Node<br><span style="font-size:0.7rem">绑定 Pod 到 Node</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>调度约束全景</h4>
+          <table>
+            <thead><tr><th>约束</th><th>类型</th><th>作用</th><th>典型场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>resources.requests/limits</strong></td><td>资源</td><td>声明 Pod 需要的 CPU/内存</td><td>所有 Pod 都该设</td></tr>
+              <tr><td><strong>nodeSelector</strong></td><td>硬约束</td><td>Pod 只调度到带指定 label 的 Node</td><td>GPU 任务 → label=gpu</td></tr>
+              <tr><td><strong>nodeAffinity</strong></td><td>硬/软</td><td>nodeSelector 升级版，支持多种运算符</td><td>preferred 时尽量满足</td></tr>
+              <tr><td><strong>podAffinity</strong></td><td>亲和</td><td>Pod 调度到与某 Pod 同 Node/Zone</td><td>前端 + 缓存同节点降延迟</td></tr>
+              <tr><td><strong>podAntiAffinity</strong></td><td>反亲和</td><td>Pod 不与某 Pod 同 Node/Zone</td><td>多副本分散避免单点</td></tr>
+              <tr><td><strong>Taint / Toleration</strong></td><td>排斥/容忍</td><td>Node 标记污点，Pod 需容忍才能调度</td><td>GPU 节点专用、节点维护</td></tr>
+              <tr><td><strong>PriorityClass</strong></td><td>优先级</td><td>高优先级 Pod 可抢占低优先级</td><td>关键业务 vs 批处理</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Taint / Toleration — 节点级排斥</h4>
+          <p><strong>设计起点</strong>：某些 Node 要"专用"（如 GPU 节点只跑 GPU 任务，维护中的 Node 不接新 Pod）。<strong>Taint 给 Node 打污点</strong>排斥 Pod，<strong>Toleration 给 Pod 写容忍</strong>才能调度上去。这是 Node 视角的"反向亲和"。</p>
+          <pre><code># 给 GPU 节点打污点：只允许容忍的 Pod 调度
+kubectl taint nodes gpu-node-1 dedicated=gpu:NoSchedule
+
+# Pod 声明容忍才能上 GPU 节点
+spec:
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "gpu"
+      effect: "NoSchedule"</code></pre>
+          <table>
+            <thead><tr><th>effect</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td><code>NoSchedule</code></td><td>不调度新 Pod（已运行的留下）</td></tr>
+              <tr><td><code>PreferNoSchedule</code></td><td>尽量不调度（软约束）</td></tr>
+              <tr><td><code>NoExecute</code></td><td>不调度且<strong>驱逐已运行</strong>的不容忍 Pod</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>内置 Taint</strong>：<code>node.kubernetes.io/not-ready</code>（节点未就绪）、<code>node.kubernetes.io/unreachable</code>（失联）、<code>node.kubernetes.io/disk-pressure</code>（磁盘压力）。这些让 K8s 自动避开不健康节点。</div>
+        </div>
+
+        <h3 id="s1-2c">1.2c QoS 等级与 Pod 驱逐</h3>
+        <div class="card">
+          <h4>设计动机：节点资源不足时，驱逐谁？</h4>
+          <p><strong>设计起点</strong>：节点资源紧张时，kubelet 要驱逐 Pod 释放资源。驱逐顺序由 <strong>QoS (Quality of Service) 等级</strong>决定——这是 K8s 在资源争抢时的"优先级"机制，根据 Pod 的 requests/limits 配置自动判定。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">三种 QoS 等级（驱逐优先级从高到低）</div>
+          <table>
+            <thead><tr><th>QoS</th><th>判定条件</th><th>驱逐优先级</th><th>典型场景</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-red">BestEffort</span></td><td>未设 requests/limits</td><td><strong>最先驱逐</strong></td><td>不重要任务、测试</td></tr>
+              <tr><td><span class="badge badge-orange">Burstable</span></td><td>设了 requests 但 &lt; limits，或不一致</td><td>其次驱逐</td><td>有波动的工作负载</td></tr>
+              <tr><td><span class="badge badge-green">Guaranteed</span></td><td>requests == limits（CPU 和内存都设）</td><td><strong>最后驱逐</strong></td><td>关键业务</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>QoS 判定与最佳实践</h4>
+          <pre><code># Guaranteed: requests == limits，CPU 和内存都设
+resources:
+  requests: { cpu: 1, memory: 1Gi }
+  limits:   { cpu: 1, memory: 1Gi }
+
+# Burstable: requests < limits
+resources:
+  requests: { cpu: 500m, memory: 512Mi }
+  limits:   { cpu: 1, memory: 1Gi }
+
+# BestEffort: 都不设
+# (无 resources 字段)</code></pre>
+          <div class="warn"><strong>易错点</strong>：CPU 是<strong>可压缩资源</strong>（超限只 throttling 不杀），内存是<strong>不可压缩</strong>（超限 OOM Kill）。所以内存压力是驱逐主因。Guaranteed Pod 内存超限也会被 OOMKilled，但不会被主动驱逐。</div>
+          <div class="tip"><strong>面试要点</strong>：生产关键业务应设成 Guaranteed（requests==limits），保证最后被驱逐且资源预留稳定。批处理任务可设 Burstable 或 BestEffort，让出资源给关键业务。</div>
+        </div>
+
+        <h3 id="s1-2d">1.2d Operator 与 CRD — K8s 的扩展范式</h3>
+        <div class="card">
+          <h4>设计动机：K8s 内置控制器不够用怎么办？</h4>
+          <p><strong>设计起点</strong>：K8s 内置 Deployment/StatefulSet 等通用控制器，但<strong>复杂应用（如 MySQL 集群、Prometheus、Kafka）有自己的运维逻辑</strong>——主从切换、备份、扩缩容都需专门知识。<strong>Operator 模式</strong>让你把领域专家的运维知识编码成一个<strong>自定义控制器</strong>，像内置资源一样管理复杂应用。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">Operator 工作原理</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">CRD 定义自定义资源<br><span style="font-size:0.7rem">如 MySQLCluster</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">用户创建 CR 实例<br><span style="font-size:0.7rem">声明期望状态</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Operator 控制循环<br><span style="font-size:0.7rem">监听 CR 变化</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">调谐到期望状态<br><span style="font-size:0.7rem">创建 Pod/Service/PVC</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>CRD + Operator 的核心概念</h4>
+          <ul>
+            <li><strong>CRD (CustomResourceDefinition)</strong>：定义一种新资源类型（如 <code>MySQLCluster</code>），告诉 K8s API Server 如何存储/校验它</li>
+            <li><strong>CR (Custom Resource)</strong>：CRD 的实例，用户创建/修改它来声明期望状态</li>
+            <li><strong>Operator</strong>：一个实现了<strong>控制循环</strong>的程序，监听 CR 变化，把实际状态调谐到期望状态</li>
+            <li><strong>本质</strong>：Operator = CRD + 自定义控制器 + 领域运维知识</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>知名 Operator 与选型</h4>
+          <table>
+            <thead><tr><th>Operator</th><th>管理对象</th><th>典型能力</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Prometheus Operator</strong></td><td>Prometheus 实例 + Alertmanager</td><td>声明式配置告警规则、持久化</td></tr>
+              <tr><td><strong>Strimzi</strong></td><td>Kafka 集群</td><td>主从管理、Topic/User CRD</td></tr>
+              <tr><td><strong>MySQL Operator (Oracle/Percona)</strong></td><td>MySQL 主从/InnoDB Cluster</td><td>备份、主从切换、扩缩容</td></tr>
+              <tr><td><strong>ArgoCD</strong></td><td>GitOps 应用部署</td><td>Application CRD，Git → 集群同步</td></tr>
+              <tr><td><strong> Cert Manager</strong></td><td>HTTPS 证书</td><td>Certificate CRD，自动签发续期</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>面试要点</strong>：Operator 是 K8s 生态繁荣的关键——它把"运维专家知识"变成可复用的软件。问"K8s 怎么管理有状态应用"时，答 Operator + CRD 比 StatefulSet 更深入。开发 Operator 用 Operator Framework 或 Kubebuilder。</div>
+          <div class="warn"><strong>易错点</strong>：Operator 不是 K8s 内置功能，而是一种<strong>设计模式</strong>。CRD 是内置的扩展机制，Operator 是利用 CRD + 控制器模式构建的具体实现。两者常配合出现。</div>
         </div>
 
         <!-- 1-3 控制器 -->

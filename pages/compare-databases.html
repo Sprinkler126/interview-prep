@@ -169,6 +169,7 @@
       <div class="toc-title">📑 目录</div>
       <ul>
         <li><a href="#overview">全景定位：七种数据库在架构中的位置</a></li>
+        <li><a href="#engines">存储引擎横向对比：B+Tree vs LSM-Tree vs 倒排索引</a></li>
         <li><a href="#summary">一句话速查表</a></li>
         <li><a href="#vs1">MySQL vs PostgreSQL — 关系型双雄</a></li>
         <li><a href="#vs2">MySQL vs TiDB — 单机 vs 分布式 SQL</a></li>
@@ -249,6 +250,125 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Storage Engines -->
+    <!-- ============================================================ -->
+    <h2 id="engines"><span class="icon">⚙️</span>存储引擎横向对比：B+Tree vs LSM-Tree vs 倒排索引</h2>
+
+    <div class="card">
+      <h4>设计起点：读写 workload 决定数据结构</h4>
+      <p>不同数据库的根本差异在<strong>底层存储结构</strong>。数据结构的选择本质是对"<strong>读快还是写快</strong>"的取舍——没有任何结构能同时做到随机读 O(1) 和随机写 O(1)。面试时理解这条主线，就能解释为什么 ES 写慢读快、HBase 写快读慢、MySQL 读写均衡。</p>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-title">三种主流存储结构对比</div>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>B+Tree (MySQL/PG/Mongo)</th>
+            <th>LSM-Tree (HBase/TiKV/Cassandra)</th>
+            <th>倒排索引 (ES)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>数据位置</td>
+            <td>原地更新（in-place update）</td>
+            <td>追加写 + 后台合并</td>
+            <td>不可变 Segment（追加 + 合并）</td>
+          </tr>
+          <tr>
+            <td>写入</td>
+            <td><span class="score s-mid">随机写（需找页+改页）</span></td>
+            <td><span class="score s-high">顺序写内存（MemStore）极快</span></td>
+            <td><span class="score s-mid">写 Buffer + 异步 Refresh</span></td>
+          </tr>
+          <tr>
+            <td>读取</td>
+            <td><span class="score s-high">B+Tree 定位快，3-4 次 IO</span></td>
+            <td><span class="score s-low">需合并多层 HFile，读放大</span></td>
+            <td><span class="score s-high">倒排表直接定位，O(1)~O(logN)</span></td>
+          </tr>
+          <tr>
+            <td>写放大</td>
+            <td>1 次（改页即落盘）</td>
+            <td>高（Compaction 反复重写）</td>
+            <td>中（Segment 合并）</td>
+          </tr>
+          <tr>
+            <td>读放大</td>
+            <td>1 次（树高次 IO）</td>
+            <td>高（查 MemStore + 多层 HFile）</td>
+            <td>低（FST + Posting List）</td>
+          </tr>
+          <tr>
+            <td>空间放大</td>
+            <td>低（页填充）</td>
+            <td>中（过期版本待 Compaction）</td>
+            <td>高（倒排表 + FST 占内存）</td>
+          </tr>
+          <tr>
+            <td>范围查询</td>
+            <td><span class="score s-high">叶子链表，极快</span></td>
+            <td>中（需归并多 HFile）</td>
+            <td>差（倒排不擅长范围）</td>
+          </tr>
+          <tr>
+            <td>全文检索</td>
+            <td>差（LIKE 全表扫）</td>
+            <td>不支持</td>
+            <td><span class="score s-high">原生支持</span></td>
+          </tr>
+          <tr>
+            <td>适合场景</td>
+            <td>OLTP 读写均衡</td>
+            <td>写多读少 + 海量数据</td>
+            <td>搜索 + 聚合分析</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>核心权衡：为什么 ES 写慢、HBase 读慢？</h4>
+      <div class="compare-row">
+        <div class="compare-box" style="border-color:var(--accent)">
+          <h4 style="color:var(--accent)">ES 写慢的根因</h4>
+          <ul>
+            <li>每条文档要<strong>分词 + 建倒排表</strong>，CPU 开销大</li>
+            <li>更新 = 标记删除 + 重新索引，<strong>写放大严重</strong></li>
+            <li>Refresh 生成新 Segment，过多需 Compaction 合并（IO 密集）</li>
+            <li>不擅长频繁更新（适合 append-only 日志/搜索）</li>
+          </ul>
+        </div>
+        <div class="compare-box" style="border-color:var(--accent4)">
+          <h4 style="color:var(--accent4)">HBase 读慢的根因</h4>
+          <ul>
+            <li>读需合并 <strong>BlockCache + MemStore + 多个 HFile</strong></li>
+            <li>多层 HFile → 读放大，Compaction 才能改善</li>
+            <li>只能按 RowKey 查，二级索引需协处理器或 Phoenix</li>
+            <li>不擅长复杂查询（适合 KV 读写 + 范围扫）</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tip"><strong>面试金句</strong>：存储引擎选型 = workload 匹配。OLTP 读写均衡选 B+Tree（MySQL），写多读少海量数据选 LSM（HBase），全文检索读多写少选倒排（ES）。没有银弹，每个结构都在<strong>读放大 / 写放大 / 空间放大</strong>三者间取舍。</div>
+    </div>
+
+    <div class="card">
+      <h4>LSM-Tree 的 Compaction 策略对比</h4>
+      <table>
+        <thead><tr><th>策略</th><th>原理</th><th>代表</th><th>特点</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Leveled</strong></td><td>L0→L1→L2...，每层有界，层层合并</td><td>RocksDB / LevelDB</td><td>读放大小，写放大大</td></tr>
+          <tr><td><strong>Tiered</strong></td><td>每层多个文件，size 攒够再合并到下层</td><td>Cassandra STCS</td><td>写放大小，读放大大（空间放大也大）</td></tr>
+          <tr><td><strong>Time-Window</strong></td><td>按时间窗口分文件，过期整窗丢弃</td><td>时序数据库 InfluxDB</td><td>时序场景空间回收快</td></tr>
+          <tr><td><strong>Hybrid (Leveled+Tiered)</strong></td><td>L0 Tiered，L1+ Leveled</td><td>RocksDB / HBase 新版</td><td>兼顾读写，工程实践主流</td></tr>
+        </tbody>
+      </table>
+      <div class="warn"><strong>易错点</strong>：LSM 不等于"HBase 专用"——RocksDB（TiKV/Redis on Flash）、Cassandra、InfluxDB 都用 LSM。理解 Compaction 策略对调优 LSM 系统至关重要：写密集选 Tiered，读密集选 Leveled。</div>
     </div>
 
     <!-- ============================================================ -->

@@ -22,6 +22,7 @@
         <ul>
           <li><a href="#part1">第一部分：技术原理</a></li>
           <li class="sub"><a href="#s1-1">容器 vs 虚拟机</a></li>
+          <li class="sub"><a href="#s1-1b">容器运行时演进</a></li>
           <li class="sub"><a href="#s1-2">镜像分层原理</a></li>
           <li class="sub"><a href="#s1-3">Dockerfile 指令详解</a></li>
           <li class="sub"><a href="#s1-4">CMD vs ENTRYPOINT</a></li>
@@ -94,6 +95,88 @@
             <li><strong>UnionFS（联合文件系统）：</strong>实现镜像分层共享，多个容器可共享相同的底层镜像层</li>
             <li><strong>Capabilities：</strong>细粒度权限控制，替代传统的 root 全权限模型</li>
           </ul>
+        </div>
+        <div class="card">
+          <h4>设计动机：容器到底是不是"轻量级虚拟机"？</h4>
+          <p><strong>设计起点</strong>：很多人误以为容器是"轻量 VM"，但<strong>容器本质是被隔离的进程</strong>，不是虚拟机。理解这点才能理解容器的所有特性与限制。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">容器 = 隔离的进程</h4>
+              <ul>
+                <li>共享宿主机内核，<strong>没有自己的内核</strong></li>
+                <li>本质是宿主机上一个被 Namespace + Cgroups 包装的进程</li>
+                <li>启动 = 启动进程（fork/exec），毫秒级</li>
+                <li><code>ps aux</code> 在宿主机能看到容器进程</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">VM = 完整操作系统</h4>
+              <ul>
+                <li>Hypervisor 虚拟化硬件，<strong>有自己的 Guest 内核</strong></li>
+                <li>启动 = 启动整个 OS（内核引导 + init），分钟级</li>
+                <li>宿主机看不到 VM 内进程（硬件级隔离）</li>
+                <li>资源开销大（每个 VM 跑完整 OS）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>易错点</strong>：容器共享内核意味着<strong>内核漏洞影响所有容器</strong>（如 Dirty COW）。这也是为什么高安全场景用 Kata Containers（轻量 VM 跑容器接口）或 gVisor（用户态内核）增强隔离。</div>
+        </div>
+
+        <h3 id="s1-1b">1.1b 容器运行时演进：Docker → containerd → OCI 标准</h3>
+        <div class="card">
+          <h4>设计起点：为什么 Docker 被拆分？</h4>
+          <p>早期 Docker 是一个<strong>大而全的单体</strong>（含镜像构建、运行时、网络、存储）。Kubernetes 兴起后，K8s 不希望被 Docker 绑定，推动<strong>容器运行时标准化</strong>——拆分出 <strong>containerd</strong>（专注运行时）+ <strong>runc</strong>（底层 OCI 运行时），Docker 退化为"构建+开发者工具"。这是云原生生态去 vendor lock-in 的关键演进。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">容器运行时分层架构</div>
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                <strong>High-Level Runtime (高级运行时)</strong> — containerd / CRI-O
+                <div class="arch-label">管理镜像拉取、卷、网络 · 实现 CRI 接口给 K8s 调用</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 调用</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                <strong>Low-Level Runtime (低级运行时)</strong> — runc / kata-runtime / gVisor
+                <div class="arch-label">真正创建/启动容器进程 · 实现 OCI Runtime Spec</div>
+              </div>
+            </div>
+            <div class="arch-connector">⬇️ 调用 Linux 内核能力</div>
+            <div class="arch-row">
+              <div class="arch-box-wide" style="border-color:var(--border);background:var(--surface2)">
+                <strong>Linux Kernel</strong> — Namespace + Cgroups + Seccomp + Capabilities
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>OCI 规范 — 容器的事实标准</h4>
+          <p><strong>OCI (Open Container Initiative)</strong> 是 2015 年由 Docker、CoreOS、Google 等成立的标准化组织，定义容器<strong>不绑定任何厂商</strong>的开放规范。</p>
+          <table>
+            <thead><tr><th>规范</th><th>定义</th><th>作用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>OCI Image Spec</strong></td><td>镜像格式（manifest + layers + config）</td><td>任何工具构建的镜像，任何运行时都能跑</td></tr>
+              <tr><td><strong>OCI Runtime Spec</strong></td><td>容器配置和生命周期（bundle + config.json）</td><td>runc/kata/gVisor 都实现此规范，可替换</td></tr>
+              <tr><td><strong>OCI Distribution Spec</strong></td><td>镜像仓库 API</td><td>Docker Registry / Harbor / Quay 互通</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Docker vs containerd vs CRI-O</h4>
+          <table>
+            <thead><tr><th>维度</th><th>Docker (dockerd)</th><th>containerd</th><th>CRI-O</th></tr></thead>
+            <tbody>
+              <tr><td><strong>定位</strong></td><td>开发者工具（含构建/Compose/CLI）</td><td>工业级运行时（Docker 的子集）</td><td>K8s 专用轻量运行时</td></tr>
+              <tr><td><strong>K8s 支持</strong></td><td>1.24 起移除 (dockershim 废弃)</td><td>✅ 主流默认</td><td>✅ Red Hat 主推</td></tr>
+              <tr><td><strong>体积</strong></td><td>大</td><td>中</td><td>小</td></tr>
+              <tr><td><strong>compose/build</strong></td><td>✅ 原生</td><td>需 nerdctl / buildkit</td><td>需外部工具</td></tr>
+              <tr><td><strong>典型用户</strong></td><td>开发本地</td><td>云厂商/生产 K8s</td><td>OpenShift</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>易错点</strong>：K8s 1.24 起<strong>移除 dockershim</strong>，不再直接支持 Docker Engine，必须用 containerd/CRI-O 等 CRI 兼容运行时。Docker 构建的镜像仍能用（因为符合 OCI Image Spec），只是 K8s 不直接调 dockerd。</div>
+          <div class="tip"><strong>面试要点</strong>：容器运行时演进体现了"<strong>标准化解耦</strong>"——OCI 规范让镜像、运行时、仓库三者可独立替换。K8s 通过 CRI 接口对接任意运行时，不被任何厂商锁定。这是云原生生态繁荣的基础。</div>
         </div>
 
         <!-- 1-2 镜像分层原理 -->

@@ -186,6 +186,43 @@
           </ul>
           <div class="tip">PD 的 TSO (Timestamp Oracle) 通过中心化分配保证全局唯一且递增的时间戳，是分布式事务的基础。</div>
         </div>
+        <div class="card">
+          <h4>乐观锁 vs 悲观锁 — TiDB 的事务模式演进</h4>
+          <p><strong>设计起点</strong>：分布式事务冲突处理有两种思路——<strong>乐观锁</strong>假设"冲突少"，先在本地攒改动，提交时再检测冲突，冲突则回滚重试；<strong>悲观锁</strong>假设"冲突多"，修改前先加锁，保证一定能提交。TiDB 早期只支持乐观锁（3.0），4.0 引入悲观锁，5.0 默认悲观锁——这是根据生产实践做的调整。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">乐观锁 (Optimistic)</h4>
+              <ul>
+                <li><strong>流程</strong>：本地攒改动 → Prewrite 检测冲突 → 冲突则全部回滚重试</li>
+                <li><strong>优势</strong>：无锁等待，<strong>冲突少时性能好</strong>，死锁不可能</li>
+                <li><strong>劣势</strong>：冲突多时大量重试，长事务重试代价大</li>
+                <li><strong>场景</strong>：冲突少的 OLTP（如不同用户操作不同行）</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">悲观锁 (Pessimistic) ⭐ 5.0 默认</h4>
+              <ul>
+                <li><strong>流程</strong>：DML 前先对 Key 加悲观锁 → 提交时转 Percolator 两阶段</li>
+                <li><strong>优势</strong>：<strong>冲突多时稳定</strong>，行为接近 MySQL，迁移友好</li>
+                <li><strong>劣势</strong>：锁等待有开销，可能死锁（TiDB 有死锁检测）</li>
+                <li><strong>场景</strong>：冲突多的热点行、从 MySQL 迁移的业务</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>易错点</strong>：TiDB 悲观锁<strong>不锁内存</strong>——锁信息存在 TiKV 的锁 CF 中，通过心跳续约。客户端断开后锁会被 cleanup（避免死锁），这是与 MySQL 单机悲观锁的差异。</div>
+          <div class="tip"><strong>面试要点</strong>：TiDB 默认悲观锁是为<strong>降低 MySQL 迁移成本</strong>——MySQL 用户习惯悲观语义（UPDATE 时行被锁住）。乐观锁适合高并发低冲突场景，可用 <code>begin optimistic</code> 显式开启。</div>
+        </div>
+        <div class="card">
+          <h4>GC 机制 — MVCC 多版本数据的清理</h4>
+          <p><strong>设计起点</strong>：MVCC 给每个 Key 存多版本数据，旧版本要被清理，否则存储无限膨胀。TiDB 的 GC 由<strong>PD 协调 + TiKV 执行</strong>，保证安全的前提下定期清理。</p>
+          <ul>
+            <li><strong>safe point</strong>：GC 安全点 = 当前时间 - <code>tidb_gc_life_time</code>（默认 10min）。安全点之前的版本才可清理</li>
+            <li><strong>GC 流程</strong>：① PD 推进 safe point → ② TiKV 扫描所有 Key，删除 safe point 之前的旧版本 → ③ 清理过期锁</li>
+            <li><strong>影响</strong>：GC 过慢 → 旧版本堆积，查询变慢；GC 过快 → 长事务、TiCDC 同步、BR 备份拿不到旧版本</li>
+            <li><strong>调优</strong>：长事务多时调大 <code>tidb_gc_life_time</code>（如 1h）；及时清理无用 TiCDC 同步任务</li>
+          </ul>
+          <div class="warn"><strong>易错点</strong>：<code>tidb_gc_life_time</code> 必须大于最长事务时长 + TiCDC 延迟 + BR 备份时长，否则这些任务会因拿不到旧版本而失败。这是 TiDB 运维常踩的坑。</div>
+        </div>
 
         <h3 id="s1-4">1.4 Raft 协议在 TiDB 中的应用</h3>
         <div class="card">

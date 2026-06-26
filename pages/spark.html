@@ -353,6 +353,26 @@
             <li><strong>Shuffle 数据压缩</strong>：<code>spark.shuffle.compress=true</code>（默认开启）</li>
           </ul>
         </div>
+        <div class="card">
+          <h4>AQE 自适应查询执行 — 设计动机</h4>
+          <p><strong>设计起点</strong>：传统 Spark 的执行计划在<strong>编译期一次性确定</strong>，依赖统计信息估算。但统计信息可能过期、Join 后行数难预估，导致 Shuffle 分区数不合理——分区太多产生海量小文件（Task 调度开销大），分区太少导致单个 Task 数据倾斜（OOM 或长尾）。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">编译期生成逻辑计划</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">执行到 Shuffle 边界<br><span style="font-size:0.7rem">拿到实际数据统计</span></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">动态调整后续计划<br><span style="font-size:0.7rem">合并小分区/拆分大分区</span></div>
+          </div>
+          <table>
+            <thead><tr><th>AQE 优化</th><th>解决的问题</th><th>原理</th></tr></thead>
+            <tbody>
+              <tr><td><strong>动态合并 Shuffle 分区</strong></td><td>小分区过多（默认 200 可能浪费）</td><td>把小分区合并成大分区，减少 Task 数</td></tr>
+              <tr><td><strong>动态切换 Join 策略</strong></td><td>编译期以为大表，运行时发现是 小表</td><td>自动转 Broadcast Hash Join，避免 Shuffle</td></tr>
+              <tr><td><strong>动态拆分倾斜分区</strong></td><td>某分区数据远超其他（数据倾斜）</td><td>把大分区按 Key 拆成多个子分区并行处理</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>面试要点</strong>：AQE 的核心思想是"<strong>用运行时真实统计信息修正编译期估算</strong>"——把静态优化变成自适应优化。开启：<code>spark.sql.adaptive.enabled=true</code>（Spark 3.2+ 默认开启）。这是 Spark 3.0 最重要的特性之一。</div>
+        </div>
 
         <h3 id="p1-8">8. 内存管理</h3>
         <div class="diagram">
@@ -521,6 +541,52 @@
             <li><strong>存储</strong>：支持 S3、HDFS、Ceph 等外部存储</li>
             <li><strong>Operator</strong>：使用 Spark Operator 管理 Spark 作业生命周期</li>
           </ul>
+        </div>
+
+        <h3 id="p2-6b">2.6b 数据湖三剑客 — Iceberg / Hudi / Delta Lake</h3>
+        <div class="card">
+          <h4>设计起点：为什么需要数据湖格式？</h4>
+          <p>传统数仓用 Hive/HDFS，痛点：① <strong>不支持 ACID</strong>（并发写覆盖、读到半成品）；② <strong>不支持 upsert/delete</strong>（只能整表覆盖或分区覆盖）；③ <strong>小文件多</strong>，元数据管理难。数据湖格式在 Parquet/ORC 之上加一层<strong>元数据层 + 事务日志</strong>，把"文件集合"变成"可事务的表"。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">数据湖格式对比</div>
+          <table>
+            <thead><tr><th>维度</th><th>Apache Iceberg</th><th>Apache Hudi</th><th>Delta Lake</th></tr></thead>
+            <tbody>
+              <tr><td><strong>主导方</strong></td><td>Netflix 开源</td><td>Uber 开源</td><td>Databricks (Spark 母公司)</td></tr>
+              <tr><td><strong>核心特性</strong></td><td>表格式规范，引擎无关</td><td>Upsert/Delete 优化，CDC 友好</td><td>与 Spark 深度集成</td></tr>
+              <tr><td><strong>更新能力</strong></td><td>Copy-on-Write / Merge-on-Read</td><td>CoW / MoR（MoR 写快读慢）</td><td>Copy-on-Write 为主</td></tr>
+              <tr><td><strong>时间旅行</strong></td><td>✅ Time Travel</td><td>✅</td><td>✅</td></tr>
+              <tr><td><strong>Schema 演进</strong></td><td>✅ 强（增删改列、重命名）</td><td>✅</td><td>✅</td></tr>
+              <tr><td><strong>分区演进</strong></td><td><span class="badge badge-green">✅ 隐藏分区</span></td><td>需重建</td><td>需重建</td></tr>
+              <tr><td><strong>引擎兼容</strong></td><td><span class="badge badge-green">Spark/Flink/Trino/Hive</span></td><td>Spark/Flink/Hive</td><td>Spark 为主（Flink 有 connector）</td></tr>
+              <tr><td><strong>适用场景</strong></td><td>多引擎、海量分析、表格式标准</td><td>流批一体、频繁 upsert、CDC 入湖</td><td>已用 Databricks/Spark 生态</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Copy-on-Write vs Merge-on-Read — 更新策略的取舍</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">Copy-on-Write (CoW)</h4>
+              <ul>
+                <li>更新时<strong>重写整个文件</strong>，新文件含合并后的数据</li>
+                <li><strong>读快</strong>：读时无需合并，直接读</li>
+                <li><strong>写慢</strong>：每次更新放大（改一条要重写一个文件）</li>
+                <li>适合<strong>读多写少</strong>、批量更新</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">Merge-on-Read (MoR)</h4>
+              <ul>
+                <li>更新写入<strong>增量 log 文件</strong>，读时合并 base + log</li>
+                <li><strong>写快</strong>：只追加 log，不重写</li>
+                <li><strong>读慢</strong>：读时需合并，Compaction 后才变快</li>
+                <li>适合<strong>写多读少</strong>、频繁 upsert（如 CDC 入湖）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：数据湖格式本质是"<strong>给 Parquet 文件集合加 ACID 事务日志</strong>"。Iceberg 的隐藏分区（按 timestamp 自动转 day/month）解决"Hive 分区字段必须硬编码进 SQL"的痛点。三者选型：多引擎/Iceberg 标准化选 Iceberg，CDC 频繁更新选 Hudi，Databricks 生态选 Delta。</div>
         </div>
 
         <h3 id="p2-7">2.7 常见问题排查</h3>

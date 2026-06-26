@@ -30,6 +30,7 @@
           <li class="sub"><a href="#s1-4">聚合管道</a></li>
           <li class="sub"><a href="#s1-5">WiredTiger 存储引擎</a></li>
           <li class="sub"><a href="#s1-6">事务支持</a></li>
+          <li class="sub"><a href="#s1-7">Change Streams 变更流</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">嵌入 vs 引用设计</a></li>
           <li class="sub"><a href="#s2-2">副本集架构</a></li>
@@ -329,6 +330,61 @@ try {
 }</code></pre>
         </div>
         <div class="warn">事务有 60 秒超时限制（可调），过大的事务会影响性能。MongoDB 推荐优先使用<strong>嵌入文档设计</strong>减少对多文档事务的依赖。</div>
+
+        <h3 id="s1-7">1.7 Change Streams — 变更流</h3>
+        <div class="card">
+          <h4>设计动机：为什么 MongoDB 要做 Change Streams？</h4>
+          <p><strong>设计起点</strong>：业务经常需要"数据变更时实时触发下游"（如订单变更同步到 ES、用户变更发通知）。传统做法是<strong>轮询数据库</strong>或<strong>应用层双写</strong>——前者延迟高、压力大，后者破坏单一数据源原则。Change Streams 让应用能<strong>订阅</strong>集合的变更事件，类似数据库的 binlog/CDC，但用 MongoDB 原生 API。</p>
+          <div class="flow" style="margin-top:1rem">
+            <div class="flow-box flow-blue">应用 write 操作</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">oplog 记录变更</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Change Stream 订阅</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">推送变更事件给应用</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Change Streams 核心</h4>
+          <ul>
+            <li><strong>底层基于 oplog</strong>：Change Streams 复用副本集的 oplog，所以<strong>必须部署副本集</strong>（单机 mongod 不支持）</li>
+            <li><strong>事件类型</strong>：insert / update / replace / delete / invalidate / drop / rename</li>
+            <li><strong>可恢复</strong>：基于 resume token，断线重连可从上次位置继续，不丢事件</li>
+            <li><strong>过滤</strong>：<code>$match</code> 按字段过滤，<code>$project</code> 投影变更字段</li>
+            <li><strong>聚合管道</strong>：支持 <code>aggregate</code> 的所有阶段预处理变更流</li>
+          </ul>
+          <pre><code>// Java Driver 订阅变更流
+MongoCollection&lt;Document&gt; coll = db.getCollection("orders");
+try (MongoChangeStreamCursor&lt;ChangeStreamDocument&lt;Document&gt;&gt; cursor =
+     coll.watch().iterator()) {
+    while (cursor.hasNext()) {
+        ChangeStreamDocument&lt;Document&gt; event = cursor.next();
+        System.out.println(event.getOperationType()); // insert/update/delete
+        System.out.println(event.getFullDocument());   // 变更后文档
+        System.out.println(event.getDocumentKey());    // _id
+    }
+}
+
+// 带过滤的变更流：只关注 status 变为 paid 的订单
+List&lt;Bson&gt; pipeline = List.of(
+    Aggregates.match(Filters.eq("fullDocument.status", "paid"))
+);
+coll.watch(pipeline).forEach(event -&gt; sendNotification(event));</code></pre>
+        </div>
+        <div class="card">
+          <h4>Change Streams vs Oplog 直连 vs Kafka CDC</h4>
+          <table>
+            <thead><tr><th>方案</th><th>实时性</th><th>易用性</th><th>可靠性</th><th>场景</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Change Streams</strong></td><td><span class="badge badge-green">毫秒级</span></td><td><span class="badge badge-green">高(原生 API)</span></td><td>resume token 保证</td><td>应用内订阅变更</td></tr>
+              <tr><td><strong>直连 oplog</strong></td><td>毫秒级</td><td><span class="badge badge-orange">低(需自己解析)</span></td><td>需自己管理位点</td><td>特殊定制 CDC</td></tr>
+              <tr><td><strong>Kafka Connect + Debezium</strong></td><td>秒级</td><td>中</td><td>高(Kafka 持久化)</td><td>跨系统数据同步</td></tr>
+              <tr><td><strong>轮询</strong></td><td><span class="badge badge-red">秒~分钟级</span></td><td>低</td><td>低(易丢更新)</td><td>简单场景兜底</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>面试要点</strong>：Change Streams 是 MongoDB 的 CDC 方案，本质是"<strong>把 oplog 封装成易用的事件流 API</strong>"。应用内订阅用 Change Streams，跨系统同步用 Debezium + Kafka。两者不冲突，可组合使用。</div>
+        </div>
 
         <!-- ============================== PART 2 ============================== -->
         <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>

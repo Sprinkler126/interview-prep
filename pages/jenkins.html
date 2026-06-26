@@ -281,6 +281,45 @@ deploy-prod:
         <h3 id="s1-5">CI/CD 最佳实践</h3>
 
         <div class="card">
+          <h4>设计动机：为什么需要 CI/CD？解决什么问题？</h4>
+          <p><strong>设计起点</strong>：传统开发模式是"<strong>长时间分支开发 → 最后集成 → 手动部署</strong>"，痛点：① 集成地狱（多人代码合并冲突爆炸）；② bug 积累到最后才发现，修复成本指数级增长；③ 手动部署易错且慢。CI/CD 的核心思想是<strong>"小步快跑、自动化、尽早反馈"</strong>——把集成和部署从"事件"变成"持续过程"。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">❌ 传统模式痛点</h4>
+              <ul>
+                <li>集成晚：冲突大、难合并</li>
+                <li>反馈慢：bug 几周后才发现</li>
+                <li>部署慢：手动操作易错</li>
+                <li>不可回滚：黑盒发布</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ CI/CD 收益</h4>
+              <ul>
+                <li>集成早：每次 push 都集成，冲突小</li>
+                <li>反馈快：几分钟内发现 bug</li>
+                <li>部署自动：一键/自动，可重复</li>
+                <li>可回滚：版本化制品，秒级回退</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>CI vs CD vs CD — 三个层次</h4>
+          <table>
+            <thead><tr><th>层次</th><th>全称</th><th>自动化程度</th><th>边界</th></tr></thead>
+            <tbody>
+              <tr><td><strong>CI</strong></td><td>Continuous Integration 持续集成</td><td>构建+测试自动</td><td>到制品仓库为止</td></tr>
+              <tr><td><strong>CD₁</strong></td><td>Continuous Delivery 持续交付</td><td>部署到 staging 自动，prod 手动审批</td><td>随时可一键上 prod</td></tr>
+              <tr><td><strong>CD₂</strong></td><td>Continuous Deployment 持续部署</td><td>全流程自动，测试通过即上 prod</td><td>无需人工审批</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>易错点</strong>：两个 CD 缩写相同但含义不同。持续交付保留"最后一公里的人工审批"（金融/医疗等合规需求），持续部署则完全自动。大多数企业做到持续交付，持续部署需高测试覆盖率和强监控兜底。</div>
+          <div class="tip"><strong>面试金句</strong>：CI/CD 本质是"<strong>用自动化把集成和部署从痛苦变成无感</strong>"。DORA 四指标（部署频率、变更前置时间、变更失败率、恢复时间）是衡量 CI/CD 成熟度的标准。</div>
+        </div>
+
+        <div class="card">
           <h4>标准 Pipeline 流程</h4>
           <div class="diagram">
             <div class="diagram-title">CI/CD 最佳实践流水线</div>

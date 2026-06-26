@@ -423,6 +423,70 @@ $$;</code></pre>
           </table>
         </div>
 
+        <h3 id="s2-5">2.5 流复制 vs 逻辑复制 + 分区表</h3>
+        <div class="card">
+          <h4>设计动机：为什么 PG 有两种复制？</h4>
+          <p><strong>设计起点</strong>：PG 的物理复制（流复制）传<strong>数据页的字节流</strong>，逻辑复制传<strong>逻辑变更（INSERT/UPDATE/DELETE）</strong>。两者解决不同问题——流复制做<strong>高可用灾备</strong>（主备完全一致），逻辑复制做<strong>异构数据同步</strong>（可跨版本、跨库表、选择性同步）。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">流复制 vs 逻辑复制</div>
+          <table>
+            <thead><tr><th>维度</th><th>流复制 (Streaming Replication)</th><th>逻辑复制 (Logical Replication)</th></tr></thead>
+            <tbody>
+              <tr><td><strong>复制内容</strong></td><td>WAL 字节流（物理数据页变更）</td><td>逻辑变更（行级 INSERT/UPDATE/DELETE）</td></tr>
+              <tr><td><strong>副本可写</strong></td><td>❌ 只读（Hot Standby）</td><td>✅ 可写（可独立修改）</td></tr>
+              <tr><td><strong>跨版本</strong></td><td>❌ 主备必须同版本</td><td>✅ 可跨大版本（升级利器）</td></tr>
+              <tr><td><strong>跨平台/架构</strong></td><td>❌ 必须同架构</td><td>✅ 可跨平台</td></tr>
+              <tr><td><strong>选择性同步</strong></td><td>❌ 全库复制</td><td>✅ 可按表/行过滤（Publication）</td></tr>
+              <tr><td><strong>一致性</strong></td><td>强一致（物理字节相同）</td><td>最终一致（逻辑变更重放）</td></tr>
+              <tr><td><strong>典型场景</strong></td><td>高可用灾备、读副本</td><td>版本升级、跨库同步、数据分发</td></tr>
+              <tr><td><strong>对应 MySQL</strong></td><td>binlog row 模式主从</td><td>binlog statement 模式 / Canal</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>逻辑复制核心概念</h4>
+          <ul>
+            <li><strong>Publication（发布）</strong>：源库定义"发布哪些表的变更"</li>
+            <li><strong>Subscription（订阅）</strong>：目标库订阅 Publication，建立复制槽</li>
+            <li><strong>Replication Slot（复制槽）</strong>：保证源库 WAL 不会被覆盖（订阅方未消费前保留）</li>
+            <li><strong>限制</strong>：不复制 DDL（表结构变更需手动同步）；大对象、序列需特殊处理</li>
+          </ul>
+          <div class="warn"><strong>易错点</strong>：逻辑复制<strong>不复制 DDL</strong>——源库 ALTER TABLE 后，目标库需手动执行相同 DDL，否则订阅中断。这是逻辑复制运维的主要痛点。</div>
+        </div>
+        <div class="card">
+          <h4>声明式分区表 (PG 10+)</h4>
+          <p><strong>设计起点</strong>：PG 9.x 分区要靠"继承表 + 触发器"手动实现，运维复杂。10+ 引入<strong>声明式分区</strong>，<code>PARTITION BY</code> 一句搞定，优化器自动裁剪分区。</p>
+          <pre><code>-- 按范围分区（时间序列最常用）
+CREATE TABLE logs (
+  id BIGSERIAL,
+  created_at TIMESTAMP,
+  level TEXT,
+  msg TEXT
+) PARTITION BY RANGE (created_at);
+
+-- 按月分区
+CREATE TABLE logs_2026_01 PARTITION OF logs
+  FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+CREATE TABLE logs_2026_02 PARTITION OF logs
+  FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+
+-- 默认分区（兜底未匹配的数据）
+CREATE TABLE logs_default PARTITION OF logs DEFAULT;
+
+-- 按列表分区（按地区）
+-- PARTITION BY LIST (region)
+-- 按哈希分区（均匀打散）
+-- PARTITION BY HASH (user_id)</code></pre>
+          <ul>
+            <li><strong>分区裁剪</strong>：查询 <code>WHERE created_at &gt; '2026-02-01'</code> 只扫 2 月分区，自动跳过其他</li>
+            <li><strong>自动分区</strong>：用 <code>pg_partman</code> 扩展自动创建未来分区、归档老分区</li>
+            <li><strong>分区索引</strong>：在父表建索引会自动在所有子分区建</li>
+            <li><strong>优势 vs MySQL</strong>：PG 分区是原生的，MySQL 分区限制多（如外键、唯一索引必须包含分区键）</li>
+          </ul>
+          <div class="tip"><strong>面试要点</strong>：PG 分区 + BRIN 索引是<strong>时序大数据</strong>的黄金组合——分区裁剪减少扫描范围，BRIN 极小索引记录每块 min/max，TB 级时间序列查询毫秒级。这是 PG 在时序/IoT 场景的优势。</div>
+        </div>
+
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
 
