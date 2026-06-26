@@ -33,10 +33,16 @@
           <li class="sub"><a href="#s1-5b">渐进式 rehash 与编码转换</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">缓存策略与缓存问题</a></li>
+          <li class="sub"><a href="#s2-1a">└ Cache Aside 并发一致性</a></li>
           <li class="sub"><a href="#s2-2">分布式锁</a></li>
+          <li class="sub"><a href="#s2-2a">└ RedLock 算法与争议</a></li>
           <li class="sub"><a href="#s2-3">消息队列与延迟队列</a></li>
           <li class="sub"><a href="#s2-4">高可用架构</a></li>
+          <li class="sub"><a href="#s2-4a">└ PSYNC 与数据丢失</a></li>
+          <li class="sub"><a href="#s2-4b">└ Cluster 16384 与 slot 迁移</a></li>
           <li class="sub"><a href="#s2-5">限流与排行榜</a></li>
+          <li class="sub"><a href="#s2-5a">└ 限流算法横向对比</a></li>
+          <li class="sub"><a href="#s2-6">大 Key 与 热 Key 专题</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
         </ul>
       </div>
@@ -144,6 +150,78 @@
             <li>每个节点层高随机（<code>zslRandomLevel</code>，P=0.25），概率性平衡</li>
             <li>Redis 选跳表而非红黑树：<strong>实现简单、范围查询高效、易做 ZRANGEBYSCORE</strong></li>
           </ul>
+          <div class="tip"><strong>面试追问：跳表层高概率 P=0.25 为什么不是 1/2？</strong>P 越小高层节点越稀疏，内存开销更低（Redis 节点多，省内存重要），但查找路径略长。P=0.25 是<strong>内存 vs 查找效率</strong>的折中：平均每节点约 1.33 个指针，比 P=0.5 的 2 个省 1/3 内存。</div>
+        </div>
+
+        <div class="card">
+          <h4>listpack — 取代 ziplist 的新一代紧凑编码（Redis 7.0）</h4>
+          <p><strong>设计起点</strong>：Redis 7.0 用 listpack 全面替代 ziplist，根本原因是 ziplist 的<strong>连锁更新（cascade update）</strong>缺陷。</p>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">ziplist 的连锁更新隐患</h4>
+              <p>ziplist 每个 entry 存 <code>prev_entry_length</code> 记录前一节点长度：</p>
+              <ul>
+                <li>前一节点 &lt;254B → 占 1 字节；≥254B → 占 5 字节</li>
+                <li>若某节点从 253→254B，其后所有节点 prevlen 都需 1B→5B 扩展</li>
+                <li>连锁反应：后续每个节点变大 → 再触发后续 prevlen 扩展 → <strong>最坏 O(N²)</strong></li>
+              </ul>
+              <p class="warn" style="margin-top:0.4rem">概率极低（需连续多个 ~252B 节点），但一旦触发<strong>阻塞主线程</strong></p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ listpack 的解法</h4>
+              <ul>
+                <li>每个 entry 只存<strong>自身长度和编码</strong>，不记录前一节点长度</li>
+                <li>反向遍历：从末尾 total bytes 逐个倒退，靠当前 entry 的 encoding 长度定位</li>
+                <li><strong>彻底消除连锁更新</strong>：修改任意 entry 不影响其他 entry</li>
+                <li>同样紧凑：变长编码，小数据极致省内存</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：连锁更新是 ziplist 的经典缺陷。Redis 7.0 用 listpack 替代后，Hash/Set/ZSet 的小数据编码全部换成 listpack。问「ziplist 有什么问题」→ 核心答案就是连锁更新。</div>
+        </div>
+
+        <div class="card">
+          <h4>quicklist — List 的终极编码（listpack + 双向链表）</h4>
+          <p><strong>设计起点</strong>：纯链表每个节点一个 element，指针开销大且内存不连续；纯 ziplist/listpack 元素多了又有连锁/压缩开销。quicklist = <strong>双向链表的节点每个是一个 listpack</strong>，兼顾两者。</p>
+          <div class="diagram">
+            <div class="diagram-title">quicklist 结构</div>
+            <div class="flow" style="flex-wrap:wrap;gap:0.3rem">
+              <div class="flow-box flow-blue" style="min-width:110px">Head<br><small>listpack<br>[a,b,c]</small></div>
+              <div class="flow-arrow">⇄</div>
+              <div class="flow-box flow-purple" style="min-width:110px">Node2<br><small>listpack<br>[d,e,f,g]</small></div>
+              <div class="flow-arrow">⇄</div>
+              <div class="flow-box flow-green" style="min-width:110px">Node3<br><small>listpack<br>[h,i]</small></div>
+              <div class="flow-arrow">⇄</div>
+              <div class="flow-box flow-orange" style="min-width:110px">Tail<br><small>listpack<br>[j,k,l]</small></div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>每个节点是一个 listpack</strong>：节点内连续内存缓存友好，节点间双向链表灵活增删</li>
+            <li><code>list-max-listpack-size</code>：控制单节点 listpack 大小（默认 -2 = 每个 8KB）</li>
+            <li><strong>中间节点可 LZF 压缩</strong>：<code>list-compress-depth</code> 设为 1 表示首尾各保留 1 个未压缩节点（LPUSH/RPOP 高频区），中间 LZF 压缩省内存</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>intset — 纯整数集合的连续内存编码</h4>
+          <p>Set 全是整数且数量 ≤512（<code>set-max-intset-entries</code>）时用 intset：连续内存数组，按值升序，二分查找 O(logN)。</p>
+          <div class="diagram">
+            <div class="diagram-title">intset 升级过程</div>
+            <div class="flow" style="flex-wrap:wrap">
+              <div class="flow-box flow-blue">encoding INT16<br><small>[1,3,5]</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">插入 70000<br><small>超 int16 范围</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">升级 INT32<br><small>数组重新分配<br>逐个拷贝转换</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">[1,3,5,70000]</div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>只升不降</strong>：int16→int32→int64 升级后即使删除大值也不降级</li>
+            <li><strong>升级代价</strong>：重新分配整个数组并逐个转换，O(N) 操作</li>
+            <li>超 512 元素或加入非整数 → 转 hashtable</li>
+          </ul>
         </div>
 
         <h3 id="s1-3">1.3 持久化机制</h3>
@@ -195,6 +273,71 @@
           </table>
         </div>
         <div class="tip">Redis 4.0+ 支持<strong>混合持久化</strong>：AOF Rewrite 时先写 RDB 格式，再追加增量 AOF，兼顾恢复速度和数据安全。5.0 默认开启。</div>
+
+        <div class="card">
+          <h4>深入：RDB 的 fork + Copy-on-Write 内存陷阱</h4>
+          <p><strong>设计起点</strong>：RDB 要对<strong>某一时刻</strong>的内存做完整快照，但 Redis 不能停下来等快照写完。解法：<code>fork()</code> 子进程 + 操作系统 COW（Copy-on-Write）。</p>
+          <div class="diagram">
+            <div class="diagram-title">fork + COW 工作原理</div>
+            <div class="flow" style="flex-wrap:wrap">
+              <div class="flow-box flow-blue">主进程 fork()<br><small>子进程获页表副本<br>父子共享物理内存(只读)</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">子进程遍历内存<br><small>写 .rdb 文件<br>不阻塞主进程</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">主进程收到写请求<br><small>修改某内存页</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">OS 触发 COW<br><small>复制该页给主进程<br>子进程仍读旧页</small></div>
+            </div>
+          </div>
+          <div class="warn"><strong>风险一 — 内存翻倍</strong>：COW 按<strong>页复制</strong>（4KB/页）。BGSAVE 期间写入量大，大量页被复制，最坏物理内存接近<strong>2 倍</strong>。16GB+ 实例做 BGSAVE 需预留 50% 以上内存，否则 OOM 被 kill。</div>
+          <div class="warn"><strong>风险二 — fork 本身阻塞</strong>：fork 需复制<strong>页表</strong>（不是数据，是页表元数据）。实例越大页表越大，fork 越慢。16GB fork 可能阻塞 <strong>几十~几百 ms</strong>，32GB 可能秒级——这是大实例用 RDB 的痛点。</div>
+          <div class="tip"><strong>优化</strong>：① 关闭 THP（Transparent Huge Pages），否则 COW 以 2MB 大页复制，放大内存开销；② <code>info memory | grep mem_fork_time</code> 监控 fork 耗时；③ 超大实例分片降低单实例内存。</div>
+        </div>
+
+        <div class="card">
+          <h4>深入：AOF Rewrite 全过程与双缓冲</h4>
+          <p>AOF 不断追加写命令，文件越来越大。Rewrite 是<strong>对当前内存做一次「命令压缩」</strong>：用最少的命令表示当前数据，丢弃已过期/已删除/被覆盖的冗余命令。</p>
+          <div class="diagram">
+            <div class="diagram-title">AOF Rewrite 流程</div>
+            <div class="flow" style="flex-direction:column;gap:0.3rem">
+              <div class="flow-box flow-blue" style="width:100%">① fork 子进程，遍历内存生成新 AOF（内存状态 → 最简命令）</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-purple" style="width:100%">② 主进程继续处理请求，新写命令同时写入 <strong>AOF 缓冲区</strong> + <strong>AOF 重写缓冲区</strong></div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-green" style="width:100%">③ 子进程写完新 AOF，发信号给主进程</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-orange" style="width:100%">④ 主进程将 AOF 重写缓冲区的增量命令追加到新 AOF 末尾</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-pink" style="width:100%">⑤ 原子替换旧 AOF 文件（rename 保证原子性）</div>
+            </div>
+          </div>
+          <div class="warn"><strong>易错点（面试高频）</strong>：Rewrite 期间有<strong>两个缓冲区</strong>——AOF 缓冲区（正常追加用）和 AOF 重写缓冲区（暂存 Rewrite 期间的增量）。后者确保新 AOF 不丢失 Rewrite 期间的新写入。双缓冲设计是常考点。</div>
+        </div>
+
+        <div class="card">
+          <h4>Redis 7.0 multi-part AOF — 格式演进</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">7.0 之前：单文件 AOF</h4>
+              <ul>
+                <li>一个 <code>appendonly.aof</code> 文件</li>
+                <li>Rewrite 时临时文件 + rename 原子替换</li>
+                <li>大文件 rename 期间崩溃可能损坏</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ 7.0+：multi-part AOF</h4>
+              <ul>
+                <li>AOF 拆为目录：<code>appendonlydir/</code></li>
+                <li><strong>base 文件</strong>（RDB 或 AOF 格式的全量快照）</li>
+                <li><strong>incr 文件</strong>（增量 AOF 命令）</li>
+                <li><strong>manifest 文件</strong>（清单，记录 base+incr 列表）</li>
+                <li>Rewrite 只新增 base+清空 incr，旧文件延迟删除保安全</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>设计动机</strong>：multi-part 把「全量快照」和「增量日志」物理分离，Rewrite 不再需要大文件 rename，降低崩溃损坏风险，支持更灵活的增量保留策略。</div>
+        </div>
 
         <h3 id="s1-4">1.4 内存淘汰策略</h3>
         <div class="diagram">
@@ -253,6 +396,60 @@
             </div>
           </div>
           <div class="tip"><strong>面试要点</strong>：Redis 的淘汰策略本质是"<strong>用精度换性能</strong>"——单线程不能为淘汰拖慢命令。这也是为什么 Redis 没有"真正"的 LRU，而是 approximate LRU。LFU 用 Morris 计数器（概率计数）也是同样思路。</div>
+        </div>
+
+        <div class="card">
+          <h4>深入：LRU 与 LFU 在 RedisObject 中的位级实现</h4>
+          <p>每个 RedisObject 有一个 24bit 的 <code>lru</code> 字段，LRU 和 LFU 复用这同一字段，只是解释不同：</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">LRU 模式：24bit 全存时间戳</h4>
+              <ul>
+                <li>24bit 存「秒级时间戳」低 24 位，约 194 天循环一次</li>
+                <li>访问时更新该字段，淘汰时比较谁最旧</li>
+                <li>精度：秒级，足够区分访问新旧</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">LFU 模式：8bit 衰减 + 16bit 计数</h4>
+              <ul>
+                <li>高 8bit：最后访问时间衰减因子（分钟级）</li>
+                <li>低 16bit：Morris 近似计数器，记录访问频率</li>
+                <li>16bit 范围 0~65535，但 Morris 算法使其可达数百万次</li>
+              </ul>
+            </div>
+          </div>
+          <div class="diagram">
+            <div class="diagram-title">LFU 的 Morris 计数器原理</div>
+            <div class="flow" style="flex-wrap:wrap">
+              <div class="flow-box flow-blue">每次访问<br><small>不是 counter+1</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">按概率递增<br><small>counter 越大<br>递增概率越低</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">16bit 存储<br><small>却能表示<br>~数百万次访问</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">长时间不访问<br><small>衰减因子递增<br>counter 自动衰减</small></div>
+            </div>
+          </div>
+          <p>Morris 计数器：第 N 次访问时，以 <code>1/(counter+1)</code> 的概率才 +1。这样 counter 增长越来越慢，小空间表示大数值。衰减机制：超过 <code>lfu-decay-time</code>（默认 1 分钟）没访问，counter 衰减 1，防止老热点永久占位。</p>
+        </div>
+
+        <div class="card">
+          <h4>淘汰策略选型决策</h4>
+          <div class="diagram">
+            <div class="diagram-title">按场景选择淘汰策略</div>
+            <table>
+              <thead><tr><th>场景</th><th>推荐策略</th><th>原因</th></tr></thead>
+              <tbody>
+                <tr><td>纯缓存（全热点）</td><td><code>allkeys-lru</code></td><td>所有 key 都可淘汰，LRU 保留热点</td></tr>
+                <tr><td>缓存 + 持久数据混合</td><td><code>volatile-lru</code></td><td>只淘汰有 TTL 的缓存 key，无 TTL 的持久数据保留</td></tr>
+                <tr><td>有明显冷热 + 扫描型访问</td><td><code>allkeys-lfu</code></td><td>LFU 防一次性扫描的冷数据挤掉真热点</td></tr>
+                <tr><td>所有 key 等价（如 session）</td><td><code>volatile-ttl</code></td><td>优先淘汰快过期的，符合直觉</td></tr>
+                <tr><td>不能丢任何数据</td><td><code>noeviction</code></td><td>写满报错，靠应用层处理</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="warn"><strong>LRU vs LFU 选择</strong>：有<strong>批量扫描</strong>场景（如定时全表扫缓存）用 LFU——LRU 会让扫描到的冷数据成为"最近访问"挤掉热点；LFU 看频次不受单次扫描影响。无扫描场景 LRU 够用且更简单。</div>
         </div>
 
         <h3 id="s1-4b">1.4b 过期 Key 删除策略 — 惰性 + 定期 的组合</h3>
@@ -331,6 +528,78 @@
           </div>
           <div class="warn"><strong>易错点</strong>：6.0 多线程默认<strong>关闭</strong>，需 <code>io-threads 4</code>（建议 CPU 核数的一半）+ <code>io-threads-do-reads yes</code> 开启。且对小数据包收益不明显，适合大 value（如大 Hash/List）场景。</div>
           <div class="tip"><strong>面试金句</strong>：Redis 的线程模型演进体现"<strong>精准优化瓶颈</strong>"——单线程够用时不动，网络成瓶颈就只多线程化网络，命令执行仍单线程保持无锁优势。这是工程优化的范本：哪里慢优化哪里，不盲目全多线程。</div>
+        </div>
+
+        <div class="card">
+          <h4>深入：aeEventLoop 事件循环内核结构</h4>
+          <p>Redis 自己实现的轻量事件循环框架 <code>ae.c</code>，核心是一个 epoll/kqueue/select 的封装 + 事件分派器。</p>
+          <div class="diagram">
+            <div class="diagram-title">aeEventLoop 处理两大类事件</div>
+            <div class="arch-container">
+              <div class="arch-row">
+                <div class="arch-box" style="border-color:var(--accent);background:rgba(56,189,248,0.06)">
+                  <strong>文件事件 (FileEvent)</strong>
+                  <div class="arch-label">socket 可读/可写<br>客户端连接、命令接收、响应回写</div>
+                </div>
+                <div class="arch-box" style="border-color:var(--accent3);background:rgba(52,211,153,0.06)">
+                  <strong>时间事件 (TimeEvent)</strong>
+                  <div class="arch-label">定时任务：serverCron<br>过期 key 清理、统计、AOF 刷盘触发</div>
+                </div>
+              </div>
+              <div class="arch-connector">⬇️ 单线程轮询</div>
+              <div class="arch-row">
+                <div class="arch-box-wide" style="border-color:var(--accent2);background:rgba(129,140,248,0.06)">
+                  <strong>aeMain 主循环</strong>：aeApiPoll(timeout) 阻塞等待 → 处理就绪文件事件 → 处理到期时间事件
+                </div>
+              </div>
+            </div>
+          </div>
+          <ul>
+            <li><strong>epoll 用的是 LT（水平触发）模式</strong>，不是 ET（边缘触发）。LT 模式下只要 socket 有数据可读就持续通知，编码简单，不易漏读——Redis 追求简单可靠</li>
+            <li><strong>aeApiPoll 的 timeout 动态计算</strong>：取最近一个时间事件的到期时间，没时间事件则阻塞到有文件事件</li>
+            <li><strong>serverCron</strong>：每 1ms（<code>hz</code> 默认 10）执行一次的时间事件，做过期清理、统计、集群心跳、渐进式 rehash 辅助等</li>
+          </ul>
+          <div class="warn"><strong>易错点</strong>：Redis「单线程」指<strong>命令执行</strong>单线程。但 fork 出的子进程（RDB/AOF Rewrite）、bio 后台线程（异步删除 unlink、关闭 fd、AOF fsync）是独立线程，不算在事件循环里。</div>
+        </div>
+
+        <div class="card">
+          <h4>深入：RESP3 协议 — Redis 的通信格式</h4>
+          <p>Redis Serialization Protocol，Redis 客户端与服务端的二进制安全文本协议。</p>
+          <div class="diagram">
+            <div class="diagram-title">RESP2 五种基本类型（首字节区分）</div>
+            <table>
+              <thead><tr><th>首字节</th><th>类型</th><th>示例</th><th>含义</th></tr></thead>
+              <tbody>
+                <tr><td><code>+</code></td><td>Simple String</td><td><code>+OK\r\n</code></td><td>成功响应</td></tr>
+                <tr><td><code>-</code></td><td>Error</td><td><code>-ERR wrong\r\n</code></td><td>错误信息</td></tr>
+                <tr><td><code>:</code></td><td>Integer</td><td><code>:1000\r\n</code></td><td>整数返回</td></tr>
+                <tr><td><code>$</code></td><td>Bulk String</td><td><code>$5\r\nhello\r\n</code></td><td>二进制安全字符串（含长度）</td></tr>
+                <tr><td><code>*</code></td><td>Array</td><td><code>*2\r\n$3\r\nfoo\r\n...</code></td><td>数组（多条命令/多值返回）</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <pre><code># 客户端发送 SET name redis，实际传输：
+*3\r\n$3\r\nSET\r\n$4\r\nname\r\n$5\r\nredis\r\n
+# *3 = 数组3元素，$N = 后续字符串长度</code></pre>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">RESP2 的局限</h4>
+              <ul>
+                <li>所有复杂类型只能用 Array 套 Bulk String 表示</li>
+                <li>客户端需<strong>按命令约定</strong>猜每个字段含义（如 HGETALL 返回的数组是交替 key-value）</li>
+                <li>无类型信息，客户端无法自动反序列化为结构化对象</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">✅ RESP3（Redis 6.0）增强</h4>
+              <ul>
+                <li>新增 Map(<code>%</code>)、Set(<code>~</code>)、Double(<code>,</code>)、Boolean(<code>#</code>)、Null(<code>_</code>) 等类型</li>
+                <li>服务端返回带类型，客户端<strong>无需猜测</strong>即可反序列化</li>
+                <li>支持 Push 类型(<code>&gt;</code>)：服务端主动推送（Pub/Sub、keyspace notification）</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：RESP 是<strong>文本协议但二进制安全</strong>（靠 <code>$长度</code> 前缀而非分隔符判断结束，所以 value 可含 \r\n）。这是 Redis 协议设计的关键点。RESP3 向后兼容 RESP2，默认仍用 RESP2，需 <code>HELLO 3</code> 协商升级。</div>
         </div>
 
         <h3 id="s1-5b">1.6 渐进式 rehash 与对象编码转换</h3>
@@ -439,6 +708,64 @@ OBJECT ENCODING bigzset  // 仍是 "skiplist"，不会降回 listpack
           </ul>
         </div>
 
+        <div class="card">
+          <h4 id="s2-1a">深入：Cache Aside 的并发一致性问题</h4>
+          <p><strong>设计起点</strong>：Cache Aside（旁路缓存）是业界最常用的缓存模式——读先查缓存，写时<strong>先更新 DB 再删缓存</strong>。但看似简单，并发下仍有经典的一致性漏洞。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">漏洞一：先删缓存再更 DB</h4>
+              <div class="flow" style="flex-direction:column;gap:0.2rem;font-size:0.8rem">
+                <div class="flow-box flow-blue" style="width:100%">线程A 删缓存</div>
+                <div class="flow-box flow-orange" style="width:100%">线程B 读缓存(未命中) → 读旧DB</div>
+                <div class="flow-box flow-purple" style="width:100%">线程B 写旧值到缓存</div>
+                <div class="flow-box flow-pink" style="width:100%">线程A 更新DB → 缓存仍是旧值！脏数据</div>
+              </div>
+              <p class="warn" style="margin-top:0.4rem">所以 Cache Aside <strong>必须先更 DB 再删缓存</strong></p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent4)">
+              <h4 style="color:var(--accent4)">漏洞二：先更 DB 再删缓存（仍有小概率）</h4>
+              <div class="flow" style="flex-direction:column;gap:0.2rem;font-size:0.8rem">
+                <div class="flow-box flow-blue" style="width:100%">缓存刚好失效</div>
+                <div class="flow-box flow-orange" style="width:100%">线程A 读旧DB（拿到旧值）</div>
+                <div class="flow-box flow-purple" style="width:100%">线程B 更新DB + 删缓存</div>
+                <div class="flow-box flow-pink" style="width:100%">线程A 写旧值到缓存 → 脏数据</div>
+              </div>
+              <p class="warn" style="margin-top:0.4rem">概率极低（需读旧值比写慢），但<strong>理论存在</strong></p>
+            </div>
+          </div>
+          <div class="card" style="margin-top:1rem;border-color:var(--accent3);background:rgba(52,211,153,0.04)">
+            <h4 style="color:var(--accent3)">解法：延迟双删（Sleep + Delete）</h4>
+            <div class="flow" style="flex-wrap:wrap">
+              <div class="flow-box flow-blue">① 删缓存</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">② 更新DB</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-orange">③ sleep N ms<br><small>等读线程读完旧值</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">④ 再删一次缓存<br><small>清理可能写入的脏值</small></div>
+            </div>
+            <p style="margin-top:0.5rem">N 取「一次读请求耗时 + 几百 ms 缓冲」。代价是更新流程变长，且第二次删可能失败（需重试队列兜底）。</p>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：Cache Aside 的最佳实践是<strong>先更 DB 再删缓存</strong>（不是更新缓存——并发写会互相覆盖）。极端一致性要求用延迟双删 + 删除重试（MQ/订阅 binlog 异步删）。彻底一致可用「通过 DB binlog 订阅（Canal）异步刷缓存」。</div>
+        </div>
+
+        <div class="card">
+          <h4>四种缓存读写模式横向对比</h4>
+          <div class="diagram">
+            <div class="diagram-title">Cache Aside / Read-Through / Write-Through / Write-Behind</div>
+            <table>
+              <thead><tr><th>模式</th><th>读流程</th><th>写流程</th><th>一致性</th><th>适用场景</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Cache Aside</strong> ⭐</td><td>查缓存→未命中查DB→回填</td><td>更DB→删缓存</td><td>最终一致</td><td>最常用，应用层控制</td></tr>
+                <tr><td><strong>Read-Through</strong></td><td>查缓存→未命中<strong>由缓存服务</strong>查DB并回填</td><td>同上</td><td>最终一致</td><td>应用不关心DB，缓存封装</td></tr>
+                <tr><td><strong>Write-Through</strong></td><td>同上</td><td>写缓存→缓存<strong>同步</strong>写DB</td><td>强一致</td><td>写性能要求不高</td></tr>
+                <tr><td><strong>Write-Behind</strong></td><td>同上</td><td>写缓存→缓存<strong>异步</strong>批量刷DB</td><td>弱一致</td><td>写极多，可容忍丢数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="warn"><strong>关键区别</strong>：Cache Aside 是<strong>应用层</strong>管缓存读写；Read/Write-Through 是<strong>缓存层</strong>代理 DB 访问（应用只认缓存）。Write-Behind（回写）写速度最快但有数据丢失风险（缓存宕机未刷盘的写会丢）。</div>
+        </div>
+
         <h3 id="s2-2">2.2 分布式锁</h3>
         <div class="card"><h4>问题场景</h4><p>单机锁只在 JVM 内有效，分布式系统中多实例访问共享资源需要跨进程锁。</p></div>
         <div class="diagram">
@@ -474,6 +801,66 @@ end</code></pre>
         </div>
         <div class="tip"><strong>Redisson</strong> 的 Watch Dog 机制：后台线程每 10 秒检查锁，自动续期（默认 30 秒），解决业务未执行完锁就过期的问题。</div>
         <div class="warn">单节点锁在主从切换时可能丢失。<strong>RedLock</strong>（向 N 个独立节点加锁，多数成功才算）可提高可靠性，但 Martin Kleppmann 有著名反驳，需了解争议。</div>
+
+        <div class="card">
+          <h4 id="s2-2a">深入：RedLock 算法与 Martin Kleppmann 争议</h4>
+          <p><strong>设计起点</strong>：单主 Redis 锁有<strong>主从切换丢锁</strong>风险——加锁成功后 Master 还没同步给 Slave 就宕机，Slave 升主后锁丢失，另一个线程也能加锁成功。RedLock 是 Antirez 提出的<strong>多节点多数派</strong>方案。</p>
+          <div class="diagram">
+            <div class="diagram-title">RedLock 算法流程（5 个独立 Master 实例）</div>
+            <div class="flow" style="flex-direction:column;gap:0.3rem">
+              <div class="flow-box flow-blue" style="width:100%">① 客户端记录当前时间 T1，对 5 个独立 Redis 实例依次 SET NX EX</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-purple" style="width:100%">② 统计成功数，记录耗时 T2-T1</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-green" style="width:100%">③ 成功数 ≥3（多数派）且 T2-T1 &lt; 锁有效期 → <strong>加锁成功</strong></div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-orange" style="width:100%">④ 锁实际有效时间 = 有效期 - (T2-T1)，扣掉网络耗时</div>
+              <div class="flow-arrow">⬇️</div>
+              <div class="flow-box flow-pink" style="width:100%">⑤ 失败（未达多数）→ 向所有实例发 DEL 释放</div>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">Martin Kleppmann 的反驳</h4>
+              <ul>
+                <li><strong>GC 停顿破坏假设</strong>：客户端加锁后 STW（GC 暂停几秒），锁过期自动释放，恢复后仍以为持有锁 → 两个客户端同时操作</li>
+                <li><strong>时钟依赖</strong>：RedLock 强依赖各节点时钟准确，若某节点时钟跳变（NTP 校正、VM 迁移），锁有效期计算出错</li>
+                <li><strong>结论</strong>：需要正确性的分布式锁应用<strong> fencing token</strong> 方案（每次加锁递增序号，DB 层拒绝旧 token 的写）</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">Antirez 的回应</h4>
+              <ul>
+                <li>GC 问题对所有锁都存在，非 RedLock 独有</li>
+                <li>时钟跳变可通过运维避免（禁止 VM 迁移、合理 NTP）</li>
+                <li>RedLock 定位是<strong>效率优先</strong>（避免重复计算），非绝对正确性</li>
+                <li>fencing token 需 DB 支持，很多场景做不到</li>
+              </ul>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：这个争议是分布式系统的经典案例。结论：<strong>对效率型锁（防重复执行）RedLock 够用</strong>；<strong>对正确性型锁（如金融扣款）用 ZooKeeper/etcd（基于 Raft 共识）+ fencing token</strong>。能讲清争议双方观点是大加分项。</div>
+        </div>
+
+        <div class="card">
+          <h4>Redisson 分布式锁的完整能力</h4>
+          <p>Redisson 是 Java 生态最成熟的 Redis 客户端，分布式锁是其王牌功能，远超手写 SETNX：</p>
+          <div class="diagram">
+            <div class="diagram-title">Redisson 锁能力矩阵</div>
+            <table>
+              <thead><tr><th>能力</th><th>实现</th><th>解决问题</th></tr></thead>
+              <tbody>
+                <tr><td><strong>可重入</strong></td><td>Hash 结构存 thread_id + 重入次数</td><td>同线程多次加锁不死锁</td></tr>
+                <tr><td><strong>Watch Dog 续期</strong></td><td>后台定时任务每 1/3 锁期检查续期</td><td>业务执行超时锁自动释放</td></tr>
+                <tr><td><strong>公平锁</strong></td><td>基于 Redis List 排队</td><td>先到先得，防饥饿</td></tr>
+                <tr><td><strong>读写锁</strong></td><td>ReadWriteLock</td><td>读多写少场景</td></tr>
+                <tr><td><strong>信号量</strong></td><td>Semaphore</td><td>限流/资源池</td></tr>
+                <tr><td><strong>联锁(MultiLock)</strong></td><td>多个 RLock 聚合</td><td>同时锁定多个资源</td></tr>
+                <tr><td><strong>红锁(RedLock)</strong></td><td>多节点多数派</td><td>提高可靠性</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="warn"><strong>注意</strong>：Watch Dog 默认只在<strong>未显式指定 leaseTime</strong>时启用。如果调用 <code>lock(30, SECONDS)</code> 显式指定了超时，就不会续期——这是常见误用。</div>
+        </div>
 
         <h3 id="s2-3">2.3 消息队列与延迟队列</h3>
         <div class="compare-row">
@@ -559,6 +946,81 @@ end</code></pre>
         </div>
 
         <div class="card">
+          <h4 id="s2-4a">深入：主从复制的 PSYNC 协议与数据丢失风险</h4>
+          <p><strong>设计起点</strong>：主从复制是 Redis 高可用的基础，但其<strong>异步</strong>特性带来数据丢失风险——这是面试高频考点。</p>
+          <div class="diagram">
+            <div class="diagram-title">PSYNC 全量 vs 增量同步判定</div>
+            <div class="flow" style="flex-wrap:wrap">
+              <div class="flow-box flow-blue">Slave 发送<br>PSYNC {runid} {offset}</div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-purple">Master 判定<br><small>runid 是否匹配？<br>offset 在 backlog 内？</small></div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-box flow-green">匹配 → +CONTINUE<br><small>增量同步<br>发 backlog 中 offset 后的数据</small></div>
+              <div class="flow-arrow">|</div>
+              <div class="flow-box flow-orange">不匹配 → +FULLRESYNC<br><small>全量同步<br>BGSAVE + RDB + 后续增量</small></div>
+            </div>
+          </div>
+          <div class="compare-row" style="margin-top:1rem">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">repl_backlog 环形缓冲区</h4>
+              <ul>
+                <li>Master 维护一个<strong>环形数组</strong>（默认 1MB），存最近的写命令</li>
+                <li>每个命令有 offset，Slave 断线重连时报告自己的 offset</li>
+                <li>offset 还在 backlog 内 → 增量同步，否则退化全量</li>
+                <li><strong>调优</strong>：写入量大或网络不稳时调大 <code>repl-backlog-size</code>（如 64MB），减少全量同步概率</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">异步复制的数据丢失</h4>
+              <ul>
+                <li>Redis 复制是<strong>异步</strong>：Master 写入后立即返回客户端，不等 Slave ACK</li>
+                <li>若 Master 返回成功后立即宕机，未同步的写入<strong>丢失</strong></li>
+                <li><code>min-slaves-to-write N</code>：至少 N 个 Slave 确认才允许写（半同步），但会牺牲可用性</li>
+                <li><strong>权衡</strong>：一致性 vs 可用性，CP 还是 AP——Redis 默认选 AP</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>面试高频</strong>：Redis 主从复制是<strong>异步</strong>的，这是它「快」的原因，也是「可能丢数据」的根源。问「主从切换会丢数据吗」→ 会，Master 宕机时未同步到 Slave 的写入会丢。要强一致需 <code>WAIT numreplicas timeout</code> 命令（同步等待）或用 min-slaves-to-write。</div>
+        </div>
+
+        <div class="card">
+          <h4 id="s2-4b">深入：Cluster 为什么是 16384 个 slot？slot 迁移怎么做？</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">为什么是 16384 而不是 65536？</h4>
+              <ul>
+                <li>节点间 Gossip 心跳要交换<strong>slot 位图</strong>（每个 slot 1 bit）</li>
+                <li>16384 slot → 位图 2KB；65536 slot → 8KB</li>
+                <li>Redis Cluster 官方建议节点数 &lt;1000，16384 足够分，且心跳包小</li>
+                <li>Antirez 原话：8KB 心跳包在 1000 节点时带宽浪费明显，2KB 刚好</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">slot 迁移（resharding）过程</h4>
+              <div class="flow" style="flex-direction:column;gap:0.2rem;font-size:0.8rem">
+                <div class="flow-box flow-blue" style="width:100%">① 源节点标记 slot 为 MIGRATING</div>
+                <div class="flow-box flow-purple" style="width:100%">② 目标节点标记 slot 为 IMPORTING</div>
+                <div class="flow-box flow-green" style="width:100%">③ 逐个 MIGRATE key 到目标节点</div>
+                <div class="flow-box flow-orange" style="width:100%">④ 迁移中：Client 访问 → ASK 临时重定向</div>
+                <div class="flow-box flow-pink" style="width:100%">⑤ 全部迁完：CLUSTER SETSLOT 确认归属</div>
+              </div>
+            </div>
+          </div>
+          <div class="diagram" style="margin-top:1rem">
+            <div class="diagram-title">MOVED vs ASK 重定向对比</div>
+            <table>
+              <thead><tr><th>维度</th><th>MOVED</th><th>ASK</th></tr></thead>
+              <tbody>
+                <tr><td><strong>触发时机</strong></td><td>slot 归属确定，但 Client 路由表过期</td><td>slot 正在迁移中</td></tr>
+                <tr><td><strong>Client 行为</strong></td><td>更新本地路由表，后续直接找新节点</td><td>临时重定向，<strong>不更新</strong>路由表</td></tr>
+                <tr><td><strong>下次请求</strong></td><td>直奔新节点</td><td>仍先找源节点（可能又 ASK）</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="warn"><strong>脑裂风险</strong>：网络分区时，原 Master 与多数派隔离，少数派侧的 Slave 被提升为新 Master，分区恢复后旧 Master 降为 Slave。分区期间旧 Master 的写入会<strong>丢失</strong>。Cluster 用 <code>cluster-node-timeout</code>（默认 15s）判定节点下线，超时才触发故障转移，一定程度上减少脑裂窗口。</div>
+        </div>
+
+        <div class="card">
           <h4>🔗 Redis Cluster 集群</h4>
           <p><strong>核心思路</strong>：数据分片 + 去中心化，解决单机内存和写入瓶颈</p>
           <div class="diagram">
@@ -613,6 +1075,91 @@ end</code></pre>
           </div>
         </div>
 
+        <!-- ===== 限流算法横向对比（设计起点） ===== -->
+        <div class="card">
+          <h3 id="s2-5a">2.5b 限流算法横向对比</h3>
+          <p><strong>设计起点：解决什么问题</strong>——"单位时间内只允许 N 次请求"看似简单，难点在于<strong>窗口边界突变</strong>（临界突刺）、<strong>平滑性</strong>（是否允许突发）、<strong>分布式一致性</strong>三个维度。四种经典算法各自在这三个维度上做取舍。</p>
+          <table>
+            <thead><tr><th>算法</th><th>核心思想</th><th>突发流量</th><th>临界突刺</th><th>实现复杂度</th></tr></thead>
+            <tbody>
+              <tr><td>固定窗口</td><td>每个时间窗口内计数，超限拒绝，窗口结束清零</td><td>允许</td><td>❌ 有（窗口边界 2 倍流量）</td><td>低（INCR + EXPIRE）</td></tr>
+              <tr><td>滑动窗口</td><td>用 ZSET 记录每次请求时间戳，统计窗口内元素数</td><td>允许</td><td>✅ 无</td><td>中（ZADD/ZREMRANGEBYSCORE/ZCARD）</td></tr>
+              <tr><td>漏桶</td><td>请求入桶，以固定速率漏出；桶满则拒绝</td><td>❌ 不允许（强制平滑）</td><td>✅ 无</td><td>中（需定时漏出线程）</td></tr>
+              <tr><td>令牌桶</td><td>以固定速率向桶中放令牌，请求消耗令牌；桶空则拒绝</td><td>✅ 允许（桶中令牌可累积）</td><td>✅ 无</td><td>中（Lua 脚本原子取令牌）</td></tr>
+            </tbody>
+          </table>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">⚡ 临界突刺问题（固定窗口的致命伤）</h4>
+              <p>限流 100/s。0.9s 时来了 100 个请求（放行），1.1s 时又来 100 个（新窗口放行）——<strong>0.2s 内放过 200 请求</strong>，后端可能被打垮。</p>
+              <p><strong>滑动窗口解法</strong>：窗口不是固定的时间格，而是"当前时刻往前推 1s"，任何时刻窗口内都不会超过阈值。</p>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">🪣 漏桶 vs 令牌桶</h4>
+              <p><strong>漏桶</strong>：无论来多少请求，输出速率恒定。适合<strong>保护下游</strong>（如对接第三方 API，对方限速严格）。</p>
+              <p><strong>令牌桶</strong>：空闲时攒令牌，突发时可瞬间消费攒下的令牌。适合<strong>允许合理突发</strong>的业务（如用户登录峰值）。</p>
+              <p>Guava <code>RateLimiter</code>、Sentinel 默认都是令牌桶变体。</p>
+            </div>
+          </div>
+          <div class="tip"><strong>面试要点</strong>：分布式限流必须用 Lua 脚本保证"取令牌/计数"原子性，否则多节点各自计数会突破总阈值。Redisson <code>RRateLimiter</code> 已封装好分布式令牌桶。</div>
+        </div>
+
+        <!-- ===== 大Key与热Key专题（设计起点） ===== -->
+        <div class="card">
+          <h3 id="s2-6">2.6 大 Key 与 热 Key 专题</h3>
+          <p><strong>设计起点：解决什么问题</strong>——Redis 单线程执行命令，一条命令的耗时取决于它操作的<strong>数据量</strong>和<strong>访问频率</strong>。数据量过大（大 Key）会阻塞主线程；访问过于集中（热 Key）会造成单分片瓶颈和热备不一致。两者是 Redis 规模化后最常见的事故源。</p>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--danger)">
+              <h4 style="color:var(--danger)">📦 大 Key 的危害</h4>
+              <ul>
+                <li><strong>阻塞主线程</strong>：DEL 一个 10MB 的 list/hash 耗时可达数十毫秒，期间所有其他请求排队</li>
+                <li><strong>网络阻塞</strong>：单次响应过大占满网卡缓冲区，影响其他客户端</li>
+                <li><strong>集群迁移卡死</strong>：slot 迁移时大 Key 要整体 MIGRATE，可能触发 <code>cluster-replica-no-failover</code> 超时</li>
+                <li><strong>阻塞式淘汰</strong>：内存淘汰时大 Key 回收慢，放大 jitter</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent)">
+              <h4 style="color:var(--accent)">📏 大 Key 判定标准</h4>
+              <ul>
+                <li>string：value &gt; 10KB</li>
+                <li>list/set/zset/hash：元素数 &gt; 5000，或总大小 &gt; 10MB</li>
+                <li>业务上：一个 Key 承载了本该分散到多 Key 的数据（如全站用户会话塞进一个 hash）</li>
+              </ul>
+              <p><strong>排查工具</strong>：<code>redis-cli --bigkeys</code>（采样）、<code>MEMORY USAGE key</code>（精确）、RDB 离线分析工具 <code>rdb-tools</code></p>
+            </div>
+          </div>
+          <h4>大 Key 的发现与处理</h4>
+          <table>
+            <thead><tr><th>阶段</th><th>手段</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>发现</td><td>--bigkeys / scan + MEMORY USAGE</td><td>线上禁用 KEYS，用 SCAN 遍历避免阻塞</td></tr>
+              <tr><td>拆分</td><td>按业务维度拆分</td><td>如 user:1000:cart 拆成 user:1000:cart:202406 这种按时间/分片</td></tr>
+              <tr><td>删除</td><td>UNLINK（4.0+）异步删除</td><td>DEL 是同步阻塞，UNLINK 丢给 bio 线程回收，不卡主线程</td></tr>
+              <tr><td>过期</td><td>分批惰性删除</td><td>大 hash 用 hscan+hdel 分批清，避免同时过期引发抖动</td></tr>
+            </tbody>
+          </table>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent3)">
+              <h4 style="color:var(--accent3)">🔥 热 Key 的危害</h4>
+              <ul>
+                <li><strong>单分片 CPU 打满</strong>：Cluster 模式下热 Key 只落在一个分片，无法横向分摊</li>
+                <li><strong>热备不一致</strong>：从节点异步复制跟不上，读从库会读到旧数据</li>
+                <li><strong>缓存击穿放大</strong>：热 Key 过期瞬间，所有请求穿透到 DB</li>
+              </ul>
+            </div>
+            <div class="compare-box" style="border-color:var(--accent2)">
+              <h4 style="color:var(--accent2)">🛡️ 热 Key 的应对</h4>
+              <ul>
+                <li><strong>本地缓存</strong>：在应用层用 Caffeine 缓存热 Key，减少对 Redis 的直接访问（多级缓存）</li>
+                <li><strong>副本打散</strong>：把 hot_key 复制成 hot_key:1 / hot_key:2 ...，读取时随机选一个副本</li>
+                <li><strong>读写分离</strong>：热 Key 读走从库，减轻主库压力</li>
+                <li><strong>发现工具</strong>：<code>redis-cli --hotkeys</code>（需开启 LFU）、代理层统计、客户端采样</li>
+              </ul>
+            </div>
+          </div>
+          <div class="warn"><strong>面试易混点：大 Key ≠ 热 Key</strong>。大 Key 看的是<strong>单 Key 数据量</strong>（影响单命令耗时）；热 Key 看的是<strong>访问 QPS</strong>（影响单分片负载）。一个 1KB 的 Key 被 10w QPS 访问是热 Key 不是大 Key；一个 50MB 的 list 每天只读一次是大 Key 不是热 Key。两者处理手段完全不同。</div>
+        </div>
+
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
 
@@ -654,6 +1201,38 @@ end</code></pre>
         <div class="qa">
           <div class="q">大 Key 怎么发现和处理？</div>
           <div class="a"><strong>发现</strong>：<code>--bigkeys</code> 扫描、<code>MEMORY USAGE</code>、<code>DEBUG OBJECT</code>。<br><strong>危害</strong>：阻塞请求、网络慢、内存不均。<br><strong>处理</strong>：拆分、<code>UNLINK</code> 异步删除、HSCAN+HDEL 渐进删除。</div>
+        </div>
+
+        <!-- ===== 新增高阶面试题 ===== -->
+
+        <div class="qa">
+          <div class="q">RDB 的 fork + COW 机制？大内存实例为什么要小心？</div>
+          <div class="a"><strong>机制</strong>：BGSAVE 调用 fork()，子进程共享父进程内存页；任意一方写某页时，内核才触发 COW（写时复制）复制该页，子进程据此得到一份"快照时刻"的内存副本。<br><strong>大内存风险</strong>：① <strong>fork 本身阻塞</strong>——需复制页表，16GB 实例复制页表可能耗时几十到几百 ms，期间主线程停顿；② <strong>内存倍增</strong>——若写操作密集，大量页被 COW，父子两份内存可能瞬时接近 2 倍。<br><strong>追问：为什么不用线程做快照？</strong>快照要求"某一时刻一致性视图"，多线程难保证；fork+COW 借助 OS 的页表机制天然拿到一致性视图，子进程无需加锁即可遍历。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">AOF Rewrite 的双缓冲机制？为什么 Rewrite 期间还能正常服务？</div>
+          <div class="a">Rewrite 时 fork 子进程遍历内存，把当前数据状态转成写入命令写到<strong>新 AOF 文件</strong>；同时父进程继续处理请求，期间产生的新命令同时写入<strong>旧 AOF 缓冲</strong>和<strong>AOF Rewrite 缓冲</strong>两处。子进程写完后通知父进程，父进程把 Rewrite 缓冲里的增量追加到新文件，最后 rename 替换旧文件。<br><strong>双缓冲意义</strong>：旧缓冲保证 Rewrite 期间崩溃不丢数据；Rewrite 缓冲保证新文件包含 Rewrite 期间的所有变更。<br><strong>追问：7.0 多部件 AOF 解决了什么？</strong>旧版 Rewrite 末尾"追加增量"那一步父进程要短暂阻塞；多部件 AOF 把文件拆成 base（RDB/命令快照）+ incr（增量），Rewrite 只重写 base，incr 始终追加，省去末尾阻塞，且可独立复用 incr。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Redis 的 LRU/LFU 是如何用很少 bit 实现的？</div>
+          <div class="a">每个对象的 redisObject 末尾留 24 bit 给 LRU 字段。<strong>LRU</strong>：24 bit 存"最近访问时间戳"（秒，约 194 天回绕），淘汰时随机采样 N 个 key 比较时间戳取最久未访问的。<strong>LFU</strong>：24 bit 拆成 16 bit 存"最后衰减时间" + 8 bit 存"访问频次"，8 bit 频次用<strong>Morris 近似计数器</strong>（不是线性计数，而是概率递增：计数越大越难再 +1，可用 0-255 表达远超 255 的频次），并按时间衰减防止老热点永驻。<br><strong>追问：为什么不用真 LRU？</strong>真 LRU 要维护双向链表，每个 key 多两个指针，内存开销大；Redis 采用"随机采样近似 LRU"（默认采 5 个），以可接受的精度换显著的内存节省。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">PSYNC 全量/增量如何判定？repl_backlog 丢了怎么办？</div>
+          <div class="a">从库上报 <code>replid + offset</code>。主库判断：若 replid 匹配且 offset 在 <strong>repl_backlog 环形缓冲</strong>范围内 → <strong>增量同步</strong>，从 offset 起补发缺失命令；否则 → <strong>全量同步</strong>（BGSAVE 生成 RDB 传输 + 期间增量缓冲后续补发）。<br><strong>repl_backlog 丢数据</strong>：它是固定大小的环形缓冲（默认 1MB），主从断连期间主库写入超出缓冲容量时，旧命令被覆盖，从库重连后 offset 命中不了 → 触发全量同步，断连期间的写入若已不在缓冲也只在新 RDB 里体现。<strong>异步复制本质上就是"可能丢最新写入"</strong>，主库宕机时未同步到从库的那部分命令永久丢失。<br><strong>追问：怎么减少全量同步？</strong>调大 <code>repl-backlog-size</code>（按峰值写入速率 × 预计断连时长估算），并开启 <code>min-slaves-to-write</code> 防止主库"脱队"写入。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">RedLock 算法的步骤？Martin Kleppmann 为什么反对？</div>
+          <div class="a"><strong>RedLock 步骤</strong>（向 N 个独立 Master 节点加锁）：① 记录开始时间 T1；② 依次向每个节点 <code>SET key NX EX</code>，单节点超时很短；③ 加锁成功的节点数 ≥ ⌈N/2 + 1⌉ 且总耗时 &lt; TTL → 加锁成功，实际有效时间 = TTL - (T2 - T1)；否则向所有节点释放锁。<br><strong>Kleppmann 反对</strong>：① 依赖系统时钟，GC 暂停/时钟漂移会让持有者以为锁还没过期实际已过期，导致两个客户端同时持锁；② Redis 没有 fencing token，无法防止过期锁导致的并发写。<br><strong>Antirez 回应</strong>：可加 fencing token；时钟漂移概率低；对正确性要求极高的场景本就不该用 Redis 做锁，应用 ZooKeeper/etcd（基于 Raft 共识 + 租约）。<br><strong>结论</strong>：业务级互斥用 Redisson 单节点锁足够；金融级强一致用 etcd/ZooKeeper。</div>
+        </div>
+
+        <div class="qa">
+          <div class="q">Cache Aside 的并发漏洞？延迟双删为什么也要加 TTL？</div>
+          <div class="a"><strong>漏洞一（先删缓存后更 DB）</strong>：删缓存后、更新 DB 前，另一请求读 DB 旧值并回写缓存 → 缓存被旧值污染，直到下次 TTL。<br><strong>漏洞二（先更 DB 后删缓存）</strong>：删缓存失败 → 缓存仍是旧值；或读请求在"删缓存之前"已读到旧缓存并发起 DB 读，写请求删完后读请求又把旧值写回。<br><strong>延迟双删</strong>：更新 DB 后先删一次缓存，休眠 N 秒（约一次读耗时）再删一次，覆盖期间被并发回写的旧值。<br><strong>为什么还要 TTL</strong>：延迟双删覆盖不了"延迟窗口内的所有并发回写"（N 取不准）、也覆盖不了删缓存失败的情况；TTL 是兜底，保证即使有脏数据最终也会过期自愈。<strong>结论：缓存无法做到强一致，延迟双删 + TTL + 订阅 binlog 重做缓存</strong>是工程上常用的组合拳。</div>
         </div>
 
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
