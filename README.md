@@ -61,18 +61,13 @@ interview-prep/
 
 ### 4. 当前主题列表
 
-| 主题 | 文件 | 状态 |
-|------|------|------|
-| Redis | redis.html | ✅ 已完成 |
-| MySQL | mysql.html | ⏳ 待添加 |
-| Java 基础 | java-basics.html | ⏳ 待添加 |
-| JVM | jvm.html | ⏳ 待添加 |
-| Spring | spring.html | ⏳ 待添加 |
-| 分布式系统 | distributed.html | ⏳ 待添加 |
-| 系统设计 | system-design.html | ⏳ 待添加 |
-| 算法与数据结构 | algorithms.html | ⏳ 待添加 |
-| 计算机网络 | networking.html | ⏳ 待添加 |
-| 操作系统 | os.html | ⏳ 待添加 |
+目前已完成 **54 个技术主题**，另有数据库、消息队列/流计算、可观测性 3 个横向对比页。完整可点击目录以 [index.html](index.html) 为准，覆盖：
+
+- 编程语言与 JVM/Java 生态
+- 数据库、缓存与搜索引擎
+- 消息队列、流计算与微服务治理
+- 运维、云原生与可观测性
+- 系统设计、分布式理论与基础计算机知识
 
 ### 5. 使用方法
 
@@ -81,4 +76,4 @@ interview-prep/
 ---
 
 *创建时间：2026-06-02*
-*最后更新：2026-06-02*
+*最后更新：2026-08-12*

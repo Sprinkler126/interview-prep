@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git 与 GitHub - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>🌿 Git 与 GitHub</h1>
+    <p class="subtitle">版本模型 · 分支协作 · 冲突解决 · Rebase · Pull Request · 发布追溯</p>
+    <div class="page-layout">
+      <aside class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#model">Git 对象模型</a></li>
+          <li class="sub"><a href="#areas">三个工作区域</a></li>
+          <li class="sub"><a href="#branches">分支与合并</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#workflow">团队协作</a></li>
+          <li class="sub"><a href="#conflict">冲突与恢复</a></li>
+          <li class="sub"><a href="#release">发布追溯</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </aside>
+
+      <main class="main-content">
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+
+        <h3 id="model">1.1 Git 的对象模型</h3>
+        <div class="card">
+          <h4>Git 是内容寻址的快照数据库</h4>
+          <p>Git 在每次提交时记录项目的<strong>快照</strong>。对象内容经哈希得到对象 ID；提交对象通过父提交连成不可变的有向无环图（DAG）。分支只是一个指向提交的可移动引用，因此创建分支几乎没有成本。</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-title">一次提交的对象关系</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">Commit<br><small>作者、说明、父提交</small></div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-purple">Tree<br><small>目录与文件名映射</small></div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-green">Blob<br><small>文件内容</small></div>
+          </div>
+          <div class="flow">
+            <div class="flow-box flow-orange">main / HEAD</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-blue">最新 Commit</div>
+            <span class="flow-arrow">←</span>
+            <div class="flow-box flow-pink">feature/login</div>
+          </div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>对象</th><th>保存内容</th><th>面试要点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>blob</strong></td><td>一个文件的原始内容</td><td>不含文件名；相同内容只存一份</td></tr>
+              <tr><td><strong>tree</strong></td><td>目录项：文件名、权限、对象 ID</td><td>将目录结构组织为树</td></tr>
+              <tr><td><strong>commit</strong></td><td>根 tree、父提交、作者、时间、说明</td><td>构成提交历史 DAG；合并提交有多个父节点</td></tr>
+              <tr><td><strong>ref</strong></td><td>分支、tag 等名称到 commit ID 的指针</td><td>分支不是提交副本，而是一个引用</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="areas">1.2 工作区、暂存区与本地仓库</h3>
+        <div class="diagram">
+          <div class="diagram-title">从修改到远端的标准路径</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">工作区<br><small>编辑文件</small></div>
+            <span class="flow-arrow">git add →</span>
+            <div class="flow-box flow-orange">暂存区 Index<br><small>选择本次提交内容</small></div>
+            <span class="flow-arrow">git commit →</span>
+            <div class="flow-box flow-green">本地仓库<br><small>提交快照</small></div>
+            <span class="flow-arrow">git push →</span>
+            <div class="flow-box flow-purple">远端仓库</div>
+          </div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>目标</th><th>命令</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>查看当前状态</td><td><code>git status</code></td><td>先确认分支、未暂存和未提交文件</td></tr>
+              <tr><td>选择性暂存</td><td><code>git add -p</code></td><td>按 hunk 拆分提交，避免无关修改混入</td></tr>
+              <tr><td>查看差异</td><td><code>git diff</code> / <code>git diff --staged</code></td><td>分别查看工作区和暂存区差异</td></tr>
+              <tr><td>更新远端信息</td><td><code>git fetch origin</code></td><td>只更新远端跟踪分支，不改当前工作区</td></tr>
+              <tr><td>同步个人分支</td><td><code>git pull --rebase</code></td><td>将本地提交重放到远端最新提交上</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>提交粒度</strong>：一个提交只表达一个可独立审阅、可回滚的意图。提交信息使用动词开头，例如 <code>fix: handle empty token</code>；不要把格式化、重构和功能修改混在一起。</div>
+        </div>
+
+        <h3 id="branches">1.3 分支、Merge 与 Rebase</h3>
+        <div class="card">
+          <div class="flow">
+            <div class="flow-box flow-green">main<br><small>始终可发布</small></div>
+            <span class="flow-arrow">← PR ←</span>
+            <div class="flow-box flow-blue">feature/xxx<br><small>短生命周期分支</small></div>
+            <span class="flow-arrow">←</span>
+            <div class="flow-box flow-orange">本地提交</div>
+          </div>
+          <table>
+            <thead><tr><th>方式</th><th>历史形态</th><th>适用场景</th><th>注意事项</th></tr></thead>
+            <tbody>
+              <tr><td><strong>merge</strong></td><td>保留真实分叉，可能产生合并提交</td><td>共享分支、需要完整协作轨迹</td><td>不改写已有提交，最安全</td></tr>
+              <tr><td><strong>rebase</strong></td><td>把本地提交重放到新基底，历史线性</td><td>提交 PR 前整理个人分支</td><td>会生成新 ID，不能改写共享提交</td></tr>
+              <tr><td><strong>squash merge</strong></td><td>多个分支提交压成 main 上一个提交</td><td>小功能、main 希望保持简洁</td><td>保留 PR 讨论，丢失分支内细粒度提交</td></tr>
+            </tbody>
+          </table>
+          <pre><code>git fetch origin
+git rebase origin/main
+git push --force-with-lease origin feature/login
+# 不要对 main、release 等共享分支 rebase 或 force push</code></pre>
+        </div>
+
+        <h2 id="part2"><span class="icon">🧰</span>第二部分：场景化讲解</h2>
+
+        <h3 id="workflow">2.1 从需求到合并的协作流程</h3>
+        <div class="diagram">
+          <div class="diagram-title">可审阅、可验证、可回滚的交付闭环</div>
+          <div class="flow">
+            <div class="flow-box flow-blue">创建 Issue<br><small>明确范围与验收</small></div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-orange">feature 分支<br><small>小步提交</small></div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-purple">Pull Request<br><small>描述、截图、关联 Issue</small></div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box flow-green">CI + Review<br><small>通过后合并</small></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Pull Request 检查清单</h4>
+          <ul>
+            <li>标题说明<strong>为什么改</strong>；描述包含方案、验证方式和风险点。</li>
+            <li>只包含当前目标的改动；无关格式化和依赖升级单独提交。</li>
+            <li>CI 至少覆盖构建、静态检查与关键测试；失败时先修复再请求审查。</li>
+            <li>合并前同步目标分支；合并后删除功能分支，保持仓库整洁。</li>
+          </ul>
+        </div>
+
+        <h3 id="conflict">2.2 冲突与误操作恢复</h3>
+        <div class="card">
+          <h4>冲突解决的正确顺序</h4>
+          <ol>
+            <li>理解双方修改的业务意图，不能机械选择 “ours/theirs”。</li>
+            <li>编辑冲突标记之间的内容，保留正确实现，再运行相关测试。</li>
+            <li><code>git add &lt;file&gt;</code> 标记已解决；merge 使用 <code>git commit</code>，rebase 使用 <code>git rebase --continue</code>。</li>
+            <li>方案不对时，使用 <code>git merge --abort</code> 或 <code>git rebase --abort</code> 回到开始前。</li>
+          </ol>
+          <pre><code># reflog 记录 HEAD 的移动历史，可找回刚丢失的提交
+git reflog
+git switch -c recover-work &lt;commit-id&gt;
+
+# 已推送的错误提交，创建反向提交而非改写共享历史
+git revert &lt;commit-id&gt;</code></pre>
+          <div class="warn"><strong>高频踩坑</strong>：不要用 <code>git push --force</code> 覆盖共享分支；个人分支确需强推时优先使用 <code>--force-with-lease</code>，它会在远端已被他人更新时拒绝覆盖。</div>
+        </div>
+
+        <h3 id="release">2.3 发布、版本与可追溯性</h3>
+        <div class="card">
+          <table>
+            <thead><tr><th>需求</th><th>做法</th><th>价值</th></tr></thead>
+            <tbody>
+              <tr><td>标记正式发布</td><td><code>git tag -a v1.4.0 -m "release v1.4.0"</code></td><td>用不可变版本定位对应源码</td></tr>
+              <tr><td>定位引入问题的提交</td><td><code>git bisect start</code></td><td>二分提交历史，快速缩小回归范围</td></tr>
+              <tr><td>紧急回滚</td><td><code>git revert</code> + 重新发布</td><td>保留完整审计轨迹，适合生产分支</td></tr>
+              <tr><td>追踪一行代码</td><td><code>git blame path/to/file</code></td><td>辅助理解上下文，不等同于追责</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>版本建议</strong>：使用语义化版本时，<code>MAJOR</code> 表示不兼容变更，<code>MINOR</code> 表示向后兼容的新功能，<code>PATCH</code> 表示向后兼容的修复。Tag、构建产物和部署记录应相互关联。</div>
+        </div>
+
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+        <div class="qa"><div class="q">Git 的分支为什么创建和切换很快？</div><div class="a"><strong>参考答案</strong>：Git 的分支本质是一个指向 commit 的引用，不复制项目文件或完整历史。创建分支只是新建一个 ref，切换分支让 HEAD 指向另一个 ref 并更新工作区，因此成本很低。提交对象由父指针形成 DAG，多个分支共享同一段历史。</div></div>
+        <div class="qa"><div class="q">merge 和 rebase 有什么区别？为什么不能随意 rebase 已推送分支？</div><div class="a"><strong>参考答案</strong>：merge 汇合两条历史，保留原始 commit ID；rebase 会把一系列提交基于新基底重新创建，因此 ID 会改变。若 rebase 了他人已拉取的共享提交，其他人的历史就会分叉。个人功能分支在发 PR 前可 rebase 保持线性；共享分支应 merge。</div></div>
+        <div class="qa"><div class="q">误执行 reset --hard 后如何恢复？已经推送的错误提交如何回滚？</div><div class="a"><strong>参考答案</strong>：先用 <code>git reflog</code> 找到 reset 前 HEAD 指向的 commit，再用 <code>git switch -c recover &lt;commit&gt;</code> 建恢复分支。若错误已推送到共享分支，不应 force push 改历史，应使用 <code>git revert &lt;commit&gt;</code> 创建反向提交并走正常发布流程。</div></div>
+        <div class="qa"><div class="q">如何处理代码冲突？</div><div class="a"><strong>参考答案</strong>：先同步目标分支，阅读冲突两边的意图，手工合成正确代码而不是盲目选一边。删除冲突标记后执行测试，确认后 <code>git add</code>；在 merge 中提交合并结果，在 rebase 中执行 <code>git rebase --continue</code>。不确定时用 <code>--abort</code> 回退。</div></div>
+
+        <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
+          <a href="../index.html" style="color:var(--accent); text-decoration:none;">← 返回知识库目录</a>
+          <br><br>
+          Git 与 GitHub · 面试知识复习库 · Last updated 2026-08-12
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
