@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>计算机组成原理 - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
+  <div class="container">
+    <h1>🧠 计算机组成原理</h1>
+    <p class="subtitle">CPU · 存储层次 · Cache · 指令流水线 · 总线 · IO</p>
+    <div class="page-layout">
+      <aside class="sidebar"><div class="sidebar-title">📌 目录导航</div><ul>
+        <li><a href="#part1">第一部分：技术原理</a></li>
+        <li class="sub"><a href="#s1-1">冯·诺依曼体系</a></li><li class="sub"><a href="#s1-2">CPU 与指令执行</a></li><li class="sub"><a href="#s1-3">存储层次与 Cache</a></li><li class="sub"><a href="#s1-4">流水线与性能</a></li>
+        <li><a href="#part2">第二部分：场景化讲解</a></li><li class="sub"><a href="#s2-1">程序如何运行</a></li><li class="sub"><a href="#s2-2">Cache 性能问题</a></li><li class="sub"><a href="#s2-3">磁盘与 IO</a></li><li><a href="#part3">第三部分：模拟面试</a></li>
+      </ul></aside>
+      <main class="main-content">
+        <h2 id="part1"><span class="icon">🔩</span>第一部分：技术原理</h2>
+        <h3 id="s1-1">1.1 冯·诺依曼体系结构</h3>
+        <div class="card"><h4>核心组成与工作模型</h4>
+          <p>计算机由<strong>运算器、控制器、存储器、输入设备、输出设备</strong>组成；程序和数据都以二进制形式存放在内存中。现代 CPU 通常将运算器与控制器合称 CPU。</p>
+          <div class="flow"><div class="flow-item">输入设备</div><div class="flow-arrow">→</div><div class="flow-item">主存：指令 + 数据</div><div class="flow-arrow">↔</div><div class="flow-item">CPU：控制器 + ALU + 寄存器</div><div class="flow-arrow">→</div><div class="flow-item">输出设备</div></div>
+          <p><strong>关键边界：</strong>CPU 不能直接执行磁盘上的程序。操作系统先把可执行文件的代码和数据映射/装入内存，CPU 再按程序计数器（PC）指向的地址逐条取指执行。</p>
+        </div>
+        <h3 id="s1-2">1.2 CPU 与指令执行</h3>
+        <div class="card"><h4>指令周期：取指 → 译码 → 执行 → 写回</h4>
+          <div class="flow"><div class="flow-item">PC 给出地址</div><div class="flow-arrow">→</div><div class="flow-item">从 Cache/内存取指</div><div class="flow-arrow">→</div><div class="flow-item">译码，读寄存器</div><div class="flow-arrow">→</div><div class="flow-item">ALU 运算/访存</div><div class="flow-arrow">→</div><div class="flow-item">结果写回</div></div>
+          <ul><li><strong>寄存器</strong>在 CPU 内部，速度最快；通用寄存器保存操作数，PC 保存下一条指令地址，SP 指向栈顶。</li><li><strong>ALU</strong>执行整数算术和逻辑运算；浮点运算通常由 FPU 处理。</li><li><strong>中断</strong>让 CPU 响应外设、时钟和异常。CPU 保存现场，跳转到中断处理程序，结束后恢复现场。</li></ul>
+        </div>
+        <h3 id="s1-3">1.3 存储层次与 Cache</h3>
+        <div class="card"><h4>用容量换速度的层次结构</h4>
+          <table><thead><tr><th>层级</th><th>位置/介质</th><th>速度</th><th>容量</th><th>特点</th></tr></thead><tbody>
+            <tr><td>寄存器</td><td>CPU 内</td><td>最快</td><td>极小</td><td>保存当前指令操作数</td></tr><tr><td>L1/L2/L3 Cache</td><td>CPU 芯片/附近</td><td>很快</td><td>KB ～ MB</td><td>缓存热点数据和指令</td></tr><tr><td>主存</td><td>DRAM</td><td>较快</td><td>GB</td><td>运行中程序的工作区</td></tr><tr><td>SSD/HDD</td><td>外存</td><td>慢</td><td>TB</td><td>持久化存储</td></tr>
+          </tbody></table>
+          <p><strong>Cache 为什么有效：</strong>程序具有局部性。时间局部性指刚访问的数据很可能再访问；空间局部性指相邻地址很可能被访问。Cache 按<strong>缓存行（cache line）</strong>搬运数据，而非单个字节。</p>
+          <p><strong>写策略：</strong>写直达（Write Through）同时写 Cache 和内存，实现简单；写回（Write Back）仅在缓存行被替换时写内存，带宽利用率高但一致性控制更复杂。</p>
+        </div>
+        <h3 id="s1-4">1.4 流水线与性能</h3>
+        <div class="card"><h4>流水线提高吞吐，不缩短单条指令延迟</h4>
+          <p>将取指、译码、执行、访存、写回分级后，不同指令可同时处在不同阶段。理想情况下，每个时钟周期完成一条指令。</p>
+          <div class="code">周期       1    2    3    4    5
+指令 A    取指 译码 执行 访存 写回
+指令 B         取指 译码 执行 访存 写回
+指令 C              取指 译码 执行 访存 写回</div>
+          <ul><li><strong>结构冒险：</strong>硬件资源不足，例如取指与访存争抢同一内存。</li><li><strong>数据冒险：</strong>后一条指令依赖前一条结果；可用转发、暂停（stall）缓解。</li><li><strong>控制冒险：</strong>分支跳转改变 PC；分支预测失败需要清空错误路径上的流水线。</li></ul>
+          <p>CPU 性能常用 <strong>CPU 时间 = 指令数 × CPI × 时钟周期时间</strong> 估算。优化要同时考虑算法减少指令数、降低 Cache miss 降低 CPI，以及硬件频率。</p>
+        </div>
+        <h2 id="part2"><span class="icon">🛠️</span>第二部分：场景化讲解</h2>
+        <h3 id="s2-1">2.1 一次函数调用如何被执行</h3>
+        <div class="card"><h4>从代码到 CPU</h4><p><strong>场景：</strong>Java/C++ 服务调用一个函数。<strong>过程：</strong>编译器/JIT 将热点代码变为机器指令；调用时参数通过寄存器或栈传递，PC 跳转到函数入口；CPU 按指令周期执行。栈帧保存返回地址、局部变量和部分寄存器，函数返回时恢复调用者现场。</p><p><strong>实践：</strong>递归过深会耗尽线程栈；频繁小对象和复杂调用链会增加 Cache miss、分支预测失败和 GC 压力，性能分析应结合火焰图与硬件计数器，而非只看代码行数。</p></div>
+        <h3 id="s2-2">2.2 为什么二维数组按行遍历更快</h3>
+        <div class="card"><h4>利用空间局部性</h4><p>多数语言的二维数组按行连续存储。按行访问会连续命中同一或相邻 Cache line；按列访问跨行跳跃，容易产生更多 Cache miss。数据量大时，这种差异会显著放大。</p><div class="compare-row"><div class="compare-box"><h4>推荐：按行</h4><div class="code">for (i) for (j)
+  sum += a[i][j];</div><p>连续访问，预取和 Cache 命中率高。</p></div><div class="compare-box"><h4>较差：按列</h4><div class="code">for (j) for (i)
+  sum += a[i][j];</div><p>跨行访问，缓存行利用率低。</p></div></div></div>
+        <h3 id="s2-3">2.3 磁盘、DMA 与高性能 IO</h3>
+        <div class="card"><h4>避免让 CPU 搬运每个字节</h4><p>外设可通过 <strong>DMA</strong> 直接在设备和内存间传输块数据，完成后用中断通知 CPU；CPU 只负责配置和处理结果。网络/磁盘高吞吐场景中，批量 IO、顺序读写、减少用户态/内核态拷贝与上下文切换，通常比微调业务循环更有效。</p><p><strong>注意：</strong>零拷贝不是“完全没有复制”，而是减少 CPU 参与的数据复制及不必要的用户态缓冲；具体效果依赖操作系统、网卡和文件大小。</p></div>
+        <h2 id="part3"><span class="icon">🎯</span>第三部分：模拟面试</h2>
+        <div class="qa"><div class="q">CPU 为什么需要 Cache？</div><div class="a"><strong>参考：</strong>CPU 的运算速度远高于 DRAM，直接访问内存会让流水线长期等待。Cache 利用程序的时间和空间局部性保存热点缓存行，大多数访问命中时以更低延迟完成，从而弥合 CPU 与内存的速度鸿沟。<br><strong>追问：</strong>Cache miss 后需从下一层取整条缓存行；常见分类为强制、容量和冲突未命中。</div></div>
+        <div class="qa"><div class="q">进程的虚拟地址如何变成物理地址？</div><div class="a"><strong>参考：</strong>CPU 产生虚拟地址，MMU 先查 TLB（页表缓存）；未命中再按页表进行地址翻译，得到物理页框和页内偏移。若页面不在内存，触发缺页异常，由操作系统调页。<br><strong>加分项：</strong>TLB miss 与缺页异常不是一回事：前者可能只是页表遍历，后者需要磁盘 IO，代价高得多。</div></div>
+        <div class="qa"><div class="q">流水线为什么会变慢？</div><div class="a"><strong>参考：</strong>数据依赖会使后续指令等待结果，分支会造成错误路径指令作废，资源冲突会导致某个阶段无法继续。现代 CPU 通过乱序执行、寄存器重命名、分支预测和多级 Cache 降低这些停顿。<br><strong>易错点：</strong>流水线提升的是吞吐量，单条指令从取指到写回的固有延迟并不会因此消失。</div></div>
+        <div class="qa"><div class="q">CPU 的字长和 64 位系统分别意味着什么？</div><div class="a"><strong>参考：</strong>字长通常表示 CPU 一次自然处理的数据宽度及寄存器宽度。64 位 ISA 可使用 64 位通用寄存器和更大的虚拟地址空间；它不等于物理内存一定有 2<sup>64</sup> 字节，也不意味着所有指令/数据都必须是 64 位。</div></div>
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem"><a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>计算机组成原理 · 面试知识复习库 · Last updated 2026-08-12</div>
+      </main>
+    </div>
+  </div>
+  <script>(function(){const links=document.querySelectorAll('.sidebar a');const sections=[];links.forEach(a=>{const el=document.getElementById(a.getAttribute('href').slice(1));if(el)sections.push({el,link:a})});function update(){let current=sections[0];for(const s of sections)if(s.el.getBoundingClientRect().top<=120)current=s;links.forEach(a=>a.classList.remove('active'));if(current)current.link.classList.add('active')}window.addEventListener('scroll',update,{passive:true});update()})()</script>
+</body>
+</html>
