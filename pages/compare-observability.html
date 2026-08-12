@@ -648,14 +648,14 @@
     </div>
 
     <div class="qa">
-      <div class="q>什么是 OpenTelemetry？为什么它很重要？</div>
+      <div class="q">什么是 OpenTelemetry？为什么它很重要？</div>
       <div class="a">
         <strong>参考答案</strong>：OpenTelemetry（OTel）是 CNCF 孵化的可观测性标准项目，统一了 Metrics、Tracing、Logging 的采集协议和 SDK。它不是后端存储工具，而是采集标准。重要性：1）统一标准：避免每种工具各自埋点；2）厂商无关：采集一次，可发送到多个后端（Jaeger、SkyWalking、Datadog）；3）多语言支持：11 种语言 SDK；4）未来趋势：所有可观测工具都在适配 OTel。推荐：用 OTel SDK 采集数据，后端自由选择。
       </div>
     </div>
 
     <div class="qa">
-      <div class="q>如何设计一个完整的可观测性方案？</div>
+      <div class="q">如何设计一个完整的可观测性方案？</div>
       <div class="a">
         <strong>参考答案</strong>：分层设计——<strong>指标层</strong>：Prometheus + Grafana，监控系统指标（CPU/内存/QPS/延迟），配置告警规则。<strong>链路层</strong>：SkyWalking 或 Jaeger + OpenTelemetry，自动追踪跨服务调用链。<strong>日志层</strong>：Loki 或 ELK，收集应用日志和访问日志。<strong>关联</strong>：通过 TraceId 将三者关联。告警触发 → 查看指标趋势 → 定位 Trace → 查看日志详情。所有工具通过 Grafana 统一展示。
       </div>
