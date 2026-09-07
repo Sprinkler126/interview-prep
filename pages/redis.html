@@ -1235,6 +1235,24 @@ end</code></pre>
           <div class="a"><strong>漏洞一（先删缓存后更 DB）</strong>：删缓存后、更新 DB 前，另一请求读 DB 旧值并回写缓存 → 缓存被旧值污染，直到下次 TTL。<br><strong>漏洞二（先更 DB 后删缓存）</strong>：删缓存失败 → 缓存仍是旧值；或读请求在"删缓存之前"已读到旧缓存并发起 DB 读，写请求删完后读请求又把旧值写回。<br><strong>延迟双删</strong>：更新 DB 后先删一次缓存，休眠 N 秒（约一次读耗时）再删一次，覆盖期间被并发回写的旧值。<br><strong>为什么还要 TTL</strong>：延迟双删覆盖不了"延迟窗口内的所有并发回写"（N 取不准）、也覆盖不了删缓存失败的情况；TTL 是兜底，保证即使有脏数据最终也会过期自愈。<strong>结论：缓存无法做到强一致，延迟双删 + TTL + 订阅 binlog 重做缓存</strong>是工程上常用的组合拳。</div>
         </div>
 
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>数据结构</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>持久化</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>高可用</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>缓存治理</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>Redis 题要把数据结构、事件循环、持久化、集群和缓存问题串联。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
           Redis · 面试知识复习库 · Last updated 2026-06-02

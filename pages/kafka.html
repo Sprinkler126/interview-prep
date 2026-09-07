@@ -612,6 +612,24 @@ T5: m6 完整保留，无丢失 ✅</pre>
 
         <div class="qa"><div class="q">KRaft 和 ZooKeeper 的区别？</div><div class="a">ZK 是外部依赖，管理元数据，启动慢，扩展瓶颈（<20万 Partition）。KRaft（3.3+）用 Raft 协议让 Kafka 自己管理元数据，启动快，支持百万级 Partition。4.0 起 ZK 模式完全移除。技术方向：去外部依赖，提升自治能力。</div></div>
 
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>分区日志</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>副本 ISR</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>消费位点</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>重平衡与语义</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>Kafka 题覆盖顺序、吞吐、可靠性、重复消费和积压治理。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
           Kafka · 面试知识复习库 · Last updated 2026-06-02

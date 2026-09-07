@@ -62,6 +62,24 @@
         <div class="qa"><div class="q">进程的虚拟地址如何变成物理地址？</div><div class="a"><strong>参考：</strong>CPU 产生虚拟地址，MMU 先查 TLB（页表缓存）；未命中再按页表进行地址翻译，得到物理页框和页内偏移。若页面不在内存，触发缺页异常，由操作系统调页。<br><strong>加分项：</strong>TLB miss 与缺页异常不是一回事：前者可能只是页表遍历，后者需要磁盘 IO，代价高得多。</div></div>
         <div class="qa"><div class="q">流水线为什么会变慢？</div><div class="a"><strong>参考：</strong>数据依赖会使后续指令等待结果，分支会造成错误路径指令作废，资源冲突会导致某个阶段无法继续。现代 CPU 通过乱序执行、寄存器重命名、分支预测和多级 Cache 降低这些停顿。<br><strong>易错点：</strong>流水线提升的是吞吐量，单条指令从取指到写回的固有延迟并不会因此消失。</div></div>
         <div class="qa"><div class="q">CPU 的字长和 64 位系统分别意味着什么？</div><div class="a"><strong>参考：</strong>字长通常表示 CPU 一次自然处理的数据宽度及寄存器宽度。64 位 ISA 可使用 64 位通用寄存器和更大的虚拟地址空间；它不等于物理内存一定有 2<sup>64</sup> 字节，也不意味着所有指令/数据都必须是 64 位。</div></div>
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>指令执行</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>Cache 命中</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>流水线冒险</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>IO 与 DMA</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>组成原理要把硬件机制和性能指标联系起来，例如 CPI、命中率、带宽。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem"><a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>计算机组成原理 · 面试知识复习库 · Last updated 2026-08-12</div>
       </main>
     </div>

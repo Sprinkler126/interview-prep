@@ -561,6 +561,24 @@ k1 = 1.2 (默认), b = 0.75 (默认)</code></pre>
           <div class="a"><strong>参考</strong>：ES 擅长全文检索、日志分析、复杂聚合，倒排索引搜索性能远超 MySQL B+Tree 的 LIKE 查询。MySQL 擅长事务、关系查询、精确匹配。场景选择：全文搜索/日志系统/实时分析用 ES，OLTP/强事务用 MySQL。两者常共存，MySQL 做主存储，ES 做搜索层。</div>
         </div>
 
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>倒排索引</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>分片与副本</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>查询与聚合</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>写入与恢复</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>搜索题重点区分 text/keyword、refresh、segment、分片和慢查询。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
           Elasticsearch · 面试知识复习库 · Last updated 2026-06-11

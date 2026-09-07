@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大模型与 RAG - 面试知识复习库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+      <a class="back" href="../index.html">← 返回目录</a>
+    </div>
+  </nav>
+  <div class="container">
+    <h1>🧠 大模型与 RAG</h1>
+    <p class="subtitle">Transformer · Embedding · 向量检索 · 重排 · 评估 · 生产落地</p>
+    <div class="page-layout">
+      <aside class="sidebar">
+        <div class="sidebar-title">📑 目录导航</div>
+        <ul>
+          <li><a href="#part1">第一部分：技术原理</a></li>
+          <li class="sub"><a href="#s1-1">Transformer 与 LLM</a></li>
+          <li class="sub"><a href="#s1-2">RAG 全链路</a></li>
+          <li class="sub"><a href="#s1-3">切分与 Embedding</a></li>
+          <li class="sub"><a href="#s1-4">召回、重排与生成</a></li>
+          <li><a href="#part2">第二部分：场景化讲解</a></li>
+          <li class="sub"><a href="#s2-1">企业知识库设计</a></li>
+          <li class="sub"><a href="#s2-2">效果评估与可观测</a></li>
+          <li class="sub"><a href="#s2-3">安全与成本</a></li>
+          <li><a href="#part3">第三部分：模拟面试</a></li>
+        </ul>
+      </aside>
+      <main class="main-content">
+        <h2 id="part1"><span class="icon">🔬</span>第一部分：技术原理</h2>
+        <h3 id="s1-1">1.1 Transformer 与 LLM 基础</h3>
+        <div class="card">
+          <h4>面试回答主线：输入如何变成下一个 Token？</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">文本 Tokenize</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">Embedding + 位置编码</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">多层 Transformer</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">Logits → 采样下一个 Token</div>
+          </div>
+          <ul>
+            <li><strong>Self-Attention</strong>：输入经过线性层得到 Q、K、V，注意力权重为 <code>softmax(QKᵀ / √dₖ)</code>，再对 V 加权求和。它让每个 Token 动态关注上下文，而不是只看固定窗口。</li>
+            <li><strong>多头注意力</strong>：不同 head 学习不同关系，拼接后再投影；实际推理瓶颈常在 KV Cache 和显存带宽，不只是 FLOPs。</li>
+            <li><strong>Decoder-only</strong>：使用因果 Mask，只能看当前位置之前的 Token，训练目标是 next-token prediction；Encoder-only 更适合表示学习和分类。</li>
+            <li><strong>Temperature / Top-p</strong>：temperature 调整 logits 分布尖锐程度，Top-p 从累计概率达到阈值的候选中采样；事实问答通常降低随机性，但不能代替检索和校验。</li>
+          </ul>
+          <div class="tip">不要把“上下文窗口大”回答成“模型记住了知识”。窗口只是一次推理可读入的 Token 数；参数知识来自训练，最新/私有知识通常需要 RAG、微调或工具调用。</div>
+        </div>
+        <h3 id="s1-2">1.2 RAG 全链路</h3>
+        <div class="card">
+          <h4>Retrieval-Augmented Generation：先找证据，再组织答案</h4>
+          <div class="diagram">
+            <div class="diagram-title">离线建库 + 在线问答双链路</div>
+            <div class="rag-pipeline">
+              <div class="rag-stage"><b>文档接入</b><span>PDF / HTML / DB</span></div><i>→</i>
+              <div class="rag-stage"><b>解析清洗</b><span>结构 / 权限 / 元数据</span></div><i>→</i>
+              <div class="rag-stage"><b>Chunk + Embedding</b><span>向量化入库</span></div><i>→</i>
+              <div class="rag-stage"><b>Vector DB</b><span>索引与版本</span></div>
+            </div>
+            <div class="rag-divider">在线 Query：改写 → 混合召回 → 重排 → 上下文组装 → LLM → 引用与校验</div>
+          </div>
+          <table>
+            <thead><tr><th>阶段</th><th>常见做法</th><th>失败表现</th><th>优化方向</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Query 理解</strong></td><td>改写、拆分、多查询、意图识别</td><td>问法与文档表达不一致</td><td>保留原问题，扩展同义词和业务实体</td></tr>
+              <tr><td><strong>召回</strong></td><td>向量检索 + BM25 + 过滤</td><td>召回不到正确片段</td><td>混合检索、metadata filter、提高召回 TopK</td></tr>
+              <tr><td><strong>重排</strong></td><td>Cross-Encoder / reranker</td><td>相关片段排在后面</td><td>先粗召回，再按 query-document 交互精排</td></tr>
+              <tr><td><strong>生成</strong></td><td>上下文拼装、提示词约束、引用</td><td>幻觉、答非所问、引用错</td><td>证据不足时拒答，要求逐条引用并做 groundedness 评估</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 id="s1-3">1.3 Chunking 与 Embedding</h3>
+        <div class="card">
+          <h4>切分不是越小越好：完整语义优先</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)"><h4 style="color:var(--accent)">固定长度切分</h4><ul><li>按 Token / 字符数切分，简单稳定</li><li>配合 overlap 避免边界丢语义</li><li>适合格式杂乱的初始版本</li></ul></div>
+            <div class="compare-box" style="border-color:var(--accent3)"><h4 style="color:var(--accent3)">结构化切分</h4><ul><li>按标题、段落、表格、代码块切分</li><li>保留父标题、页码、权限、时间等 metadata</li><li>适合制度、API 文档、技术手册</li></ul></div>
+          </div>
+          <ul>
+            <li><strong>Chunk 大小权衡</strong>：太小上下文不完整，太大检索相似度被噪声稀释且占满上下文；应按文档结构、问题粒度和模型上下文预算做离线实验。</li>
+            <li><strong>Embedding</strong>：把文本映射为向量，使语义相近文本距离更近。余弦相似度关注方向，点积还受向量模长影响，索引距离度量必须与模型训练目标匹配。</li>
+            <li><strong>多语种与领域词</strong>：通用 embedding 对业务缩写、产品名、代码符号可能不稳定；可加关键词检索、实体 metadata，必要时做领域微调。</li>
+            <li><strong>更新策略</strong>：文档 hash 去重，按版本增量索引；删除时同步删除向量，权限变更要重新计算可见范围，不能只在 Prompt 中提醒模型。</li>
+          </ul>
+        </div>
+        <h3 id="s1-4">1.4 召回、重排与上下文工程</h3>
+        <div class="card">
+          <h4>为什么向量检索 TopK 不是最终答案？</h4>
+          <div class="flow"><div class="flow-box flow-blue">BM25 关键词召回</div><div class="flow-box flow-purple">Dense 向量召回</div><div class="flow-box flow-orange">RRF / 融合去重</div><div class="flow-box flow-green">Reranker 精排</div></div>
+          <ul>
+            <li><strong>稀疏检索</strong>擅长专有名词、编号、错误码；<strong>稠密检索</strong>擅长语义改写和自然语言表达。混合检索通常比单一召回更稳。</li>
+            <li><strong>RRF</strong> 不要求不同检索器分数可比，按排名融合；重排模型再读取 query 与候选文本的交互信息，成本高于向量相似度，应放在候选集之后。</li>
+            <li><strong>上下文组装</strong>：去重、按相关性排序、保留标题和来源、控制 Token 预算；长文档可做父子 Chunk，子块召回后回填父级上下文。</li>
+            <li><strong>提示词防幻觉</strong>：明确“仅基于证据回答”“证据不足输出未知”，要求引用 chunk ID；这能降低风险，但最终仍需评估和业务兜底。</li>
+          </ul>
+        </div>
+
+        <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
+        <h3 id="s2-1">2.1 企业知识库如何设计？</h3>
+        <div class="card">
+          <h4>从数据治理到答案闭环</h4>
+          <div class="arch-container">
+            <div class="arch-row"><div class="arch-box" style="border-color:var(--accent)">数据接入<div class="arch-label">文档、工单、数据库、网页</div></div><div class="arch-box" style="border-color:var(--accent2)">解析与权限<div class="arch-label">OCR、结构、ACL、脱敏</div></div><div class="arch-box" style="border-color:var(--accent3)">索引服务<div class="arch-label">向量 + 倒排 + 元数据</div></div></div>
+            <div class="arch-connector">▼</div>
+            <div class="arch-row"><div class="arch-box" style="border-color:var(--accent4)">Query Router<div class="arch-label">FAQ / SQL / RAG / Agent</div></div><div class="arch-box" style="border-color:var(--accent5)">Retrieval<div class="arch-label">过滤、召回、重排</div></div><div class="arch-box" style="border-color:var(--accent)">回答与观测<div class="arch-label">引用、反馈、评估、审计</div></div></div>
+          </div>
+          <ul>
+            <li>权限必须在召回前过滤，至少携带 tenant、部门、角色、文档版本等 metadata；否则会出现“模型知道但用户不该看到”的越权。</li>
+            <li>对表格、代码、图片和扫描 PDF 采用不同解析器；保留页码、标题层级、来源 URL，便于引用和故障定位。</li>
+            <li>建立离线评测集：真实问题、标准答案、证据片段、不可回答样本，避免只看主观 Demo。</li>
+          </ul>
+        </div>
+        <h3 id="s2-2">2.2 RAG 评估与可观测</h3>
+        <div class="card">
+          <h4>指标要分层：检索对不对，生成说没说错</h4>
+          <table>
+            <thead><tr><th>层次</th><th>指标</th><th>回答的面试重点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>检索层</strong></td><td>Recall@K、Precision@K、MRR、nDCG</td><td>正确证据是否进入候选集；Recall 低时调切分/召回，别只换大模型</td></tr>
+              <tr><td><strong>生成层</strong></td><td>Faithfulness、Answer Relevancy、Citation Correctness</td><td>答案是否被证据支持、是否回答问题、引用是否真的支持结论</td></tr>
+              <tr><td><strong>系统层</strong></td><td>P50/P95 延迟、Token、命中率、失败率、成本</td><td>线上要看分阶段耗时：Embedding、召回、重排、LLM、首 Token</td></tr>
+              <tr><td><strong>业务层</strong></td><td>一次解决率、转人工率、用户反馈、知识覆盖率</td><td>离线分数高不代表业务有效，要闭环采集 bad case</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">排查顺序建议：先确认知识库中是否存在答案 → 看权限过滤 → 看召回候选 → 看重排 → 看上下文截断 → 最后看 Prompt 和模型输出。</div>
+        </div>
+        <h3 id="s2-3">2.3 安全、成本与生产稳定性</h3>
+        <div class="card">
+          <h4>RAG 生产落地的高频风险</h4>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--danger)"><h4 style="color:var(--danger)">安全</h4><ul><li>Prompt Injection：文档中的指令不能覆盖系统规则</li><li>数据外泄：租户隔离、ACL 过滤、日志脱敏</li><li>工具调用：白名单、参数校验、最小权限</li><li>输出安全：敏感信息检测、引用审计</li></ul></div>
+            <div class="compare-box" style="border-color:var(--accent4)"><h4 style="color:var(--accent4)">成本与稳定性</h4><ul><li>Embedding 批量化、缓存、增量索引</li><li>召回先过滤，控制 rerank 候选数</li><li>小模型路由、回答缓存、流式输出</li><li>超时、重试、熔断、降级到搜索/人工</li></ul></div>
+          </div>
+        </div>
+
+        <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+        <div class="qa"><div class="q">RAG 和微调有什么区别？什么时候选 RAG？</div><div class="a"><strong>参考</strong>：RAG 通过检索把外部知识放进上下文，知识更新快、可引用、可按权限控制，但依赖召回质量并增加延迟。微调改变模型参数，更适合固定格式、风格、领域任务能力，不适合频繁变化的事实知识。企业知识库、政策、产品文档通常先 RAG，行为模式再考虑微调。</div></div>
+        <div class="qa"><div class="q">为什么 RAG 会回答错？如何系统定位？</div><div class="a"><strong>参考</strong>：可能是知识不存在、解析丢失、Chunk 边界不完整、Embedding 不匹配、召回被权限过滤、重排错序、上下文超长截断或模型忽略证据。按“数据 → 权限 → 召回 → 重排 → 上下文 → 生成”分层打点，使用带标准证据的评测集逐层定位。</div></div>
+        <div class="qa"><div class="q">如何防止 RAG 中的 Prompt Injection？</div><div class="a"><strong>参考</strong>：把检索内容视为不可信数据，系统指令与证据严格分隔；只允许模型基于证据回答，不允许文档改变工具权限或系统规则；工具调用做白名单和参数校验；对输入、文档、输出做安全检测，并记录审计。不能只靠一句“忽略恶意指令”解决。</div></div>
+        <div class="qa"><div class="q">大模型应用如何控制延迟和成本？</div><div class="a"><strong>参考</strong>：离线做增量 Embedding，在线做查询缓存和结果缓存；先 metadata 过滤，再混合召回，限制 rerank TopK；按问题复杂度路由小模型/大模型，控制上下文 Token，使用流式返回；设置超时、重试、熔断和降级。指标要看 P95、首 Token、Token 用量和单次成本。</div></div>
+        <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem"><a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>大模型与 RAG · 面试知识复习库 · Last updated 2026-09-07</div>
+      </main>
+    </div>
+  </div>
+  <script>
+  (function() {
+    const links = document.querySelectorAll('.sidebar a');
+    const sections = [];
+    links.forEach(a => { const id = a.getAttribute('href')?.replace('#',''); const el = id && document.getElementById(id); if (el) sections.push({el,link:a}); });
+    function update() { let current=sections[0]; for (const s of sections) if (s.el.getBoundingClientRect().top <= 120) current=s; links.forEach(a=>a.classList.remove('active')); if(current) current.link.classList.add('active'); }
+    window.addEventListener('scroll', update, {passive:true}); update();
+  })();
+  </script>
+</body>
+</html>

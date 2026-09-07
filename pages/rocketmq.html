@@ -570,6 +570,24 @@
 
         <div class="qa"><div class="q">如何处理 RocketMQ 消息积压？</div><div class="a">紧急：增加消费者实例数（≤ Queue 数）、临时增加 Queue 数量。消费端：批量消费、异步处理、数据库批量写入、调整 consumeThreadMin/Max。根本：优化消费逻辑耗时、异步化非关键操作。预防：Dashboard 监控 Consumer Lag，设告警阈值。</div></div>
 
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>CommitLog</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>消费模式</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>顺序与事务</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>重试与堆积</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>RocketMQ 题重点是存储、路由、消费位点和事务消息状态机。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
           RocketMQ · 面试知识复习库 · Last updated 2026-06-11

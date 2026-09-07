@@ -636,6 +636,24 @@
 
         <div class="qa"><div class="q">如何排查 Spark 数据倾斜？</div><div class="a">排查：Spark UI 查看各 Stage Task 执行时间分布，个别 Task 远超其他即为倾斜。解决：① <strong>加盐打散</strong>：给倾斜 Key 加随机前缀；② <strong>两阶段聚合</strong>：先局部聚合再全局聚合；③ <strong>Broadcast Join</strong>：小表广播避免 Shuffle；④ <strong>AQE</strong>（Spark 3.0+）：自动拆分倾斜分区。</div></div>
 
+
+        <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="knowledge-boost" class="knowledge-boost">
+          <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
+          <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
+          <div class="knowledge-map" aria-label="本章面试答题路线图">
+            <div class="knowledge-node"><strong>RDD/DataFrame</strong><span>先界定边界、角色和核心对象</span></div>
+            <div class="knowledge-node"><strong>DAG Stage</strong><span>按数据流或状态机解释怎么工作</span></div>
+            <div class="knowledge-node"><strong>Shuffle</strong><span>补充故障、边界、性能瓶颈</span></div>
+            <div class="knowledge-node"><strong>容错与调优</strong><span>给出方案取舍与生产实践</span></div>
+          </div>
+          <div class="knowledge-checklist">
+            <div class="knowledge-check"><b>① 原理</b><br>数据结构 / 调用链 / 状态变化</div>
+            <div class="knowledge-check"><b>② 场景</b><br>为什么用、何时失效、如何排查</div>
+            <div class="knowledge-check"><b>③ 加分</b><br>指标、源码点、替代方案与代价</div>
+          </div>
+          <div class="tip"><strong>本章专项提醒：</strong>Spark 题重点是宽窄依赖、Shuffle、缓存级别和数据倾斜。</div>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
           Apache Spark · 面试知识复习库 · Last updated 2026-06-11
