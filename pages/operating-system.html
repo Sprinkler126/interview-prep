@@ -30,6 +30,9 @@
           <li class="sub"><a href="#s1-4">线程同步</a></li>
           <li class="sub"><a href="#s1-5">死锁</a></li>
           <li class="sub"><a href="#s1-6">虚拟内存</a></li>
+          <li class="sub"><a href="#s1-7">内存分配与 mmap</a></li>
+          <li class="sub"><a href="#s1-8">缓存与并发可见性</a></li>
+          <li class="sub"><a href="#s1-9">Linux 进程与信号</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">IO 模型</a></li>
           <li class="sub"><a href="#s2-2">epoll 原理</a></li>
@@ -230,6 +233,63 @@
               <tr><td><strong>分页</strong></td><td>将内存和进程分为固定大小的页</td><td>无外部碎片</td><td>有内部碎片</td></tr>
               <tr><td><strong>分段</strong></td><td>按逻辑单元分为大小不等的段</td><td>符合程序逻辑</td><td>外部碎片</td></tr>
               <tr><td><strong>段页式</strong></td><td>先分段，段内再分页</td><td>兼具两者优点</td><td>地址转换复杂</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-7">1.7 内存分配与 mmap</h3>
+        <div class="card">
+          <h4>malloc、mmap、堆和栈怎么答？</h4>
+          <table>
+            <thead><tr><th>区域/机制</th><th>面试要点</th><th>典型问题</th></tr></thead>
+            <tbody>
+              <tr><td><strong>栈</strong></td><td>函数调用帧、局部变量、返回地址；线程独立，自动分配释放</td><td>深递归栈溢出；线程数越多越要关注栈预留</td></tr>
+              <tr><td><strong>堆</strong></td><td>动态分配，生命周期由程序管理；malloc 通常由 allocator 管理空闲块</td><td>内存泄漏、碎片、并发分配锁竞争</td></tr>
+              <tr><td><strong>mmap</strong></td><td>把文件或匿名内存映射到进程地址空间，按页建立映射</td><td>文件映射、共享内存、减少 read/write 拷贝</td></tr>
+              <tr><td><strong>Copy-on-Write</strong></td><td>fork 后父子先共享物理页，任一方写入时触发缺页并复制</td><td>fork 很快但写时成本可能集中爆发</td></tr>
+            </tbody>
+          </table>
+          <div class="flow">
+            <div class="flow-box flow-blue">虚拟地址访问</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">页表/TLB 翻译</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">缺页中断</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">分配物理页 / 读入磁盘页</div>
+          </div>
+          <div class="tip"><strong>区分缺页：</strong>缺页不一定是错误，可能只是合法的按需分配；如果频繁换入换出导致 CPU 大量等待磁盘，就是 thrashing（抖动），通常要减少并发、增加内存或改善局部性。</div>
+        </div>
+
+        <h3 id="s1-8">1.8 缓存与并发可见性</h3>
+        <div class="card">
+          <h4>volatile、原子性、有序性和 happens-before</h4>
+          <p>面试中不要把 volatile 说成“线程安全”。它主要保证<strong>可见性和一定的禁止重排序语义</strong>，不能保证 <code>count++</code> 这种复合操作的原子性。</p>
+          <table>
+            <thead><tr><th>问题</th><th>原因</th><th>解决思路</th></tr></thead>
+            <tbody>
+              <tr><td><strong>可见性</strong></td><td>线程读到寄存器/CPU 缓存中的旧值</td><td>volatile、锁的 unlock/lock、线程 start/join</td></tr>
+              <tr><td><strong>原子性</strong></td><td>读-改-写被其他线程插入</td><td>synchronized、Lock、CAS、Atomic 类</td></tr>
+              <tr><td><strong>有序性</strong></td><td>编译器/CPU 为优化重排指令</td><td>锁、volatile、final 安全发布建立 happens-before</td></tr>
+              <tr><td><strong>伪共享</strong></td><td>不同线程写同一缓存行的不同变量，缓存行反复失效</td><td>填充/分离热点字段，减少共享写</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">CAS 不是没有代价：高竞争下会自旋浪费 CPU，还可能有 ABA 问题。需要版本号或带 stamp 的 CAS；长临界区不要用自旋替代阻塞锁。</div>
+        </div>
+
+        <h3 id="s1-9">1.9 Linux 进程与信号</h3>
+        <div class="card">
+          <h4>fork、exec、僵尸进程、孤儿进程</h4>
+          <ul>
+            <li><strong>fork</strong>：复制当前进程，返回两次；父进程得到子进程 PID，子进程返回 0。地址空间通过 COW 共享，不是立即完整复制。</li>
+            <li><strong>exec</strong>：用新程序映像替换当前进程，PID 通常不变；常与 fork + exec 组合启动外部程序。</li>
+            <li><strong>僵尸进程</strong>：子进程已退出但父进程未 wait，内核保留退出码和少量信息；父进程应 wait/waitpid 回收。</li>
+            <li><strong>孤儿进程</strong>：父进程先退出，子进程被 1 号进程接管并负责回收，不等于僵尸。</li>
+          </ul>
+          <table>
+            <thead><tr><th>信号</th><th>语义</th><th>可否捕获/忽略</th><th>常见用途</th></tr></thead>
+            <tbody>
+              <tr><td><strong>SIGTERM</strong></td><td>请求进程优雅退出</td><td>可以</td><td>服务发布、进程管理器停止</td></tr>
+              <tr><td><strong>SIGKILL</strong></td><td>立即强制终止</td><td>不可以</td><td>进程无响应时最后手段</td></tr>
+              <tr><td><strong>SIGINT</strong></td><td>中断，常由 Ctrl-C 触发</td><td>可以</td><td>终端停止前台程序</td></tr>
+              <tr><td><strong>SIGCHLD</strong></td><td>子进程状态变化通知</td><td>可以</td><td>父进程回收子进程，避免僵尸</td></tr>
             </tbody>
           </table>
         </div>
@@ -481,6 +541,23 @@
 
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">进程、线程、协程怎么选？线程越多性能越好吗？</div>
+          <div class="a"><strong>参考</strong>：进程提供隔离，线程共享地址空间并由内核调度，协程通常在用户态调度。CPU 密集任务受 CPU 核数限制，线程过多会增加上下文切换和缓存失效；IO 密集任务可以用线程池或异步模型提高并发，但要受连接数、内存和下游承载能力约束。协程降低调度成本，却不能让阻塞系统调用凭空变成异步。</div>
+        </div>
+        <div class="qa">
+          <div class="q">虚拟内存解决了什么问题？TLB 和缺页中断分别做什么？</div>
+          <div class="a"><strong>参考</strong>：虚拟内存为每个进程提供独立、连续的地址空间，利用分页实现隔离、按需加载和物理内存共享。TLB 是页表项缓存，命中时快速完成地址翻译；页不在内存时触发缺页中断，由内核分配/换入页面、更新页表后重试指令。TLB miss 不等于 page fault，前者只是快表没命中。</div>
+        </div>
+        <div class="qa">
+          <div class="q">select、poll、epoll 的区别是什么？为什么 epoll 高并发更好？</div>
+          <div class="a"><strong>参考</strong>：select 用固定大小位图，poll 用数组，二者每次调用都要把 fd 集合从用户态拷入内核并遍历 O(n)。epoll 用红黑树维护监听 fd、就绪链表保存活跃事件，通过回调把就绪 fd 放入链表，等待时主要处理活跃连接，避免每次扫描全部 fd。epoll 不是任何场景都 O(1)，活跃连接很多时处理成本仍与就绪事件数有关。</div>
+        </div>
+        <div class="qa">
+          <div class="q">如何定位线上死锁或 CPU 飙高？</div>
+          <div class="a"><strong>参考</strong>：先看现象和指标：load、CPU、线程数、GC、IO、锁等待。死锁用线程 dump、<code>jstack</code> 或系统级锁信息找互相等待链；CPU 飙高先定位线程，再看线程栈和热点方法。处理上先止损（限流、摘流量、回滚），再修复锁顺序、缩短临界区、避免在锁内做 IO，并补充超时、监控和压测。</div>
+        </div>
 
         <div class="qa">
           <div class="q">进程和线程的区别是什么？什么时候用多进程，什么时候用多线程？</div>

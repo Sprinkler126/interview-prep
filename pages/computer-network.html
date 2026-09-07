@@ -30,6 +30,9 @@
           <li class="sub"><a href="#s1-4">TCP 拥塞控制</a></li>
           <li class="sub"><a href="#s1-5">HTTP 协议演进</a></li>
           <li class="sub"><a href="#s1-6">HTTPS 与 TLS</a></li>
+          <li class="sub"><a href="#s1-7">TCP 粘包与拆包</a></li>
+          <li class="sub"><a href="#s1-8">可靠 UDP 与 QUIC</a></li>
+          <li class="sub"><a href="#s1-9">跨域与 CORS</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">HTTP 缓存机制</a></li>
           <li class="sub"><a href="#s2-2">DNS 解析</a></li>
@@ -226,6 +229,58 @@
           </ul>
         </div>
 
+        <h3 id="s1-7">1.7 TCP 粘包与拆包</h3>
+        <div class="card">
+          <h4>为什么 TCP 没有消息边界？</h4>
+          <p>TCP 面向字节流，只保证字节按序到达，不关心应用层一次 write 对应一次 read。因此一次发送可能被拆成多次接收，多次发送也可能被合并读取；这不是 TCP 丢包，而是应用协议没有定义消息边界。</p>
+          <div class="flow">
+            <div class="flow-box flow-blue">应用消息 A + B</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">TCP 字节流</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">read：A的一半 / A+B / B的一半</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">按协议解码完整消息</div>
+          </div>
+          <table>
+            <thead><tr><th>解决方案</th><th>做法</th><th>注意点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>定长消息</strong></td><td>每条消息固定 N 字节</td><td>简单但浪费空间，适合协议字段固定场景</td></tr>
+              <tr><td><strong>分隔符</strong></td><td>以换行、特殊字符作为结束标志</td><td>正文需要转义，适合文本协议</td></tr>
+              <tr><td><strong>长度字段</strong></td><td>Header 写 body 长度，先读满 Header 再读 body</td><td>最常用；校验长度上限，防止恶意大包</td></tr>
+              <tr><td><strong>序列化协议</strong></td><td>使用 Protobuf、HTTP、Dubbo 等自带 framing</td><td>仍需处理半包、粘包和版本兼容</td></tr>
+            </tbody>
+          </table>
+          <div class="tip">UDP 是报文协议，保留消息边界，但不保证可靠、有序；“TCP 有粘包”与“UDP 不会粘包”是传输层语义差异，不是网络设备行为。</div>
+        </div>
+
+        <h3 id="s1-8">1.8 可靠 UDP 与 QUIC</h3>
+        <div class="card">
+          <h4>QUIC 为什么基于 UDP 还比 TCP 更适合现代网络？</h4>
+          <ul>
+            <li><strong>可靠性上移</strong>：QUIC 自己实现 ACK、重传、拥塞控制和流量控制，并支持连接级多个独立 stream。</li>
+            <li><strong>解决队头阻塞</strong>：一个 stream 丢包只阻塞自己，TCP 则会阻塞同一连接的所有 HTTP/2 流。</li>
+            <li><strong>更快建连</strong>：TLS 1.3 与传输握手合并，通常 1-RTT；已有会话支持 0-RTT，但要防重放。</li>
+            <li><strong>连接迁移</strong>：使用 Connection ID，不依赖四元组，移动网络从 Wi-Fi 切到 5G 时可保持连接。</li>
+          </ul>
+          <div class="compare-row">
+            <div class="compare-box" style="border-color:var(--accent)"><h4 style="color:var(--accent)">TCP + TLS</h4><p>内核实现可靠字节流，连接由四元组标识；HTTP/2 多路复用仍受 TCP 队头阻塞影响。</p></div>
+            <div class="compare-box" style="border-color:var(--accent3)"><h4 style="color:var(--accent3)">QUIC + HTTP/3</h4><p>用户态实现可靠多流传输，集成 TLS 1.3，可快速握手、迁移连接并避免跨流阻塞。</p></div>
+          </div>
+        </div>
+
+        <h3 id="s1-9">1.9 跨域与 CORS</h3>
+        <div class="card">
+          <h4>跨域请求为什么被浏览器拦截？</h4>
+          <p>同源由协议、域名、端口三者共同决定。浏览器限制的是“脚本读取跨源响应”，不是服务器之间不能通信；后端收到请求后仍要通过响应头明确授权。</p>
+          <table>
+            <thead><tr><th>请求类型</th><th>触发条件</th><th>浏览器行为</th><th>服务端关键响应头</th></tr></thead>
+            <tbody>
+              <tr><td><strong>简单请求</strong></td><td>方法 GET/HEAD/POST，且 Content-Type 属于安全类型</td><td>直接发送，浏览器检查响应</td><td><code>Access-Control-Allow-Origin</code></td></tr>
+              <tr><td><strong>预检请求</strong></td><td>PUT/DELETE、自定义 Header、JSON 等</td><td>先 OPTIONS，许可后才发真实请求</td><td>Origin、Methods、Headers、Max-Age</td></tr>
+              <tr><td><strong>携带凭证</strong></td><td>Cookie / Authorization</td><td>前端设置 credentials</td><td>不能使用 <code>*</code>，必须指定 Origin</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">CORS 是浏览器安全策略，不是鉴权。允许跨域只代表浏览器允许读取响应，仍要在服务端校验身份、权限，并防范 CSRF。</div>
+        </div>
+
         <!-- ============================== PART 2 ============================== -->
         <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
 
@@ -331,6 +386,19 @@
 
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">浏览器输入 URL 后，为什么一定先 DNS、再 TCP、再 HTTP？HTTPS 又多了什么？</div>
+          <div class="a"><strong>参考</strong>：先通过 DNS 将域名解析为 IP，之后 TCP 三次握手建立可靠连接；HTTPS 在 HTTP 之前完成 TLS 协商，验证证书、协商密码套件并生成会话密钥，随后用对称加密传输 HTTP 数据。实际还要考虑 DNS 缓存、连接复用、代理、CDN、HTTP/2 多路复用和浏览器渲染。</div>
+        </div>
+        <div class="qa">
+          <div class="q">TCP 如何保证可靠？为什么有了校验和还需要重传？</div>
+          <div class="a"><strong>参考</strong>：校验和只能发现比特错误，不能恢复数据；TCP 通过序列号和 ACK 确认顺序，发送窗口连续发送，超时重传或收到三个重复 ACK 触发快重传，并结合 rwnd 流量控制和 cwnd 拥塞控制。校验和负责“数据是否损坏”，确认与重传负责“数据是否到达且可恢复”。</div>
+        </div>
+        <div class="qa">
+          <div class="q">为什么服务端会出现大量 CLOSE_WAIT？TIME_WAIT 能不能直接关掉？</div>
+          <div class="a"><strong>参考</strong>：CLOSE_WAIT 表示对端已关闭而本端尚未 close，通常是应用没有释放连接、线程阻塞或异常路径漏关。TIME_WAIT 是主动关闭方为保证最后 ACK 可达、旧报文过期而等待 2MSL，不能简单关闭；应优先连接复用、长连接、连接池和合理的服务端架构，必要时再评估内核参数。</div>
+        </div>
 
         <div class="qa">
           <div class="q">TCP 三次握手的过程是什么？为什么不是两次或四次？</div>

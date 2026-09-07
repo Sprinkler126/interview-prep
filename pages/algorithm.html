@@ -30,6 +30,9 @@
           <li class="sub"><a href="#s1-4">高级树结构</a></li>
           <li class="sub"><a href="#s1-5">图算法</a></li>
           <li class="sub"><a href="#s1-6">链表</a></li>
+          <li class="sub"><a href="#s1-7">哈希表与字符串</a></li>
+          <li class="sub"><a href="#s1-8">栈、队列与堆</a></li>
+          <li class="sub"><a href="#s1-9">并查集与前缀树</a></li>
           <li><a href="#part2">第二部分：场景化讲解</a></li>
           <li class="sub"><a href="#s2-1">动态规划</a></li>
           <li class="sub"><a href="#s2-2">贪心算法</a></li>
@@ -420,6 +423,66 @@ class LRUCache {
           </ul>
         </div>
 
+        <!-- ============================== DATA STRUCTURE补充 ============================== -->
+        <h3 id="s1-7">1.7 哈希表与字符串</h3>
+        <div class="card">
+          <h4>哈希表为什么快？冲突怎么解决？</h4>
+          <p>面试不要只回答“平均 O(1)”。哈希表先对 key 计算 hash，再通过 <code>index = (n - 1) &amp; hash</code>（容量为 2 的幂时）定位桶；真正的性能取决于<strong>负载因子、hash 扰动、冲突分布和扩容成本</strong>。</p>
+          <table>
+            <thead><tr><th>考点</th><th>面试回答要点</th><th>工程影响</th></tr></thead>
+            <tbody>
+              <tr><td><strong>链地址法</strong></td><td>桶内挂链表；Java 8 冲突链表过长时树化为红黑树</td><td>平均 O(1)，极端冲突最坏 O(n) / O(log n)</td></tr>
+              <tr><td><strong>开放寻址</strong></td><td>冲突后按探测序列找下一个空槽，删除通常需要墓碑标记</td><td>缓存友好，但扩容和删除更复杂</td></tr>
+              <tr><td><strong>扩容</strong></td><td>元素数超过 capacity × loadFactor 时扩容并重新分桶</td><td>单次可能 O(n)，高并发初始化应预估容量</td></tr>
+              <tr><td><strong>一致性哈希</strong></td><td>节点和 key 映射到哈希环，用虚拟节点改善倾斜</td><td>缓存集群扩缩容时减少迁移数据</td></tr>
+            </tbody>
+          </table>
+          <div class="tip"><strong>高频追问：</strong>为什么 HashMap 的容量通常是 2 的幂？可以用位运算代替取模，且扩容时元素只需留在原位置或移动 <code>oldCap</code>，分布和迁移都更高效。key 若可变，放入 Map 后改变参与 hashCode 的字段，会导致“找不到自己”。</div>
+        </div>
+        <div class="card">
+          <h4>字符串匹配：别只会暴力</h4>
+          <table>
+            <thead><tr><th>算法</th><th>核心思路</th><th>复杂度/常考点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>暴力匹配</strong></td><td>主串逐位尝试，失配后回退</td><td>最坏 O(nm)，代码简单但重复比较多</td></tr>
+              <tr><td><strong>KMP</strong></td><td>用 next / lps 表记录模式串最长相等前后缀，主串指针不回退</td><td>预处理 O(m)，匹配 O(n+m)；next 的定义要说清楚</td></tr>
+              <tr><td><strong>Trie</strong></td><td>公共前缀共享路径，节点表示前缀而非完整字符串</td><td>插入/查询 O(L)，适合词频、前缀搜索、敏感词过滤</td></tr>
+              <tr><td><strong>字符串哈希</strong></td><td>前缀哈希 O(1) 判断子串相等</td><td>存在碰撞，工程上可双哈希或与实际比较结合</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="s1-8">1.8 栈、队列与堆：场景决定结构</h3>
+        <div class="card">
+          <h4>高频数据结构选择题</h4>
+          <table>
+            <thead><tr><th>结构</th><th>核心操作</th><th>典型题型</th><th>回答时的关键细节</th></tr></thead>
+            <tbody>
+              <tr><td><strong>单调栈</strong></td><td>维护单调递增/递减序列</td><td>下一个更大元素、柱状图最大矩形</td><td>每个元素最多入栈出栈一次，总复杂度 O(n)</td></tr>
+              <tr><td><strong>单调队列</strong></td><td>队头始终是窗口最值</td><td>滑动窗口最大值</td><td>队列存下标，过期下标从队头删除</td></tr>
+              <tr><td><strong>优先队列</strong></td><td>堆顶优先级最高</td><td>TopK、合并 K 个有序链表、任务调度</td><td>插入/删除 O(log k)，只保留 K 个元素可控内存</td></tr>
+              <tr><td><strong>双端队列</strong></td><td>两端 O(1) 插入删除</td><td>0-1 BFS、LRU、滑动窗口</td><td>与 HashMap 组合可实现 O(1) LRU</td></tr>
+            </tbody>
+          </table>
+          <div class="warn"><strong>TopK 复杂度：</strong>全量排序 O(n log n)；维护大小 K 的堆为 O(n log K)；若只求第 K 大，可用快速选择平均 O(n)、最坏 O(n²)，需要随机化 pivot。</div>
+        </div>
+
+        <h3 id="s1-9">1.9 并查集与前缀树</h3>
+        <div class="card">
+          <h4>并查集（Union-Find）</h4>
+          <div class="flow">
+            <div class="flow-box flow-blue">初始化 parent[i] = i</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-purple">find：路径压缩</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-green">union：按秩/大小合并</div><div class="flow-arrow">→</div>
+            <div class="flow-box flow-orange">判断连通性 / 判环</div>
+          </div>
+          <ul>
+            <li><strong>用途</strong>：动态连通分量、Kruskal 最小生成树、岛屿合并、无向图判环。</li>
+            <li><strong>为什么近似 O(1)</strong>：路径压缩 + 按秩合并后，均摊复杂度为 O(α(n))，α(n) 增长极慢。</li>
+            <li><strong>易错点</strong>：并查集适合“合并后查询”，不擅长删除边；有向图判环不能直接照搬无向图并查集。</li>
+          </ul>
+        </div>
+
         <!-- ============================== PART 2 ============================== -->
         <h2 id="part2"><span class="icon">🎯</span>第二部分：场景化讲解</h2>
 
@@ -592,6 +655,19 @@ int binarySearch(int[] arr, int target) {
 
         <!-- ============================== PART 3 ============================== -->
         <h2 id="part3"><span class="icon">🎤</span>第三部分：模拟面试</h2>
+
+        <div class="qa">
+          <div class="q">HashMap 为什么容量是 2 的幂？链表什么时候树化？</div>
+          <div class="a"><strong>参考</strong>：容量为 2 的幂时，<code>(n - 1) &amp; hash</code> 等价于取模，计算快且扩容时只需判断新增的高位是否为 1 来决定留在原桶还是移动 oldCap。Java 8 中一个桶的链表长度达到 8 且容量至少 64 时才树化，容量太小时优先扩容，避免小表因偶发冲突付出红黑树维护成本。<br><strong>追问</strong>：为什么重写 equals 必须重写 hashCode？相等对象必须落到同一桶，否则 Map 会先按 hash 定位失败，违反契约。</div>
+        </div>
+        <div class="qa">
+          <div class="q">如何在 O(n) 时间内求滑动窗口最大值？为什么不是每次排序？</div>
+          <div class="a"><strong>参考</strong>：使用单调递减双端队列存下标。新元素入队前，从队尾删除所有不可能成为最大值的更小元素；窗口右移时删除队头过期下标，队头即当前最大值。每个下标最多入队和出队一次，因此总复杂度 O(n)，空间 O(k)。每次排序是 O(nk log k)，堆则是 O(n log k)。</div>
+        </div>
+        <div class="qa">
+          <div class="q">如何判断一道题用 DP、贪心还是回溯？</div>
+          <div class="a"><strong>参考</strong>：先看是否存在“选择后不影响未来”的贪心选择性质；无法证明时优先考虑 DP。若目标是枚举所有方案、排列组合或需要撤销选择，使用回溯，并通过排序去重、剪枝、记忆化降低复杂度。DP 要明确状态、选择、转移、初始化和遍历顺序，不能只套模板。</div>
+        </div>
 
         <div class="qa">
           <div class="q">快速排序的时间复杂度分析？什么情况下退化为 O(n^2)？如何优化？</div>
