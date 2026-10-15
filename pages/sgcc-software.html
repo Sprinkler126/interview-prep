@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国网计算机类 · 软件工程 - 面试知识复习库</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/sgcc.css">
+<script src="../js/sgcc.js" defer>
+</script>
+</head>
+<body class="sgcc">
+<nav class="nav">
+<div class="nav-inner">
+<a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+<a class="back" href="sgcc-exam.html">← 国网专业课目录</a>
+</div>
+</nav>
+<div class="container">
+<h1>国网计算机类 · 软件工程</h1>
+<p class="subtitle">2026 版大纲条目 37–44 · 概念判断、计算过程、算法追踪与自编练习</p>
+<nav class="exam-nav" aria-label="专业课导航">
+<a href="sgcc-data-structure.html">数据结构与算法</a>
+<a href="sgcc-database.html">数据库系统</a>
+<a href="sgcc-network.html">计算机网络</a>
+<a href="sgcc-os.html">操作系统</a>
+<a href="sgcc-organization.html">计算机组成与体系结构</a>
+<a href="sgcc-software.html" aria-current="page">软件工程</a>
+<a href="sgcc-new-tech.html">信息新技术</a>
+</nav>
+<p class="tip">先掌握本页基础考点与手算步骤，再到<a href="design-patterns.html">原主题页</a>看实现和面试拓展。大纲版本与来源见<a href="sgcc-exam.html#sources">专业课目录</a>。编写日期：2026-10-15。</p>
+<div class="page-layout">
+<aside class="sidebar">
+<div class="sidebar-title">本章导航</div>
+<ul>
+<li>
+<a href="#part1">第一部分：技术原理</a>
+</li>
+<li>
+<a href="#topic-1">软件工程、质量与生命周期</a>
+</li>
+<li>
+<a href="#topic-2">过程管理、估算与配置控制</a>
+</li>
+<li>
+<a href="#topic-3">瀑布、原型、螺旋、结构化、面向对象与敏捷</a>
+</li>
+<li>
+<a href="#topic-4">需求分析、DFD、用例与可追踪性</a>
+</li>
+<li>
+<a href="#topic-5">架构设计、模块化与 UML</a>
+</li>
+<li>
+<a href="#topic-6">编码实现、评审与集成</a>
+</li>
+<li>
+<a href="#topic-7">测试设计、覆盖率与缺陷定位</a>
+</li>
+<li>
+<a href="#topic-8">交付、维护与变更验证</a>
+</li>
+<li>
+<a href="#part2">第二部分：场景化讲解</a>
+</li>
+<li>
+<a href="#part3">第三部分：模拟笔试与追问</a>
+</li>
+</ul>
+</aside>
+<main class="main-content">
+<h2 id="part1">第一部分：技术原理</h2>
+<article class="card exam-topic" id="topic-1">
+<h3>1. 软件工程、质量与生命周期</h3>
+<p class="exam-meta">对应大纲条目 37</p>
+<h4>思想 · 大白话</h4>
+<p>写出能运行的程序只是开始，还要让需求、设计、测试、交付能被管理和验证。软件工程把这套工作变成可重复的过程。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>软件包含程序、相关数据及文档；软件工程强调系统、规范、可度量的方法。</li>
+<li>典型生命周期有可行性、需求、设计、编码、测试、部署、维护，实际可迭代并行，不总是严格一次走完。</li>
+<li>正确性、可靠性、性能、易用性、可维护性、安全等质量属性可能互相制约，要把目标写成可检验条件。</li>
+<li>验证关注是否符合规格，确认关注是否满足用户实际需要；术语可对照 verification/validation 理解。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>“系统响应快”不可直接验收；改为“规定负载下95%查询在2秒内返回”，给定测量条件后可测试。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>质量不只靠最后测试，错误需求即使被完美实现也可能不满足用户。</div>
+</article>
+<article class="card exam-topic" id="topic-2">
+<h3>2. 过程管理、估算与配置控制</h3>
+<p class="exam-meta">对应大纲条目 38</p>
+<h4>思想 · 大白话</h4>
+<p>多人开发要知道谁改了什么、哪一版能发布、改需求会影响哪些任务。管理是把变化变得可追踪。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>计划需定义范围、任务分解、依赖、资源、里程碑与风险；进度、成本、质量不是孤立指标。</li>
+<li>配置项包括代码、需求、设计、测试与脚本；基线是正式评审确认的参考版本，修改要走变更控制。</li>
+<li>版本控制记录历史，配置管理还包含变更审批、状态记录、审计等，不能简单等同于 Git。</li>
+<li>风险通常按概率与影响评估，制定缓解与应急措施；已经发生的是问题，未来不确定的是风险。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>需求新增短信通知，应记录变更、评估接口与测试影响、批准后更新基线，而非只修改一处页面。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>人月不能无限线性换算：加入新人还需要培训与沟通，未必让延期项目更快。</div>
+</article>
+<article class="card exam-topic" id="topic-3">
+<h3>3. 瀑布、原型、螺旋、结构化、面向对象与敏捷</h3>
+<p class="exam-meta">对应大纲条目 39</p>
+<h4>思想 · 大白话</h4>
+<p>需求稳定时可以按阶段逐步推进，拿不准时先做原型；风险高时先解决风险；敏捷用短周期不断验证方向。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>瀑布强调阶段产物与评审，适合需求较明确的情形；原型帮助澄清交互和需求，不必成为最终生产实现。</li>
+<li>螺旋模型以风险分析驱动迭代，不是简单绕圈画图。</li>
+<li>结构化方法常用功能分解、数据流图和数据字典；面向对象围绕对象、类、封装、继承、多态。</li>
+<li>敏捷重视可工作软件、协作和响应变化；迭代增量交付也要测试、文档与纪律。Scrum 是一种具体框架，不等于全部敏捷。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>用户说不清审批界面，先做可点击原型验证流程；核心安全算法不确定，先做风险验证，再扩展业务。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>敏捷不等于无计划、无文档、不设计；原型也不等于已经通过生产质量检验。</div>
+</article>
+<article class="card exam-topic" id="topic-4">
+<h3>4. 需求分析、DFD、用例与可追踪性</h3>
+<p class="exam-meta">对应大纲条目 40</p>
+<h4>思想 · 大白话</h4>
+<p>先弄清用户要做什么、哪些条件算成功，再决定用什么技术。需求图描述业务信息如何流动，不是程序怎么跳转。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>功能需求描述系统做什么；非功能需求描述性能、安全、可靠性等质量与约束；范围需明确边界与外部角色。</li>
+<li>DFD 数据流图含外部实体、处理、数据流、数据存储；分层分解时保持父子图输入输出平衡。</li>
+<li>用例描述角色与系统交互以达成目标；include 常表示必需复用行为，extend 常表示条件扩展。</li>
+<li>需求应可验证、无歧义、可追踪，建立需求→设计→代码→测试的关联，便于影响分析。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>“用户提交报修，系统生成工单”是功能；“只允许本人查看个人工单”是访问约束，应有对应测试。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>DFD 中数据流不是控制流程箭头；不能把所有循环分支都当数据流。</div>
+</article>
+<article class="card exam-topic" id="topic-5">
+<h3>5. 架构设计、模块化与 UML</h3>
+<p class="exam-meta">对应大纲条目 41</p>
+<h4>思想 · 大白话</h4>
+<p>先分清谁负责什么，再约定模块怎么交接。好的划分让一个变化尽量少牵连不相关部分。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>高内聚强调模块内部职责集中，低耦合强调模块间依赖少且明确；不是模块越小越好。</li>
+<li>详细设计明确算法、数据、接口与错误处理；概要设计更关注总体架构和模块关系。</li>
+<li>类图表示静态类型关系，时序图表示消息随时间的交互，状态图描述对象状态与转移。</li>
+<li>接口设计应说明输入输出、前后置条件、异常与边界，不能只列函数名。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>把工单规则和短信服务调用分开，通过明确通知接口连接，替换短信供应商时减少对业务规则的改动。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>继承表示 is-a，不是所有代码复用都应该用继承；设计模式不是必须逐个套用的模板。</div>
+</article>
+<article class="card exam-topic" id="topic-6">
+<h3>6. 编码实现、评审与集成</h3>
+<p class="exam-meta">对应大纲条目 42</p>
+<h4>思想 · 大白话</h4>
+<p>把设计变成可靠代码时，先让边界明确、失败可见，再持续小步集成，减少最后一次合并才发现问题。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>编码规范、输入校验、错误处理、资源生命周期和安全检查都属于实现质量。</li>
+<li>代码评审、静态分析不运行程序；动态测试实际执行程序，二者发现的问题互补。</li>
+<li>持续集成频繁集成并自动构建检查；不等于每次自动部署到生产。</li>
+<li>依赖、配置和数据库迁移也属于交付系统的一部分，应能重现版本。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>把用户金额输入解析为规定精度，校验范围，失败返回明确错误；不能捕获全部异常后返回“成功”。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>单元测试全过不代表外部依赖、配置、并发与部署一定正确。</div>
+</article>
+<article class="card exam-topic" id="topic-7">
+<h3>7. 测试设计、覆盖率与缺陷定位</h3>
+<p class="exam-meta">对应大纲条目 43</p>
+<h4>思想 · 大白话</h4>
+<p>测试不是随便点几下，而是选能区分正确与错误行为的输入，并给出明确预期。覆盖率说明走到了哪里，不证明没有缺陷。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>黑盒从规格出发，用等价类、边界值、决策表等；白盒从结构出发，看语句、分支、条件、路径。</li>
+<li>语句覆盖不保证分支覆盖；分支覆盖不保证每个原子条件均取过真假。复合条件、短路执行需仔细分析。</li>
+<li>单元→集成→系统→验收面向不同层级；回归测试检查修改是否破坏已有功能，确认修复要复现原缺陷。</li>
+<li>独立路径数常以圈复杂度 V(G)=E-N+2P 估计，单连通控制流图 P=1；常见规范图也可用判定节点数+1。</li>
+<li>穷尽全部路径往往不可行，特别是循环；测试能发现缺陷，不能一般性证明不存在缺陷。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>输入范围1..100，边界候选0,1,2,99,100,101。对 if(A&amp;&amp;B)，只用 A=true,B=true 可以执行主体，却没有覆盖条件为假的情况。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>“100%语句覆盖”不能推出“100%分支覆盖”，更不能推出系统无缺陷。</div>
+</article>
+<article class="card exam-topic" id="topic-8">
+<h3>8. 交付、维护与变更验证</h3>
+<p class="exam-meta">对应大纲条目 44</p>
+<h4>思想 · 大白话</h4>
+<p>上线要有可重复的包、配置、验证和回退办法；之后修错误、适应环境、改功能，都属于维护。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>交付需核对版本、环境、配置、数据迁移、验收条件和运维说明，发布后做针对性验证。</li>
+<li>改正性维护修缺陷；适应性维护跟随平台环境变化；完善性维护改善功能性能；预防性维护降低未来故障风险。</li>
+<li>回滚程序不一定能回滚已修改的数据，数据库迁移需单独设计兼容和恢复方案。</li>
+<li>变更后进行影响分析和回归验证，保留追踪信息，避免同一缺陷反复出现。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>修计算错误是改正性；支持新操作系统是适应性；新增统计视图是完善性；消除难维护重复逻辑以防后续问题是预防性。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>维护类别按目的判断，不能只看到“修改代码”就归为改正性。</div>
+</article>
+<h2 id="part2">第二部分：场景化讲解</h2>
+<article class="card" data-trace>
+<h3>需求到测试：输入数量 1..100</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>需求明确为整数且闭区间1..100，空值、非整数也必须定义行为。</li>
+<li>划分有效等价类1..100，无效类小于1、大于100、缺失或非整数。</li>
+<li>选边界0,1,2,99,100,101，另加缺失与非整数；每个用例写明预期。</li>
+<li>实现校验后，先跑单元测试，再验证界面与服务端是否统一；服务端不能仅信任前端限制。</li>
+</ol>
+</article>
+<article class="card" data-trace>
+<h3>变更与维护分类</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>已有系统接到三项请求：修金额计算、适配新平台、新增月报。</li>
+<li>分别归改正性、适应性、完善性；不能把新增功能算成修缺陷。</li>
+<li>评估需求与数据迁移影响，更新受控版本和测试，准备回退。</li>
+<li>上线后验证核心流程；若数据格式已改变，旧程序能否运行需单独验证。</li>
+</ol>
+</article>
+<h2 id="part3">第三部分：模拟笔试与追问</h2>
+<div data-quiz>
+<p class="exam-meta">共 8 道自编单选练习，不是真题，不用于估计实际考试分值。先作答，再看推导。</p>
+<div class="exam-controls">
+<button type="button" data-reset-quiz>重做本章</button>
+<span data-score aria-live="polite">
+</span>
+</div>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>1. 最可验证的性能需求是？</legend>
+<label class="exam-option">
+<input type="radio" name="q1" value="0">
+<span>A. 响应很快</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="1">
+<span>B. 体验很好</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="2">
+<span>C. 规定负载下95%查询2秒内返回</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="3">
+<span>D. 功能先进</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。定义了负载、比例和时间门槛，具备可测量条件。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>2. 软件配置管理等同于 Git 吗？</legend>
+<label class="exam-option">
+<input type="radio" name="q2" value="0">
+<span>A. 完全等同</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="1">
+<span>B. 只需保存源码</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="2">
+<span>C. 不等同，还包括变更、状态记录与审计</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="3">
+<span>D. 只做发布后运维</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。版本控制是配置管理的一部分。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>3. 以风险分析驱动的经典过程模型是？</legend>
+<label class="exam-option">
+<input type="radio" name="q3" value="0">
+<span>A. 瀑布</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="1">
+<span>B. 螺旋</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="2">
+<span>C. 纯编码</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="3">
+<span>D. 只做最终验收</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。螺旋模型每轮关注风险识别与降低。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="0">
+<fieldset class="exam-question">
+<legend>4. DFD 箭头主要表示？</legend>
+<label class="exam-option">
+<input type="radio" name="q4" value="0">
+<span>A. 数据流</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="1">
+<span>B. 线程切换</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="2">
+<span>C. 控制跳转</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="3">
+<span>D. CPU 指令</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：A</strong>。数据流图描述数据在外部实体、处理、存储间的流动。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>5. 表达对象交互消息的时间顺序，常用？</legend>
+<label class="exam-option">
+<input type="radio" name="q5" value="0">
+<span>A. 类图</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="1">
+<span>B. 时序图</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="2">
+<span>C. ER图</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="3">
+<span>D. 部署清单</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。时序图按时间展开参与对象的消息交互。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>6. 100%语句覆盖能保证什么？</legend>
+<label class="exam-option">
+<input type="radio" name="q6" value="0">
+<span>A. 无缺陷</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="1">
+<span>B. 100%分支覆盖</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="2">
+<span>C. 被统计的可执行语句均执行过</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="3">
+<span>D. 覆盖所有路径</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。它只说明语句执行情况，不涵盖全部分支、条件和路径。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>7. 适配新操作系统通常属于？</legend>
+<label class="exam-option">
+<input type="radio" name="q7" value="0">
+<span>A. 改正性维护</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="1">
+<span>B. 适应性维护</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="2">
+<span>C. 完善性维护</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="3">
+<span>D. 无需维护</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。由运行环境变化引起，是适应性维护。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>8. 持续集成意味着？</legend>
+<label class="exam-option">
+<input type="radio" name="q8" value="0">
+<span>A. 每次必须自动上生产</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="1">
+<span>B. 频繁集成并自动构建检查</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="2">
+<span>C. 不需要评审</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="3">
+<span>D. 不需要测试</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。CI 强调集成验证，与自动生产部署不是同一承诺。</p>
+</details>
+</article>
+</div>
+<p>
+<a href="sgcc-exam.html">← 返回国网专业课目录</a> · <a href="../index.html">返回首页</a>
+</p>
+</main>
+</div>
+</div>
+</body>
+</html>

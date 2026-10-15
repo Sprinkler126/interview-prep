@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国网计算机类 · 计算机网络 - 面试知识复习库</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/sgcc.css">
+<script src="../js/sgcc.js" defer>
+</script>
+</head>
+<body class="sgcc">
+<nav class="nav">
+<div class="nav-inner">
+<a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+<a class="back" href="sgcc-exam.html">← 国网专业课目录</a>
+</div>
+</nav>
+<div class="container">
+<h1>国网计算机类 · 计算机网络</h1>
+<p class="subtitle">2026 版大纲条目 16–23 · 概念判断、计算过程、算法追踪与自编练习</p>
+<nav class="exam-nav" aria-label="专业课导航">
+<a href="sgcc-data-structure.html">数据结构与算法</a>
+<a href="sgcc-database.html">数据库系统</a>
+<a href="sgcc-network.html" aria-current="page">计算机网络</a>
+<a href="sgcc-os.html">操作系统</a>
+<a href="sgcc-organization.html">计算机组成与体系结构</a>
+<a href="sgcc-software.html">软件工程</a>
+<a href="sgcc-new-tech.html">信息新技术</a>
+</nav>
+<p class="tip">先掌握本页基础考点与手算步骤，再到<a href="computer-network.html">原主题页</a>看实现和面试拓展。大纲版本与来源见<a href="sgcc-exam.html#sources">专业课目录</a>。编写日期：2026-10-15。</p>
+<div class="page-layout">
+<aside class="sidebar">
+<div class="sidebar-title">本章导航</div>
+<ul>
+<li>
+<a href="#part1">第一部分：技术原理</a>
+</li>
+<li>
+<a href="#topic-1">网络分层、封装与时延</a>
+</li>
+<li>
+<a href="#topic-2">物理层：编码、复用与信道容量</a>
+</li>
+<li>
+<a href="#topic-3">链路层：差错检测、ARQ 与介质访问</a>
+</li>
+<li>
+<a href="#topic-4">IPv4 子网、最长前缀匹配与路由</a>
+</li>
+<li>
+<a href="#topic-5">传输层：TCP 序号、窗口与拥塞控制</a>
+</li>
+<li>
+<a href="#topic-6">应用层：DNS、HTTP、邮件与 DHCP</a>
+</li>
+<li>
+<a href="#topic-7">网络管理与安全：认证、加密、签名</a>
+</li>
+<li>
+<a href="#topic-8">无线与移动网络</a>
+</li>
+<li>
+<a href="#part2">第二部分：场景化讲解</a>
+</li>
+<li>
+<a href="#part3">第三部分：模拟笔试与追问</a>
+</li>
+</ul>
+</aside>
+<main class="main-content">
+<h2 id="part1">第一部分：技术原理</h2>
+<article class="card exam-topic" id="topic-1">
+<h3>1. 网络分层、封装与时延</h3>
+<p class="exam-meta">对应大纲条目 16</p>
+<h4>思想 · 大白话</h4>
+<p>每层只解决自己那一段问题：应用产生消息，传输层管端到端，网络层找下一跳，链路层负责这一段链路。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>OSI 七层：物理、链路、网络、传输、会话、表示、应用；TCP/IP 常用四层模型，教材也常按五层讲解。</li>
+<li>交换机主要看链路地址，路由器按 IP 转发；端口区分主机上的应用进程。</li>
+<li>发送时延 L/R，传播时延 d/v；带宽影响发送时延，不直接改变介质传播速度。</li>
+<li>存储转发路径若各链路速率相同，一个完整分组跨 k 条链路的发送时延共 kL/R，再加传播、处理、排队；多分组还可流水。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>1500 B 分组在 100 Mb/s 链路发送需 1500×8/10^8=120 μs。1000 km 介质传播速度 2×10^8 m/s，传播需 5 ms。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>Mb/s 的 b 是位；MB 的 B 是字节；不能把发送与传播时延当成一个概念。</div>
+</article>
+<article class="card exam-topic" id="topic-2">
+<h3>2. 物理层：编码、复用与信道容量</h3>
+<p class="exam-meta">对应大纲条目 17</p>
+<h4>思想 · 大白话</h4>
+<p>道路每秒能变多少次信号、每次能表达多少信息，还受噪声限制。两种容量公式是在不同假设下给上限。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>码元速率单位 Baud，数据速率 bit/s；M 种码元理想携带 log2 M bit/码元。</li>
+<li>奈奎斯特无噪理想低通信道上限 C=2B log2 M；香农带限有噪信道 C=B log2(1+S/N)。</li>
+<li>S/N 为线性功率比；给 dB 时 S/N=10^(dB/10)。不能把 30 dB 直接当 30 代入。</li>
+<li>FDM 按频段、TDM 按时隙、WDM 按光波长、CDM 按码字共享资源。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>B=3 kHz、M=4，无噪上限 12 kb/s；B=3 kHz、信噪比 30 dB 时 S/N=1000，香农上限约 29.9 kb/s。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>奈奎斯特不是任何实际信道的直接测量值；给定码元数与噪声时应同时考虑各自限制。</div>
+</article>
+<article class="card exam-topic" id="topic-3">
+<h3>3. 链路层：差错检测、ARQ 与介质访问</h3>
+<p class="exam-meta">对应大纲条目 18</p>
+<h4>思想 · 大白话</h4>
+<p>同一段路上，先把比特包成帧，再发现传坏的帧并决定是否重发。共享一条路时，还要解决谁先发。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>CRC 把位串当 GF(2) 多项式，模 2 除法用异或；r 阶生成多项式附 r 位余数。CRC 本身是检测机制，不自动纠错。</li>
+<li>停等每次只发一帧，理想无差错忽略 ACK 发送时长时效率 Tframe/(Tframe+2Tprop)。</li>
+<li>GBN 用 k 位序号时发送窗≤2^k-1、接收窗为 1；SR 在相同发送接收窗大小时窗≤2^(k-1)。</li>
+<li>共享半双工以太网使用 CSMA/CD；现代交换全双工以太网不靠碰撞检测争用链路；无线常用 CSMA/CA。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>3 位序号共 8 个号码，GBN 最大发送窗 7，SR 等大窗口上限 4。发帧 1 ms、单程传播 4 ms，停等效率 1/(1+8)=1/9。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>不能把 GBN 和 SR 窗口公式互换，也不能把 CA 说成“检测到碰撞后再发”。</div>
+</article>
+<article class="card exam-topic" id="topic-4">
+<h3>4. IPv4 子网、最长前缀匹配与路由</h3>
+<p class="exam-meta">对应大纲条目 19</p>
+<h4>思想 · 大白话</h4>
+<p>IP 地址像街区加门牌，掩码划出街区；路由表里有多条可用规则时，先选描述范围最具体的一条。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>IPv4 共 32 位，/p 的主机位是 32-p；常规子网地址数 2^(32-p)，通常可用主机数减去网络和广播地址。/31 点到点、/32 主机路由另按用途。</li>
+<li>网络地址=IP 按位 AND 掩码；广播地址把主机位全置 1；跨子网通信交给网关，不能把网关当 DNS。</li>
+<li>路由转发采用最长前缀匹配；ARP 用于 IPv4 同链路 IP 到 MAC 解析，跨网段时解析的是下一跳。</li>
+<li>IPv6 地址 128 位，无广播，邻居发现使用 ICMPv6；NAT 地址转换与路由转发不是同一功能。</li>
+<li>距离向量与链路状态是两类路由思路；不能把交换机的 MAC 学习表当成 IP 路由表。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>192.168.10.130/26：每块 64 地址，网络 .128，广播 .191，常规主机 .129–.190，共 62。目的 10.1.2.3 同时匹配 /8 与 /16 时选 /16。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>路由器逐跳转发时 IP 目的地址通常不变，但链路层源/目的 MAC 随链路改变（NAT 等修改另论）。</div>
+</article>
+<article class="card exam-topic" id="topic-5">
+<h3>5. 传输层：TCP 序号、窗口与拥塞控制</h3>
+<p class="exam-meta">对应大纲条目 20</p>
+<h4>思想 · 大白话</h4>
+<p>TCP 给字节编号，告诉对方下次想收到哪个字节。接收窗口管对方能装多少，拥塞窗口管网络能承受多少。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>TCP 面向连接、可靠字节流，无应用消息边界；UDP 提供数据报边界，本身不保证可靠、顺序或重传。</li>
+<li>ACK 表示下一个期望字节序号；SYN、FIN 各占一个序号，纯 ACK 不占序号。</li>
+<li>发送受接收窗口 rwnd 与拥塞窗口 cwnd 共同限制，通常取较小者；流量控制与拥塞控制对象不同。</li>
+<li>经典拥塞控制含慢开始、拥塞避免、快重传、快恢复；具体增长和丢包反应需按题目使用的算法版本。</li>
+<li>三次握手同步序号并确认双向通信；关闭可能四段也可能合并 ACK/FIN，不能机械地把所有实现都说成固定四包。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>发出 seq=100、有效载荷 500 B，正常确认 ACK=600。若只是 SYN 且 seq=100，确认 ACK=101。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>TCP 可靠不代表永不失败；网络中断仍可能最终超时。UDP 上可以由应用另加可靠机制。</div>
+</article>
+<article class="card exam-topic" id="topic-6">
+<h3>6. 应用层：DNS、HTTP、邮件与 DHCP</h3>
+<p class="exam-meta">对应大纲条目 21</p>
+<h4>思想 · 大白话</h4>
+<p>应用协议规定人们真正要办的事：查名字、取网页、发邮件或领网络配置。端口只是约定入口，不是安全保证。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>DNS 常用 UDP 53，也使用 TCP 53；递归是请对方替自己查到底，迭代是对方告诉下一站。缓存减少查询。</li>
+<li>HTTP 常用 80，HTTPS 常用 443；HTTPS 在 HTTP 基础上借助 TLS 保护通信。</li>
+<li>SMTP 发信/转交，POP3 和 IMAP 收取或访问邮箱；不要把发信与收信协议互换。</li>
+<li>DHCP 常见 Discover→Offer→Request→ACK，客户端初始可用广播；服务端 UDP 67、客户端 UDP 68。</li>
+<li>HTTP 无状态指协议本身不自动记住会话，应用可用 Cookie 等维持登录状态。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>打开域名网页：先取地址（可能命中 DNS 缓存），再连接目标服务并按协议交换请求响应；有缓存时不保证每层都实际发生网络查询。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>DNS 不只用 UDP，HTTPS 也不意味着服务器业务内容必然可信。</div>
+</article>
+<article class="card exam-topic" id="topic-7">
+<h3>7. 网络管理与安全：认证、加密、签名</h3>
+<p class="exam-meta">对应大纲条目 22</p>
+<h4>思想 · 大白话</h4>
+<p>加密像把信封锁上，签名像在内容上盖可验证的私章。隐藏内容和证明谁签了内容是不同任务。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>对称加密使用共享秘密适合大量数据；非对称机制使用公私钥，适合身份验证、密钥协商等。</li>
+<li>数字签名通常对摘要签名：签名者用私钥签，验证者用公钥验；加密给接收者时使用接收者公钥的概念方向不同。</li>
+<li>哈希不等于加密；MAC 需要共享密钥，可验证完整性和来源，但不提供与数字签名同样的公开可验证性。</li>
+<li>防火墙按规则控制通信，IDS 检测告警、IPS 可阻断；不能替代应用鉴权、补丁和审计。</li>
+<li>SNMP 管理模型含管理站、代理与 MIB；SNMPv3 提供安全能力，具体配置仍决定是否启用认证加密。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>甲签文件：甲私钥签摘要，乙用甲公钥验；若还需保密，再使用合适的加密方案保护正文。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>“公钥加密、私钥解密”和“私钥签名、公钥验签”目的不同，不要称签名为反向加密。</div>
+</article>
+<article class="card exam-topic" id="topic-8">
+<h3>8. 无线与移动网络</h3>
+<p class="exam-meta">对应大纲条目 23</p>
+<h4>思想 · 大白话</h4>
+<p>无线站点可能听不见彼此，却同时干扰接收端。移动时还要处理从一个接入点切到另一个的连接变化。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>802.11 属无线局域网；802.3 属以太网。Wi-Fi 共享介质，实际吞吐受干扰、争用和协议开销影响。</li>
+<li>隐藏终端可能都能联系 AP 但互相听不到；RTS/CTS 可缓解相关冲突，但有额外开销且非万能。</li>
+<li>CSMA/CA 用侦听、随机退避、确认等降低碰撞概率；不能保证绝无碰撞。</li>
+<li>移动网络涉及接入、鉴权、漫游与切换；带宽、时延、覆盖范围是不同维度。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>A、C 都能听到 AP，却互相听不到，同时发送可能在 AP 处冲突；AP 发 CTS 使附近站点推迟发送，有助缓解隐藏终端。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>无线有确认并不表示广播帧和所有帧类型都采用相同确认规则。</div>
+</article>
+<h2 id="part2">第二部分：场景化讲解</h2>
+<article class="card" data-trace>
+<h3>子网手算：192.168.10.130/26</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>/26 意味末字节前 2 位属网络，掩码 255.255.255.192。</li>
+<li>末字节块大小 256-192=64，区间 0–63、64–127、128–191、192–255。</li>
+<li>130 落在 128–191，网络 .128、广播 .191。</li>
+<li>常规可用 .129 到 .190，共 64-2=62。网关地址需由配置指定，不能从题面自动断定。</li>
+</ol>
+</article>
+<article class="card" data-trace>
+<h3>TCP 字节确认</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>连接已建立，发送方准备从 seq=100 发 500 字节。</li>
+<li>本段覆盖序号 100..599，接收方完整按序收到。</li>
+<li>ACK=600，表示希望下次从 600 开始，不是“最后收到 600”。</li>
+<li>后续若收到一个乱序高序号段而 600 仍缺失，累计确认仍可停在 600；SACK 等扩展可补充说明已收区间。</li>
+</ol>
+</article>
+<h2 id="part3">第三部分：模拟笔试与追问</h2>
+<div data-quiz>
+<p class="exam-meta">共 9 道自编单选练习，不是真题，不用于估计实际考试分值。先作答，再看推导。</p>
+<div class="exam-controls">
+<button type="button" data-reset-quiz>重做本章</button>
+<span data-score aria-live="polite">
+</span>
+</div>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>1. 1500 B 在 100 Mb/s 链路发送时延？</legend>
+<label class="exam-option">
+<input type="radio" name="q1" value="0">
+<span>A. 12 μs</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="1">
+<span>B. 120 μs</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="2">
+<span>C. 1.2 ms</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="3">
+<span>D. 12 ms</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。1500×8/100000000=0.00012 秒=120 μs。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="3">
+<fieldset class="exam-question">
+<legend>2. 30 dB 对应线性信噪比？</legend>
+<label class="exam-option">
+<input type="radio" name="q2" value="0">
+<span>A. 3</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="1">
+<span>B. 30</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="2">
+<span>C. 100</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="3">
+<span>D. 1000</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：D</strong>。10^(30/10)=1000。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>3. 3 位序号、等大 SR 收发窗口，上限？</legend>
+<label class="exam-option">
+<input type="radio" name="q3" value="0">
+<span>A. 3</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="1">
+<span>B. 4</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="2">
+<span>C. 7</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="3">
+<span>D. 8</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。2^(3-1)=4，防止新旧序号窗口混淆。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>4. 192.168.10.130/26 的网络地址？</legend>
+<label class="exam-option">
+<input type="radio" name="q4" value="0">
+<span>A. 192.168.10.0</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="1">
+<span>B. 192.168.10.64</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="2">
+<span>C. 192.168.10.128</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="3">
+<span>D. 192.168.10.130</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。/26 块大小 64，130 所在块从 128 开始。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="3">
+<fieldset class="exam-question">
+<legend>5. seq=100，载荷 500 B，无 SYN/FIN，正常 ACK？</legend>
+<label class="exam-option">
+<input type="radio" name="q5" value="0">
+<span>A. 100</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="1">
+<span>B. 500</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="2">
+<span>C. 599</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="3">
+<span>D. 600</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：D</strong>。确认的是下一个期望字节，100+500=600。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="0">
+<fieldset class="exam-question">
+<legend>6. 流量控制主要防止什么？</legend>
+<label class="exam-option">
+<input type="radio" name="q6" value="0">
+<span>A. 接收端来不及接收</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="1">
+<span>B. 链路被窃听</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="2">
+<span>C. 路由表失效</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="3">
+<span>D. 域名过期</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：A</strong>。接收窗口约束接收缓冲能力；拥塞窗口主要约束网络负载。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="3">
+<fieldset class="exam-question">
+<legend>7. 验证甲的数字签名使用哪把钥匙？</legend>
+<label class="exam-option">
+<input type="radio" name="q7" value="0">
+<span>A. 乙私钥</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="1">
+<span>B. 乙公钥</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="2">
+<span>C. 甲私钥</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="3">
+<span>D. 甲公钥</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：D</strong>。甲用私钥签，验证者用甲公钥验。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>8. 关于 DNS 正确的是？</legend>
+<label class="exam-option">
+<input type="radio" name="q8" value="0">
+<span>A. 只能 UDP</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="1">
+<span>B. 只能 TCP</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="2">
+<span>C. 既用 UDP 也用 TCP</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="3">
+<span>D. 替代 DHCP 配置地址</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。DNS 两种传输都使用，不能把“常用 UDP”背成“只用 UDP”。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>9. Wi-Fi 使用 CSMA/CA 的正确描述？</legend>
+<label class="exam-option">
+<input type="radio" name="q9" value="0">
+<span>A. 保证绝无冲突</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q9" value="1">
+<span>B. 检测到冲突才停止发送</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q9" value="2">
+<span>C. 降低冲突概率但不保证消除</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q9" value="3">
+<span>D. 所有站必须互相可听见</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。随机退避与确认帮助降低碰撞，隐藏终端仍需其他机制缓解。</p>
+</details>
+</article>
+</div>
+<p>
+<a href="sgcc-exam.html">← 返回国网专业课目录</a> · <a href="../index.html">返回首页</a>
+</p>
+</main>
+</div>
+</div>
+</body>
+</html>

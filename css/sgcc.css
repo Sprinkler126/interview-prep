@@ -1,0 +1,32 @@
+.sgcc a { color:var(--accent); }
+.sgcc .main-content { min-width:0; }
+.sgcc .compare-box { min-width:0; }
+.sgcc table { display:block; max-width:100%; overflow-x:auto; }
+.sgcc pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.exam-nav { display:flex; flex-wrap:wrap; gap:.6rem; margin:1rem 0; }
+.exam-nav a { border:1px solid var(--border); border-radius:6px; padding:.35rem .6rem; text-decoration:none; }
+.exam-meta { color:var(--text-dim); font-size:.9rem; }
+.exam-topic { scroll-margin-top:90px; }
+.exam-topic h3 { margin-top:0; }
+.exam-topic h4 { color:var(--accent3); }
+.exam-example { border-left:3px solid var(--accent); padding:.6rem .9rem; margin:1rem 0; background:rgba(56,189,248,.06); }
+.exam-trap { border-left:3px solid var(--accent4); padding:.6rem .9rem; margin:1rem 0; }
+.exam-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; margin:.8rem 0; }
+.sgcc button,.sgcc input[type=number] { font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:.35rem .65rem; }
+.sgcc button { cursor:pointer; }
+.sgcc button:disabled { opacity:.4; cursor:default; }
+.sgcc button:focus-visible,.sgcc input:focus-visible,.sgcc summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.sgcc input[type=number] { width:100px; }
+.trace-view { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--bg); padding:1rem; border-radius:8px; min-height:100px; }
+.exam-question { border:0; min-width:0; padding:0; }
+.exam-question legend { font-weight:600; margin-bottom:.7rem; }
+.exam-option { display:flex; align-items:baseline; gap:.6rem; padding:.4rem; border:1px solid transparent; border-radius:5px; cursor:pointer; }
+.exam-option:has(input:checked) { border-color:var(--accent); background:rgba(56,189,248,.08); }
+.exam-feedback { min-height:1.7em; color:var(--accent3); }
+.exam-answer { padding:.7rem; background:var(--bg); border-radius:6px; }
+.exam-answer summary { cursor:pointer; color:var(--accent); }
+.exam-answer p { margin-top:.5rem; }
+.sgcc [hidden] { display:none; }
+.exam-hub-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:1rem; }
+.exam-hub-grid .card { margin:0; }
+@media(max-width:1024px) { .sgcc .main-content { width:100%; } }

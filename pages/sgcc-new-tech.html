@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国网计算机类 · 信息新技术 - 面试知识复习库</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/sgcc.css">
+<script src="../js/sgcc.js" defer>
+</script>
+</head>
+<body class="sgcc">
+<nav class="nav">
+<div class="nav-inner">
+<a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+<a class="back" href="sgcc-exam.html">← 国网专业课目录</a>
+</div>
+</nav>
+<div class="container">
+<h1>国网计算机类 · 信息新技术</h1>
+<p class="subtitle">2026 版大纲条目 45–47 · 概念判断、计算过程、算法追踪与自编练习</p>
+<nav class="exam-nav" aria-label="专业课导航">
+<a href="sgcc-data-structure.html">数据结构与算法</a>
+<a href="sgcc-database.html">数据库系统</a>
+<a href="sgcc-network.html">计算机网络</a>
+<a href="sgcc-os.html">操作系统</a>
+<a href="sgcc-organization.html">计算机组成与体系结构</a>
+<a href="sgcc-software.html">软件工程</a>
+<a href="sgcc-new-tech.html" aria-current="page">信息新技术</a>
+</nav>
+<p class="tip">先掌握本页基础考点与手算步骤，再到<a href="llm-rag.html">原主题页</a>看实现和面试拓展。大纲版本与来源见<a href="sgcc-exam.html#sources">专业课目录</a>。编写日期：2026-10-15。</p>
+<div class="page-layout">
+<aside class="sidebar">
+<div class="sidebar-title">本章导航</div>
+<ul>
+<li>
+<a href="#part1">第一部分：技术原理</a>
+</li>
+<li>
+<a href="#topic-1">人工智能、机器学习与大模型基础</a>
+</li>
+<li>
+<a href="#topic-2">物联网：感知、网络、平台与协议</a>
+</li>
+<li>
+<a href="#topic-3">大数据：采集、预处理、分析、挖掘与可视化</a>
+</li>
+<li>
+<a href="#part2">第二部分：场景化讲解</a>
+</li>
+<li>
+<a href="#part3">第三部分：模拟笔试与追问</a>
+</li>
+</ul>
+</aside>
+<main class="main-content">
+<h2 id="part1">第一部分：技术原理</h2>
+<article class="card exam-topic" id="topic-1">
+<h3>1. 人工智能、机器学习与大模型基础</h3>
+<p class="exam-meta">对应大纲条目 45</p>
+<h4>思想 · 大白话</h4>
+<p>机器学习从样例中学规律；大模型用大规模数据学通用表示，再按任务使用。生成得流畅不代表每一句都有事实依据。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>监督学习用标签，分类预测类别、回归预测数值；无监督学习常做聚类和降维；强化学习通过交互奖励学习策略。</li>
+<li>训练集拟合，验证集选超参数，测试集做最终泛化评估；标准化等预处理参数也应只从训练数据学习，避免泄漏。</li>
+<li>过拟合训练表现好、泛化差；正则化、更多有效数据、合理早停等可缓解。欠拟合则模型表达或训练不足。</li>
+<li>自然语言处理处理文本语言；语音识别把语音转文本；文字识别 OCR 从图像提取文字；图像识别处理视觉类别或对象，任务不能混同。</li>
+<li>Precision=TP/(TP+FP)，Recall=TP/(TP+FN)，F1=2PR/(P+R)，分母为0时需说明约定；类别失衡时准确率可能误导。</li>
+<li>大模型按 token 处理，预训练、微调、推理是不同阶段；注意力建立上下文关系，RAG 先检索再生成，仍需核实引用、权限与事实。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>告警模型 TP=30,FP=10,FN=20：精确率30/40=0.75，召回率30/50=0.6，F1≈0.667。电表照片转数字是 OCR，客服录音转文字是语音识别。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>把测试集参与调参会污染评估；RAG 不保证消除幻觉，也不等于把资料重新训练进模型。</div>
+</article>
+<article class="card exam-topic" id="topic-2">
+<h3>2. 物联网：感知、网络、平台与协议</h3>
+<p class="exam-meta">对应大纲条目 46</p>
+<h4>思想 · 大白话</h4>
+<p>传感器把温度、电流等现实量变成数据，网络送到平台，应用再作判断或控制。不同层解决不同问题。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>常用三层理解为感知、网络、应用，具体平台架构可进一步分层；传感器采集，执行器影响物理过程。</li>
+<li>RFID 用标签与读写器识别对象，无源标签通常由读写器电磁场供能；不是所有标签都有电池。</li>
+<li>MQTT 是常见发布订阅应用协议，通常跑在 TCP 上；QoS0至多一次、QoS1至少一次、QoS2协议交互层面恰好一次，不能自动等同端到端业务无重复。</li>
+<li>CoAP 常用于受限环境，经典传输常基于 UDP，也有其他传输绑定；应用协议与 Wi-Fi、蜂窝等接入技术层级不同。</li>
+<li>边缘计算可在靠近设备处过滤和处理，降低时延与上送量；设备认证、固件更新和最小权限不能省。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>温度传感器采样→网关过滤→MQTT发布到 broker→订阅服务写库并告警。QoS1 允许重投，告警处理需按事件ID去重。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>采样率、网络带宽、端到端时延、供电寿命不同；不能把“实时”当成未定义的无限快。</div>
+</article>
+<article class="card exam-topic" id="topic-3">
+<h3>3. 大数据：采集、预处理、分析、挖掘与可视化</h3>
+<p class="exam-meta">对应大纲条目 47</p>
+<h4>思想 · 大白话</h4>
+<p>数据多只是起点。先确认怎么来、是否可靠，再整理成能分析的结构，最后用结果回答具体问题。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>常用 V 描述体量、速度、多样性等特征，但 V 数量和定义不是所有材料统一；核心是数据与处理需求。</li>
+<li>采集后做缺失、异常、重复与时间对齐处理，保留原始记录与处理依据；异常不一定是错误，可能是真实故障信号。</li>
+<li>批处理面向有限数据集，流处理面对持续到来的事件；事件时间是业务发生时刻，处理时间是系统处理时刻。</li>
+<li>MapReduce 的 Map 产生键值对，Shuffle 按键汇集，Reduce 聚合；分布式存储与分布式计算是不同角色。</li>
+<li>数据模型组织结构和语义；挖掘包括分类、聚类、关联等。可视化需标清单位、时间范围和分母，避免截轴或聚合误导。</li>
+<li>训练或评估涉及时间序列时要注意未来信息泄漏；数据治理包括质量、元数据、权限和血缘追踪。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>每天电表读数先去重复、统一时区、保留异常标签，再按设备与日期聚合；迟到记录按事件时间补入正确日期，而不是无条件算作今天。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>批处理与流处理不是“慢”和“快”的同义词；原始异常不能为了好看直接删掉。</div>
+</article>
+<h2 id="part2">第二部分：场景化讲解</h2>
+<article class="card" data-trace>
+<h3>告警模型评价</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>真实故障50条，模型报出40条，其中真正故障30条。</li>
+<li>TP=30，FP=40-30=10，FN=50-30=20。</li>
+<li>精确率=30/(30+10)=0.75；召回率=30/(30+20)=0.6。</li>
+<li>F1=2×0.75×0.6/(0.75+0.6)=2/3。若漏报代价高，应结合代价与阈值评估，不能只看准确率。</li>
+</ol>
+</article>
+<article class="card" data-trace>
+<h3>物联网数据到分析</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>设备D在10:00产生事件E，但网络延迟到10:05平台才收到。</li>
+<li>感知层采样，网络传送，平台按设备身份认证，并按事件ID检测重复。</li>
+<li>统计10:00窗口时用事件时间；处理时间是10:05。迟到如何补算必须按规则处理。</li>
+<li>分析结果形成告警，留存原始记录、清洗规则与处理链路，便于追溯。</li>
+</ol>
+</article>
+<h2 id="part3">第三部分：模拟笔试与追问</h2>
+<div data-quiz>
+<p class="exam-meta">共 8 道自编单选练习，不是真题，不用于估计实际考试分值。先作答，再看推导。</p>
+<div class="exam-controls">
+<button type="button" data-reset-quiz>重做本章</button>
+<span data-score aria-live="polite">
+</span>
+</div>
+<article class="card" data-question data-answer="0">
+<fieldset class="exam-question">
+<legend>1. 有标签样本预测故障类别属于？</legend>
+<label class="exam-option">
+<input type="radio" name="q1" value="0">
+<span>A. 监督分类</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="1">
+<span>B. 无监督聚类</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="2">
+<span>C. 纯数据库备份</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="3">
+<span>D. 地址转换</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：A</strong>。输入与目标类别标签配对，是监督分类任务。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>2. TP=30,FP=10,FN=20，召回率？</legend>
+<label class="exam-option">
+<input type="radio" name="q2" value="0">
+<span>A. 0.5</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="1">
+<span>B. 0.6</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="2">
+<span>C. 0.75</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="3">
+<span>D. 0.9</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。TP/(TP+FN)=30/50=0.6。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>3. 选择超参数通常用哪部分数据？</legend>
+<label class="exam-option">
+<input type="radio" name="q3" value="0">
+<span>A. 测试集反复调</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="1">
+<span>B. 验证集</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="2">
+<span>C. 生产用户隐私直接公开</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="3">
+<span>D. 完全不用评估</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。验证集用于选择，测试集尽量保留为最终评估。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>4. 电表照片中的数字转成文本属于？</legend>
+<label class="exam-option">
+<input type="radio" name="q4" value="0">
+<span>A. 语音识别</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="1">
+<span>B. OCR</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="2">
+<span>C. 路由转发</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="3">
+<span>D. RFID写入</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。OCR 从图像提取文字或数字。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>5. MQTT QoS1 的正确描述？</legend>
+<label class="exam-option">
+<input type="radio" name="q5" value="0">
+<span>A. 至多一次</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="1">
+<span>B. 至少一次，可能重复</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="2">
+<span>C. 所有业务天然恰好一次</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="3">
+<span>D. 绝不丢失且不需确认</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。协议可能重投，业务层仍要处理重复。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="0">
+<fieldset class="exam-question">
+<legend>6. 事件10:00发生、10:05被处理，事件时间？</legend>
+<label class="exam-option">
+<input type="radio" name="q6" value="0">
+<span>A. 10:00</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="1">
+<span>B. 10:05</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="2">
+<span>C. 两者必须相等</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="3">
+<span>D. 数据库提交后才定义</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：A</strong>。事件时间来自业务发生时刻，处理时间取系统处理时刻。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>7. RAG 的主要过程？</legend>
+<label class="exam-option">
+<input type="radio" name="q7" value="0">
+<span>A. 仅增加CPU</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="1">
+<span>B. 检索相关资料后辅助生成</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="2">
+<span>C. 把所有问题当真值</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="3">
+<span>D. 永久消除幻觉</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。检索为生成提供上下文，但可靠性仍需验证。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>8. 清洗发现异常电流值，合理做法？</legend>
+<label class="exam-option">
+<input type="radio" name="q8" value="0">
+<span>A. 全部直接删除</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="1">
+<span>B. 先核实来源与业务含义并保留处理依据</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="2">
+<span>C. 改成平均值且不记录</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="3">
+<span>D. 隐藏数据</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。异常可能是真实故障，需判断与追踪，不能掩盖。</p>
+</details>
+</article>
+</div>
+<p>
+<a href="sgcc-exam.html">← 返回国网专业课目录</a> · <a href="../index.html">返回首页</a>
+</p>
+</main>
+</div>
+</div>
+</body>
+</html>

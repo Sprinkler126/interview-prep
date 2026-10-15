@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国网计算机类 · 数据库系统 - 面试知识复习库</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/sgcc.css">
+<script src="../js/sgcc.js" defer>
+</script>
+</head>
+<body class="sgcc">
+<nav class="nav">
+<div class="nav-inner">
+<a class="nav-brand" href="../index.html">📚 面试知识复习库</a>
+<a class="back" href="sgcc-exam.html">← 国网专业课目录</a>
+</div>
+</nav>
+<div class="container">
+<h1>国网计算机类 · 数据库系统</h1>
+<p class="subtitle">2026 版大纲条目 10–15 · 概念判断、计算过程、算法追踪与自编练习</p>
+<nav class="exam-nav" aria-label="专业课导航">
+<a href="sgcc-data-structure.html">数据结构与算法</a>
+<a href="sgcc-database.html" aria-current="page">数据库系统</a>
+<a href="sgcc-network.html">计算机网络</a>
+<a href="sgcc-os.html">操作系统</a>
+<a href="sgcc-organization.html">计算机组成与体系结构</a>
+<a href="sgcc-software.html">软件工程</a>
+<a href="sgcc-new-tech.html">信息新技术</a>
+</nav>
+<p class="tip">先掌握本页基础考点与手算步骤，再到<a href="mysql.html">原主题页</a>看实现和面试拓展。大纲版本与来源见<a href="sgcc-exam.html#sources">专业课目录</a>。编写日期：2026-10-15。</p>
+<div class="page-layout">
+<aside class="sidebar">
+<div class="sidebar-title">本章导航</div>
+<ul>
+<li>
+<a href="#part1">第一部分：技术原理</a>
+</li>
+<li>
+<a href="#topic-1">数据库基础、三级模式与数据独立性</a>
+</li>
+<li>
+<a href="#topic-2">关系代数、键与函数依赖</a>
+</li>
+<li>
+<a href="#topic-3">范式、分解与连接损失</a>
+</li>
+<li>
+<a href="#topic-4">SQL 查询、连接、分组与 NULL</a>
+</li>
+<li>
+<a href="#topic-5">事务、并发调度与锁</a>
+</li>
+<li>
+<a href="#topic-6">日志、检查点、备份与恢复</a>
+</li>
+<li>
+<a href="#topic-7">数据库设计：ER、映射与约束</a>
+</li>
+<li>
+<a href="#part2">第二部分：场景化讲解</a>
+</li>
+<li>
+<a href="#part3">第三部分：模拟笔试与追问</a>
+</li>
+</ul>
+</aside>
+<main class="main-content">
+<h2 id="part1">第一部分：技术原理</h2>
+<article class="card exam-topic" id="topic-1">
+<h3>1. 数据库基础、三级模式与数据独立性</h3>
+<p class="exam-meta">对应大纲条目 10</p>
+<h4>思想 · 大白话</h4>
+<p>数据库把数据集中组织起来，应用程序不用各自维护一份互相矛盾的文件。三级模式像分别给用户、管理员和磁盘画三张不同尺度的地图。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>数据库 DB 是数据集合；DBMS 是管理软件；DBS 还包含应用、人员和运行环境。</li>
+<li>外模式描述用户视图，模式描述全库逻辑结构，内模式描述物理组织；外模式可多个，模式与内模式通常各一个。</li>
+<li>外模式/模式映射保障逻辑独立性，模式/内模式映射保障物理独立性。</li>
+<li>数据模型包括数据结构、数据操作、完整性约束；实体完整性要求主键非空且唯一，参照完整性约束外键。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>给表增加一个索引、改变文件存储位置，而应用 SQL 不变，体现物理独立性；用视图屏蔽逻辑表调整，体现逻辑独立性。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>模式不等于某一时刻的数据内容；数据库实例随更新改变。</div>
+</article>
+<article class="card exam-topic" id="topic-2">
+<h3>2. 关系代数、键与函数依赖</h3>
+<p class="exam-meta">对应大纲条目 11</p>
+<h4>思想 · 大白话</h4>
+<p>一张表是一类事实。键能认出是哪一条事实；函数依赖表示知道一组属性后，另一组属性就被唯一确定。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>超键能唯一标识元组；候选键是最小超键；主键是选定的候选键；主属性出现在至少一个候选键中。</li>
+<li>关系代数选择 σ 筛行，投影 π 选列，连接组合相关行；集合语义的投影会去重，SQL SELECT 默认一般不去重。</li>
+<li>属性闭包 X+：从 X 出发反复用函数依赖加入能推出的属性；X+ 覆盖全属性表示 X 是超键，再检验是否最小。</li>
+<li>函数依赖由业务语义决定，不能仅凭一小批样例恰好唯一就认定永久成立。</li>
+</ul>
+<h4>伪代码 / 操作步骤</h4>
+<pre>
+<code>closure(X,F):
+  result=X
+  repeat:
+    old=result
+    for L→R in F:
+      if L ⊆ result: result=result ∪ R
+  until result==old
+  return result</code>
+</pre>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>R(A,B,C)，F={A→B,B→C}：A+={A,B,C}，A 是候选键；AB 是超键但不是候选键。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>候选键可以由多个属性构成；外键不是“另一张表的主键值一定唯一地出现在本表”。</div>
+</article>
+<article class="card exam-topic" id="topic-3">
+<h3>3. 范式、分解与连接损失</h3>
+<p class="exam-meta">对应大纲条目 11</p>
+<h4>思想 · 大白话</h4>
+<p>把不同事实塞进一张表，会出现“改一个名字要改好多行”的麻烦。规范化拆开事实，减少重复，同时必须能正确拼回来。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>1NF 属性值不可再按当前模型拆分；2NF 在 1NF 上消除非主属性对候选键的部分依赖。</li>
+<li>3NF 的正式判据：每个非平凡依赖 X→A 中，X 是超键或 A 是主属性；BCNF 更严格，要求 X 必为超键。</li>
+<li>无损连接意味着分解后自然连接恰好还原原关系；保持依赖意味着原依赖能由各分解关系的依赖联合推出。两者不同。</li>
+<li>二元分解 R1,R2 在函数依赖条件下，无损的判据为交集属性函数决定 R1 或 R2。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>选课表(学号,课程号,姓名,成绩)，键为(学号,课程号)，学号→姓名是部分依赖，违反 2NF；拆成学生(学号,姓名)和选课(学号,课程号,成绩)。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>3NF 并不等于“完全没有任何传递依赖”的无条件口号；有多个候选键时应按正式判据判断。</div>
+</article>
+<article class="card exam-topic" id="topic-4">
+<h3>4. SQL 查询、连接、分组与 NULL</h3>
+<p class="exam-meta">对应大纲条目 12</p>
+<h4>思想 · 大白话</h4>
+<p>先决定哪些行参加，再把它们分组、算统计，最后输出想看的列。NULL 表示未知，不能当成普通的零或空字符串。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>理解顺序：FROM/JOIN → WHERE → GROUP BY → HAVING → SELECT → ORDER BY；这是逻辑理解顺序，不代表物理执行计划。</li>
+<li>WHERE 过滤行，HAVING 过滤分组；COUNT(*) 数行，COUNT(col) 只数非 NULL；AVG 忽略 NULL。</li>
+<li>NULL 比较通常产生 UNKNOWN；WHERE 仅保留 TRUE；判断空值用 IS NULL，不能写 =NULL。</li>
+<li>LEFT JOIN 保留左表未匹配行；右表过滤条件放 ON 或 WHERE 可能得到不同结果。EXISTS 判断子查询是否存在行，NOT IN 遇 NULL 要谨慎。</li>
+<li>DELETE 删除行，DROP 删除对象，TRUNCATE 清空表的事务行为和限制依 DBMS 实现；不要混背回滚结论。</li>
+</ul>
+<h4>伪代码 / 操作步骤</h4>
+<pre>
+<code>SELECT dept_id, COUNT(*) AS n, AVG(score) AS avg_score
+FROM exam_result
+WHERE score IS NOT NULL
+GROUP BY dept_id
+HAVING AVG(score) &gt;= 60
+ORDER BY dept_id;
+-- 先筛非空成绩，再按部门统计并筛组</code>
+</pre>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>成绩为 60,NULL,90：COUNT(*)=3，COUNT(score)=2，AVG(score)=75。某部门无人时 LEFT JOIN 后 COUNT(employee.id)=0，COUNT(*) 却可能为 1。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>分组后输出非聚合列，必须符合分组规则，不能依赖某产品宽松模式的随机取值。</div>
+</article>
+<article class="card exam-topic" id="topic-5">
+<h3>5. 事务、并发调度与锁</h3>
+<p class="exam-meta">对应大纲条目 13</p>
+<h4>思想 · 大白话</h4>
+<p>事务像一张必须整体完成的转账单。并发时要让交错操作仍然表现得像某种合理的先后执行。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>ACID：原子性、保持约束的一致性、隔离性、持久性。脏读读未提交，非重复读同一行值变化，幻读条件查询的行集合变化。</li>
+<li>冲突需不同事务、同一数据项、至少一个写。画优先图：冲突操作先发生的事务连向后发生者；无环当且仅当冲突可串行化。</li>
+<li>两段锁 2PL 先申请后释放，首次释放后不能再申请新锁，可保证冲突可串行化但可能死锁。严格 2PL 至少把排他锁保持到事务结束。</li>
+<li>共享锁 S 与 S 兼容，S 与 X、X 与 X 不兼容；死锁和饥饿不同。隔离级别与具体 MVCC/锁实现的可见性规则要分开讨论。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>调度 r1(A),w1(A),r2(A),w2(B),r1(B)：A 形成 T1→T2，B 形成 T2→T1，有环，非冲突可串行化。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>可串行化不等于事务真的完全串行运行；2PL 不保证没有死锁。</div>
+</article>
+<article class="card exam-topic" id="topic-6">
+<h3>6. 日志、检查点、备份与恢复</h3>
+<p class="exam-meta">对应大纲条目 14</p>
+<h4>思想 · 大白话</h4>
+<p>写操作先留下能重做或撤销的凭证，再放心改数据。备份是一张历史快照，日志把快照之后的变化补上。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>WAL 要求相关日志先于数据页落盘；提交前需保证恢复所需提交记录与日志持久化。</li>
+<li>一般的立即更新、允许未提交页落盘模型：未提交事务需 UNDO，已提交但页面未落盘需 REDO；具体算法依日志与缓冲策略。</li>
+<li>检查点缩小恢复扫描范围，不等于完整备份，也不表示所有之后的数据永久安全。</li>
+<li>全量备份全部；增量备份自上次备份以来变化；差异备份自上次全量以来变化。恢复链长度不同。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>周日全量、周一增量、周二增量：恢复周二需要全量+周一+周二。若周二是相对周日的差异，只需全量+周二差异。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>复制不等于备份，误删也可能同步；备份成功还应通过恢复演练验证。</div>
+</article>
+<article class="card exam-topic" id="topic-7">
+<h3>7. 数据库设计：ER、映射与约束</h3>
+<p class="exam-meta">对应大纲条目 15</p>
+<h4>思想 · 大白话</h4>
+<p>先问现实中有哪些对象、关系、限制，再落成表。不能先随意建表，最后才发现一个学生可以选多门课。</p>
+<h4>要掌握的规则</h4>
+<ul>
+<li>通常经过需求分析、概念设计、逻辑设计、物理设计、实施、运行维护；ER 模型属于概念设计。</li>
+<li>1:N 联系通常把 1 端键作为 N 端外键；M:N 联系需独立关系，包含两端键及联系属性。</li>
+<li>1:1 联系可在一端放带唯一约束的外键；是否可空取决于参与约束。</li>
+<li>主键、外键、UNIQUE、NOT NULL、CHECK 分别落实标识、引用和业务约束；权限遵循最小授权。</li>
+</ul>
+<div class="exam-example">
+<strong>手算例子：</strong>
+<p>学生与课程为 M:N，选课关系(学号,课程号,成绩)，通常以(学号,课程号)为复合主键，两个属性分别引用学生与课程。</p>
+</div>
+<div class="exam-trap">
+<strong>易错点：</strong>ER 图中的联系属性如成绩属于选课事实，不能随意塞进学生或课程实体。</div>
+</article>
+<h2 id="part2">第二部分：场景化讲解</h2>
+<article class="card" data-trace>
+<h3>闭包、范式与分解</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>R(A,B,C)，依赖 A→B,B→C。计算 A+ 从 {A} 开始。</li>
+<li>用 A→B 加入 B，再用 B→C 加入 C，因此 A 是候选键。</li>
+<li>B→C 中 B 不是超键、C 非主属性，违反 3NF。</li>
+<li>拆为 R1(A,B)、R2(B,C)，交集 B 能决定 R2，因而无损；两条依赖都能在各表内检查，保持依赖。</li>
+</ol>
+</article>
+<article class="card" data-trace>
+<h3>并发调度的优先图</h3>
+<p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
+<ol>
+<li>调度 r1(A),w1(A),r2(A),w2(B),r1(B)。不同事务同一项且至少一写才冲突。</li>
+<li>w1(A) 在 r2(A) 前，画 T1→T2。</li>
+<li>w2(B) 在 r1(B) 前，画 T2→T1。</li>
+<li>图有环，非冲突可串行化；单看每个事务内部顺序正确还不够。</li>
+</ol>
+</article>
+<h2 id="part3">第三部分：模拟笔试与追问</h2>
+<div data-quiz>
+<p class="exam-meta">共 8 道自编单选练习，不是真题，不用于估计实际考试分值。先作答，再看推导。</p>
+<div class="exam-controls">
+<button type="button" data-reset-quiz>重做本章</button>
+<span data-score aria-live="polite">
+</span>
+</div>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>1. 增建索引但应用无需修改，主要体现？</legend>
+<label class="exam-option">
+<input type="radio" name="q1" value="0">
+<span>A. 逻辑独立性</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="1">
+<span>B. 物理独立性</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="2">
+<span>C. 参照完整性</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q1" value="3">
+<span>D. 实体完整性</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。索引是物理组织层调整，模式与内模式映射屏蔽它。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="0">
+<fieldset class="exam-question">
+<legend>2. R(A,B,C)，A→B,B→C，候选键是？</legend>
+<label class="exam-option">
+<input type="radio" name="q2" value="0">
+<span>A. A</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="1">
+<span>B. B</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="2">
+<span>C. C</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q2" value="3">
+<span>D. AB 才是最小键</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：A</strong>。A+ 包含全属性且 A 不可再缩小。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>3. 复合键(学号,课程号)，学号→姓名，违反的最低后续范式是？</legend>
+<label class="exam-option">
+<input type="radio" name="q3" value="0">
+<span>A. 1NF</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="1">
+<span>B. 2NF</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="2">
+<span>C. 所有范式都满足</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q3" value="3">
+<span>D. 仅 BCNF</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。非主属性姓名依赖候选键的一部分，违反 2NF。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>4. 60,NULL,90 三行的 AVG(score) 为？</legend>
+<label class="exam-option">
+<input type="radio" name="q4" value="0">
+<span>A. 50</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="1">
+<span>B. 60</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="2">
+<span>C. 75</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q4" value="3">
+<span>D. NULL</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。AVG 忽略 NULL，(60+90)/2=75。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>5. SQL 中判断缺失值应使用？</legend>
+<label class="exam-option">
+<input type="radio" name="q5" value="0">
+<span>A. = NULL</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="1">
+<span>B. != NULL</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="2">
+<span>C. IS NULL</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q5" value="3">
+<span>D. = 0</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。与 NULL 的普通比较产生 UNKNOWN，不能用于判空。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>6. 关于两段锁，正确的是？</legend>
+<label class="exam-option">
+<input type="radio" name="q6" value="0">
+<span>A. 保证无死锁</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="1">
+<span>B. 保证冲突可串行化但可能死锁</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="2">
+<span>C. 释放后可继续申请</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q6" value="3">
+<span>D. 等于完全串行执行</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。两阶段限制加锁与解锁次序，但可能形成循环等待。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="2">
+<fieldset class="exam-question">
+<legend>7. 周日全量、周一和周二连续增量，恢复周二需要？</legend>
+<label class="exam-option">
+<input type="radio" name="q7" value="0">
+<span>A. 仅周二</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="1">
+<span>B. 全量和周二</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="2">
+<span>C. 全量+周一+周二</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q7" value="3">
+<span>D. 仅全量</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：C</strong>。增量备份之间相互依赖，必须补齐整条链。</p>
+</details>
+</article>
+<article class="card" data-question data-answer="1">
+<fieldset class="exam-question">
+<legend>8. 学生选课 M:N 的合理设计是？</legend>
+<label class="exam-option">
+<input type="radio" name="q8" value="0">
+<span>A. 把所有课程塞进学生单个字段</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="1">
+<span>B. 独立选课表，含两端键及成绩</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="2">
+<span>C. 只保留课程表</span>
+</label>
+<label class="exam-option">
+<input type="radio" name="q8" value="3">
+<span>D. 删去联系属性</span>
+</label>
+</fieldset>
+<div class="exam-controls">
+<button type="button" data-check>检查答案</button>
+</div>
+<p class="exam-feedback" role="status">
+</p>
+<details class="exam-answer">
+<summary>答案与推导</summary>
+<p>
+<strong>答案：B</strong>。多对多关系映射为独立关系，成绩属于选课联系。</p>
+</details>
+</article>
+</div>
+<p>
+<a href="sgcc-exam.html">← 返回国网专业课目录</a> · <a href="../index.html">返回首页</a>
+</p>
+</main>
+</div>
+</div>
+</body>
+</html>
