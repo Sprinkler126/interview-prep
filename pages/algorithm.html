@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>算法与数据结构 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/algorithm.css">
+  <script src="../js/algorithm.js" defer></script>
 </head>
 <body>
 
@@ -26,6 +28,7 @@
           <li><a href="#part1">第一部分：技术原理</a></li>
           <li class="sub"><a href="#s1-1">时间与空间复杂度</a></li>
           <li class="sub"><a href="#s1-2">排序算法</a></li>
+          <li class="sub"><a href="#structure-guide">数据结构逐步入门</a></li>
           <li class="sub"><a href="#s1-3">二叉树</a></li>
           <li class="sub"><a href="#s1-4">高级树结构</a></li>
           <li class="sub"><a href="#s1-5">图算法</a></li>
@@ -88,91 +91,23 @@
               <tr><td><strong>冒泡排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>教学、小数据量</td></tr>
               <tr><td><strong>选择排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n^2)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>小数据量</td></tr>
               <tr><td><strong>插入排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>近乎有序数据、小数据量</td></tr>
-              <tr><td><strong>希尔排序</strong></td><td>O(n^1.3)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>中等数据量</td></tr>
-              <tr><td><strong>快速排序</strong></td><td>O(n log n)</td><td>O(n^2)</td><td>O(n log n)</td><td>O(log n)</td><td><span class="badge badge-red">不稳定</span></td><td>通用排序首选</td></tr>
+              <tr><td><strong>希尔排序</strong></td><td>依间隔序列而定</td><td>O(n^2)（折半间隔）</td><td>O(n log n)（折半间隔）</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>中等数据量</td></tr>
+              <tr><td><strong>快速排序</strong></td><td>O(n log n)</td><td>O(n^2)</td><td>O(n log n)</td><td>平均 O(log n)，最坏 O(n)</td><td><span class="badge badge-red">不稳定</span></td><td>通用排序首选</td></tr>
               <tr><td><strong>归并排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td><span class="badge badge-green">稳定</span></td><td>链表排序、外部排序</td></tr>
               <tr><td><strong>堆排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>TopK 问题</td></tr>
-              <tr><td><strong>计数排序</strong></td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、范围不大</td></tr>
+              <tr><td><strong>计数排序</strong></td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、范围不大</td></tr>
               <tr><td><strong>基数排序</strong></td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、位数不多</td></tr>
-              <tr><td><strong>桶排序</strong></td><td>O(n+k)</td><td>O(n^2)</td><td>O(n)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>均匀分布数据</td></tr>
+              <tr><td><strong>桶排序</strong></td><td>O(n+k)</td><td>O(n^2)</td><td>O(n)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>均匀分布数据；桶内使用稳定排序</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div class="card">
-          <h4>快速排序（Quick Sort）</h4>
-          <div class="flow">
-            <div class="flow-box flow-blue">选择基准 pivot</div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-purple">Partition 分区</div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-green">递归左半部分</div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-box flow-orange">递归右半部分</div>
-          </div>
-          <pre><code>// 经典 Lomuto 分区
-int partition(int[] arr, int lo, int hi) {
-    int pivot = arr[hi], i = lo;
-    for (int j = lo; j &lt; hi; j++) {
-        if (arr[j] &lt;= pivot) { swap(arr, i, j); i++; }
-    }
-    swap(arr, i, hi);
-    return i;
-}
+        <p class="tip">下面 10 种排序都有独立的思想、伪代码和逐步演示。先点“下一步”观察，再试着修改数组；下标从 0 开始。稳定是指相等元素的原始先后顺序不变。</p>
+        <div id="sorting-lessons"></div>
 
-// 随机化快排：随机选 pivot 与 arr[hi] 交换，避免最坏 O(n^2)
-// 三路快排（Dutch National Flag）：处理大量重复元素
-// [lo...lt-1] &lt; pivot | [lt...gt] == pivot | [gt+1...hi] &gt; pivot</code></pre>
-          <ul>
-            <li><strong>优化</strong>：随机化选 pivot 避免最坏情况；三路快排处理大量重复元素</li>
-            <li><strong>空间</strong>：O(log n) 递归栈深度（随机化后期望如此）</li>
-            <li><strong>最坏情况</strong>：每次选到最小/最大元素，退化为 O(n^2)</li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <h4>归并排序（Merge Sort）</h4>
-          <pre><code>// 自顶向下（递归）
-void mergeSort(int[] arr, int lo, int hi) {
-    if (lo &gt;= hi) return;
-    int mid = lo + (hi - lo) / 2;
-    mergeSort(arr, lo, mid);
-    mergeSort(arr, mid + 1, hi);
-    merge(arr, lo, mid, hi);  // 合并两个有序子数组
-}
-
-// 自底向上（迭代）：从步长 1 开始，两两归并，步长翻倍
-// 逆序对计数：在 merge 过程中，左半部分 arr[i] &gt; 右半部分 arr[j] 时，
-// 逆序对数量 += (mid - i + 1)</code></pre>
-          <ul>
-            <li><strong>稳定性</strong>：稳定排序（合并时相等元素保持原序）</li>
-            <li><strong>逆序对</strong>：归并排序的副产品，merge 时统计</li>
-            <li><strong>外部排序</strong>：数据无法全部装入内存时，归并排序是首选</li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <h4>堆排序（Heap Sort）</h4>
-          <pre><code>// 大顶堆：parent &gt;= children，用于升序排序
-// 小顶堆：parent &lt;= children，用于降序排序 / 优先队列
-
-void heapify(int[] arr, int n, int i) {
-    int largest = i, left = 2*i+1, right = 2*i+2;
-    if (left &lt; n && arr[left] &gt; arr[largest]) largest = left;
-    if (right &lt; n && arr[right] &gt; arr[largest]) largest = right;
-    if (largest != i) {
-        swap(arr, i, largest);
-        heapify(arr, n, largest);
-    }
-}
-
-// 建堆：从最后一个非叶子节点开始 heapify，O(n)
-// 排序：每次取堆顶放末尾，heapify 调整，O(n log n)</code></pre>
-          <ul>
-            <li><strong>优先队列</strong>：Java <code>PriorityQueue</code> 底层是小顶堆</li>
-            <li><strong>TopK 问题</strong>：维护大小为 K 的小顶堆，遍历数据，比堆顶大则替换并调整</li>
-          </ul>
-        </div>
+        <h3 id="structure-guide">数据结构逐步入门</h3>
+        <p class="tip">每项都配有大白话思想、核心操作伪代码和固定小例子的回放。点“下一步”查看结构变化，也可以回退或重置。树形图中的左右位置、箭头和颜色文字表示结构关系。</p>
+        <div id="structure-lessons"></div>
 
         <h3 id="s1-3">1.3 二叉树</h3>
         <div class="card">
@@ -762,7 +697,7 @@ int binarySearch(int[] arr, int target) {
         </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem">
           <a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>
-          算法与数据结构 · 面试知识复习库 · Last updated 2026-06-11
+          算法与数据结构 · 面试知识复习库 · Last updated 2026-10-15
         </div>
 
       </div><!-- /.main-content -->
