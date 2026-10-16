@@ -330,7 +330,7 @@
               <tr><td><strong>数据结构</strong></td><td>fd_set 位图</td><td>pollfd 数组</td><td>红黑树 + 就绪链表</td></tr>
               <tr><td><strong>最大连接数</strong></td><td>1024（FD_SETSIZE）</td><td>无硬限制</td><td>无硬限制</td></tr>
               <tr><td><strong>fd 拷贝</strong></td><td>每次调用都要全量拷贝</td><td>每次调用都要全量拷贝</td><td>mmap 共享，无需拷贝</td></tr>
-              <tr><td><strong>事件检测</strong></td><td>线性遍历 O(n)</td><td>线性遍历 O(n)</td><td>回调通知 O(1)</td></tr>
+              <tr><td><strong>事件检测</strong></td><td>线性遍历 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>线性遍历 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>回调通知 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
               <tr><td><strong>触发模式</strong></td><td>LT（水平触发）</td><td>LT（水平触发）</td><td>LT / ET（边缘触发）</td></tr>
               <tr><td><strong>适用场景</strong></td><td>少量连接</td><td>少量连接</td><td>大量并发连接（C10K）</td></tr>
             </tbody>
@@ -346,13 +346,13 @@
               <div class="arch-row">
                 <div class="arch-box-wide" style="border-color:var(--accent);background:rgba(56,189,248,0.06);">
                   <strong>红黑树（RB-Tree）</strong>
-                  <div class="arch-label">存储所有被监听的 fd，O(log n) 增删改</div>
+                  <div class="arch-label">存储所有被监听的 fd，<span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 增删改</div>
                 </div>
               </div>
               <div class="arch-row">
                 <div class="arch-box-wide" style="border-color:var(--accent3);background:rgba(52,211,153,0.06);">
                   <strong>就绪链表（Ready List）</strong>
-                  <div class="arch-label">IO 就绪的 fd 通过回调加入此链表，O(1) 获取就绪事件</div>
+                  <div class="arch-label">IO 就绪的 fd 通过回调加入此链表，<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 获取就绪事件</div>
                 </div>
               </div>
             </div>
@@ -561,7 +561,7 @@
         </div>
         <div class="qa">
           <div class="q">select、poll、epoll 的区别是什么？为什么 epoll 高并发更好？</div>
-          <div class="a"><strong>参考</strong>：select 用固定大小位图，poll 用数组，二者每次调用都要把 fd 集合从用户态拷入内核并遍历 O(n)。epoll 用红黑树维护监听 fd、就绪链表保存活跃事件，通过回调把就绪 fd 放入链表，等待时主要处理活跃连接，避免每次扫描全部 fd。epoll 不是任何场景都 O(1)，活跃连接很多时处理成本仍与就绪事件数有关。</div>
+          <div class="a"><strong>参考</strong>：select 用固定大小位图，poll 用数组，二者每次调用都要把 fd 集合从用户态拷入内核并遍历 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。epoll 用红黑树维护监听 fd、就绪链表保存活跃事件，通过回调把就绪 fd 放入链表，等待时主要处理活跃连接，避免每次扫描全部 fd。epoll 不是任何场景都 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>，活跃连接很多时处理成本仍与就绪事件数有关。</div>
         </div>
         <div class="qa">
           <div class="q">如何定位线上死锁或 CPU 飙高？</div>

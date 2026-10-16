@@ -55,7 +55,7 @@
 指令 B         取指 译码 执行 访存 写回
 指令 C              取指 译码 执行 访存 写回</div>
           <ul><li><strong>结构冒险：</strong>硬件资源不足，例如取指与访存争抢同一内存。</li><li><strong>数据冒险：</strong>后一条指令依赖前一条结果；可用转发、暂停（stall）缓解。</li><li><strong>控制冒险：</strong>分支跳转改变 PC；分支预测失败需要清空错误路径上的流水线。</li></ul>
-          <p>CPU 性能常用 <strong>CPU 时间 = 指令数 × CPI × 时钟周期时间</strong> 估算。优化要同时考虑算法减少指令数、降低 Cache miss 降低 CPI，以及硬件频率。</p>
+          <p>CPU 性能常用 <strong><span class="math-inline" data-tex="T_{\mathrm{CPU}}=\mathrm{IC}\times\mathrm{CPI}\times T_{\mathrm{clock}}" aria-label="CPU 时间 = 指令数 × CPI × 时钟周期时间"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>T</mi><mrow><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">U</mi></mrow></mrow></msub><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">I</mi><mi mathvariant="normal">C</mi></mrow><mi>&#x000D7;</mi><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">I</mi></mrow><mi>&#x000D7;</mi><msub><mi>T</mi><mrow><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">k</mi></mrow></mrow></msub></mrow></math></span></strong> 估算。优化要同时考虑算法减少指令数、降低 Cache miss 降低 CPI，以及硬件频率。</p>
         </div>
         <h2 id="part2"><span class="icon">🛠️</span>第二部分：场景化讲解</h2>
         <h3 id="s2-1">2.1 一次函数调用如何被执行</h3>
@@ -89,7 +89,7 @@
             <p><strong>边界与易错：</strong>易错：无符号加法的进位标志和有符号溢出不同。8位补码范围是−128~127，−128没有可表示的正相反数。</p>
           </article>
           <h3>面试追问：展开查看答题要点</h3>
-          <details class="lab-question"><summary>为什么提升CPU频率一倍，程序不一定快一倍？</summary><p>执行时间=指令数×CPI÷频率；CPI会受访存、分支和依赖影响，程序还可能受磁盘或网络限制。先看实际热点，不能仅用频率推断端到端性能。</p></details>
+          <details class="lab-question"><summary>为什么提升CPU频率一倍，程序不一定快一倍？</summary><p><span class="math-inline" data-tex="T_{\mathrm{CPU}}=\frac{\mathrm{IC}\times\mathrm{CPI}}{f}" aria-label="执行时间=指令数×CPI÷频率"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>T</mi><mrow><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">U</mi></mrow></mrow></msub><mo>&#x0003D;</mo><mfrac><mrow><mrow><mi mathvariant="normal">I</mi><mi mathvariant="normal">C</mi></mrow><mi>&#x000D7;</mi><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">I</mi></mrow></mrow><mrow><mi>f</mi></mrow></mfrac></mrow></math></span>；CPI会受访存、分支和依赖影响，程序还可能受磁盘或网络限制。先看实际热点，不能仅用频率推断端到端性能。</p></details>
           <details class="lab-question"><summary>直接映射Cache命中率差，扩容一定有用吗？</summary><p>若热点地址反复映射到同一行，冲突未命中可能占主导。增大相联度或改变布局可能更有效；还要区分首次访问、容量不足和映射冲突。</p></details>
           <h3>笔试单选：先作答，再核对解析</h3>
           <article class="lab-quiz study-question" data-answer="1"><h4>1. 32位字节地址、32KiB数据Cache、64B块、4路组相联，组索引有几位？</h4>

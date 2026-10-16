@@ -107,7 +107,15 @@ interview-prep/
 
 验证：`node tests/bank-exam-smoke.cjs` 检查20题、动画、债券折现与无效输入、导航和四档视口；`STUDY_PAGE_FILTER=bank-exam` 可配合已有状态回放验证脚本使用。
 
-### 9. 使用方法
+### 9. 全站公式排版
+
+公式使用原生MathML，统一由 `css/math.css`（全局样式自动引入）控制。分数、幂、下标、对数和求和直接存入HTML，支持离线及关闭JavaScript阅读，无外部字体或公式渲染脚本。独立长公式在自身容器内横向滚动，正文和代码使用各自的排版。
+
+数学表达式以 `.math-inline` 或 `.math-block` 的 `span` 包裹；`data-tex` 保存编辑源，`aria-label` 保存可读的线性表达，内部为生成好的MathML。新增或修改公式后，安装仅供编辑使用的依赖 `python -m pip install -r tools/requirements-math.txt`，运行 `python tools/render-math.py` 更新HTML。网站运行不需要Python或该依赖。程序代码、位运算和正则表达式保留原写法；不要用公式转换处理代码块。
+
+验证：`node tests/math-smoke.cjs` 检查全站公式的原生结构、分式布局、离线及无脚本阅读、三档宽度和题目选项格式。共享题目与步骤回放保留HTML节点，避免公式在交互中降为纯文本；相应回归仍运行 `tests/study-lab-smoke.cjs`、`tests/sgcc-smoke.cjs` 与 `tests/bank-exam-smoke.cjs`。
+
+### 10. 使用方法
 
 直接在浏览器中打开 `index.html` 即可开始复习。
 

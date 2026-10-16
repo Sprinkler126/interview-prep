@@ -64,31 +64,31 @@
           <h4>大 O 表示法</h4>
           <p>大 O 表示法描述算法执行时间随输入规模 n 增长的<strong>上界</strong>，忽略常数项和低阶项。</p>
           <table>
-            <thead><tr><th>复杂度</th><th>名称</th><th>示例</th><th>n=10^6 量级</th></tr></thead>
+            <thead><tr><th>复杂度</th><th>名称</th><th>示例</th><th>n=<span class="math-inline" data-tex="10^{6}" aria-label="10^6"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mrow><mn>6</mn></mrow></msup></mrow></math></span> 量级</th></tr></thead>
             <tbody>
-              <tr><td><span class="badge badge-green">O(1)</span></td><td>常数</td><td>哈希表查找、数组按下标访问</td><td>1</td></tr>
-              <tr><td><span class="badge badge-green">O(log n)</span></td><td>对数</td><td>二分查找、平衡BST操作</td><td>20</td></tr>
-              <tr><td><span class="badge badge-blue">O(n)</span></td><td>线性</td><td>遍历数组、链表查找</td><td>10^6</td></tr>
-              <tr><td><span class="badge badge-blue">O(n log n)</span></td><td>线性对数</td><td>快速排序、归并排序、堆排序</td><td>2×10^7</td></tr>
-              <tr><td><span class="badge badge-orange">O(n^2)</span></td><td>平方</td><td>冒泡排序、选择排序、插入排序</td><td>10^12</td></tr>
-              <tr><td><span class="badge badge-red">O(2^n)</span></td><td>指数</td><td>递归求斐波那契（无记忆化）</td><td>不可计算</td></tr>
-              <tr><td><span class="badge badge-red">O(n!)</span></td><td>阶乘</td><td>全排列暴力枚举</td><td>不可计算</td></tr>
+              <tr><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>常数</td><td>哈希表查找、数组按下标访问</td><td>1</td></tr>
+              <tr><td><span class="badge badge-green"><span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>对数</td><td>二分查找、平衡BST操作</td><td>20</td></tr>
+              <tr><td><span class="badge badge-blue"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>线性</td><td>遍历数组、链表查找</td><td><span class="math-inline" data-tex="10^{6}" aria-label="10^6"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mrow><mn>6</mn></mrow></msup></mrow></math></span></td></tr>
+              <tr><td><span class="badge badge-blue"><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>线性对数</td><td>快速排序、归并排序、堆排序</td><td>2×<span class="math-inline" data-tex="10^{7}" aria-label="10^7"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mrow><mn>7</mn></mrow></msup></mrow></math></span></td></tr>
+              <tr><td><span class="badge badge-orange"><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>平方</td><td>冒泡排序、选择排序、插入排序</td><td><span class="math-inline" data-tex="10^{12}" aria-label="10^12"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mrow><mn>12</mn></mrow></msup></mrow></math></span></td></tr>
+              <tr><td><span class="badge badge-red"><span class="math-inline" data-tex="O(2^n)" aria-label="O(2^n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mn>2</mn><mi>n</mi></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>指数</td><td>递归求斐波那契（无记忆化）</td><td>不可计算</td></tr>
+              <tr><td><span class="badge badge-red"><span class="math-inline" data-tex="O(n!)" aria-label="O(n!)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x00021;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td><td>阶乘</td><td>全排列暴力枚举</td><td>不可计算</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="card">
           <h4>主定理（Master Theorem）</h4>
-          <p>用于求解递推关系 <code>T(n) = aT(n/b) + O(n^d)</code>，其中 a &ge; 1, b &gt; 1, d &ge; 0：</p>
+          <p>用于求解递推关系 <span class="math-inline" data-tex="T(n)=aT\left(\frac{n}{b}\right)+O(n^d)" aria-label="T(n) = aT(n/b) + O(n^d)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>a</mi><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mi>b</mi></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mi>d</mi></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，其中 a &ge; 1, b &gt; 1, d &ge; 0：</p>
           <table>
             <thead><tr><th>条件</th><th>结果</th><th>示例</th></tr></thead>
             <tbody>
-              <tr><td>d &lt; log_b(a)</td><td>T(n) = O(n^(log_b(a)))</td><td>Strassen 矩阵乘法：T(n)=7T(n/2)+O(n^2) → O(n^2.81)</td></tr>
-              <tr><td>d = log_b(a)</td><td>T(n) = O(n^d log n)</td><td>归并排序：T(n)=2T(n/2)+O(n) → O(n log n)</td></tr>
-              <tr><td>d &gt; log_b(a)</td><td>T(n) = O(n^d)</td><td>T(n)=2T(n/2)+O(n^2) → O(n^2)</td></tr>
+              <tr><td><span class="math-inline" data-tex="d&lt;\log_b a" aria-label="d &lt; log_b(a)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003C;</mo><msub><mi>log</mi><mi>b</mi></msub><mi>a</mi></mrow></math></span></td><td><span class="math-inline" data-tex="T(n)=O\left(n^{\log_b a}\right)" aria-label="T(n) = O(n^(log_b(a)))"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>O</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><msup><mi>n</mi><mrow><msub><mi>log</mi><mi>b</mi></msub><mi>a</mi></mrow></msup><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow></mrow></math></span></td><td>Strassen 矩阵乘法：<span class="math-inline" data-tex="T(n)=7T\left(\frac{n}{2}\right)+O(n^2)" aria-label="T(n)=7T(n/2)+O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mn>7</mn><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> → <span class="math-inline" data-tex="O(n^{2.81})" aria-label="O(n^2.81)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2.81</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><span class="math-inline" data-tex="d=\log_b a" aria-label="d = log_b(a)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003D;</mo><msub><mi>log</mi><mi>b</mi></msub><mi>a</mi></mrow></math></span></td><td><span class="math-inline" data-tex="T(n)=O(n^d\log n)" aria-label="T(n) = O(n^d log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mi>d</mi></msup><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>归并排序：<span class="math-inline" data-tex="T(n)=2T\left(\frac{n}{2}\right)+O(n)" aria-label="T(n)=2T(n/2)+O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mn>2</mn><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> → <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><span class="math-inline" data-tex="d&gt;\log_b a" aria-label="d &gt; log_b(a)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>d</mi><mo>&#x0003E;</mo><msub><mi>log</mi><mi>b</mi></msub><mi>a</mi></mrow></math></span></td><td><span class="math-inline" data-tex="T(n)=O(n^d)" aria-label="T(n) = O(n^d)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mi>d</mi></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="T(n)=2T\left(\frac{n}{2}\right)+O(n^2)" aria-label="T(n)=2T(n/2)+O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mn>2</mn><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> → <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
             </tbody>
           </table>
-          <div class="tip">常见复杂度排序：O(1) &lt; O(log n) &lt; O(n) &lt; O(n log n) &lt; O(n^2) &lt; O(n^3) &lt; O(2^n) &lt; O(n!)</div>
+          <div class="tip">常见复杂度排序：<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(n^{3})" aria-label="O(n^3)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>3</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(2^n)" aria-label="O(2^n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mn>2</mn><mi>n</mi></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> &lt; <span class="math-inline" data-tex="O(n!)" aria-label="O(n!)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x00021;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span></div>
         </div>
 
         <h3 id="s1-2">1.2 排序算法</h3>
@@ -97,16 +97,16 @@
           <table>
             <thead><tr><th>算法</th><th>平均</th><th>最坏</th><th>最好</th><th>空间</th><th>稳定性</th><th>适用场景</th></tr></thead>
             <tbody>
-              <tr><td><strong>冒泡排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>教学、小数据量</td></tr>
-              <tr><td><strong>选择排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n^2)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>小数据量</td></tr>
-              <tr><td><strong>插入排序</strong></td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td><span class="badge badge-green">稳定</span></td><td>近乎有序数据、小数据量</td></tr>
-              <tr><td><strong>希尔排序</strong></td><td>依间隔序列而定</td><td>O(n^2)（折半间隔）</td><td>O(n log n)（折半间隔）</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>中等数据量</td></tr>
-              <tr><td><strong>快速排序</strong></td><td>O(n log n)</td><td>O(n^2)</td><td>O(n log n)</td><td>平均 O(log n)，最坏 O(n)</td><td><span class="badge badge-red">不稳定</span></td><td>通用排序首选</td></tr>
-              <tr><td><strong>归并排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td><span class="badge badge-green">稳定</span></td><td>链表排序、外部排序</td></tr>
-              <tr><td><strong>堆排序</strong></td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td><span class="badge badge-red">不稳定</span></td><td>TopK 问题</td></tr>
-              <tr><td><strong>计数排序</strong></td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、范围不大</td></tr>
-              <tr><td><strong>基数排序</strong></td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>整数、位数不多</td></tr>
-              <tr><td><strong>桶排序</strong></td><td>O(n+k)</td><td>O(n^2)</td><td>O(n)</td><td>O(n+k)</td><td><span class="badge badge-green">稳定</span></td><td>均匀分布数据；桶内使用稳定排序</td></tr>
+              <tr><td><strong>冒泡排序</strong></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>教学、小数据量</td></tr>
+              <tr><td><strong>选择排序</strong></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-red">不稳定</span></td><td>小数据量</td></tr>
+              <tr><td><strong>插入排序</strong></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>近乎有序数据、小数据量</td></tr>
+              <tr><td><strong>希尔排序</strong></td><td>依间隔序列而定</td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>（折半间隔）</td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（折半间隔）</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-red">不稳定</span></td><td>中等数据量</td></tr>
+              <tr><td><strong>快速排序</strong></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>平均 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，最坏 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-red">不稳定</span></td><td>通用排序首选</td></tr>
+              <tr><td><strong>归并排序</strong></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>链表排序、外部排序</td></tr>
+              <tr><td><strong>堆排序</strong></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-red">不稳定</span></td><td>TopK 问题</td></tr>
+              <tr><td><strong>计数排序</strong></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>整数、范围不大</td></tr>
+              <tr><td><strong>基数排序</strong></td><td><span class="math-inline" data-tex="O(d(n+k))" aria-label="O(d(n+k))"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>d</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(d(n+k))" aria-label="O(d(n+k))"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>d</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(d(n+k))" aria-label="O(d(n+k))"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>d</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>整数、位数不多</td></tr>
+              <tr><td><strong>桶排序</strong></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(n+k)" aria-label="O(n+k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green">稳定</span></td><td>均匀分布数据；桶内使用稳定排序</td></tr>
             </tbody>
           </table>
         </div>
@@ -170,10 +170,10 @@ void preorder(TreeNode root) {
 }</code></pre>
             </div>
             <div class="compare-box" style="border-color:var(--accent5)">
-              <h4 style="color:var(--accent5)">Morris 遍历 O(1) 空间</h4>
-              <p>利用叶子节点的空指针指向中序前驱/后继，实现 O(1) 空间遍历。遍历完成后恢复树结构。</p>
+              <h4 style="color:var(--accent5)">Morris 遍历 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 空间</h4>
+              <p>利用叶子节点的空指针指向中序前驱/后继，实现 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 空间遍历。遍历完成后恢复树结构。</p>
               <ul>
-                <li>前序/中序 Morris：O(n) 时间 O(1) 空间</li>
+                <li>前序/中序 Morris：<span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 时间 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 空间</li>
                 <li>后序 Morris：需要翻转路径，实现较复杂</li>
               </ul>
             </div>
@@ -185,7 +185,7 @@ void preorder(TreeNode root) {
           <ul>
             <li><strong>性质</strong>：左子树所有节点 &lt; 根 &lt; 右子树所有节点</li>
             <li><strong>中序遍历</strong>：BST 的中序遍历结果是升序序列</li>
-            <li><strong>操作复杂度</strong>：查找/插入/删除平均 O(log n)，最坏退化为链表 O(n)</li>
+            <li><strong>操作复杂度</strong>：查找/插入/删除平均 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，最坏退化为链表 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></li>
             <li><strong>验证 BST</strong>：递归传递上下界，或中序遍历检查是否严格递增</li>
           </ul>
         </div>
@@ -197,9 +197,9 @@ void preorder(TreeNode root) {
             <thead><tr><th>特性</th><th>AVL 树</th><th>红黑树</th><th>B+ 树</th></tr></thead>
             <tbody>
               <tr><td><strong>平衡方式</strong></td><td>严格平衡（高度差 &le; 1）</td><td>近似平衡（颜色约束）</td><td>多路平衡</td></tr>
-              <tr><td><strong>查找</strong></td><td>O(log n) 更快（树更矮）</td><td>O(log n)</td><td>O(log_m n)（m 路）</td></tr>
+              <tr><td><strong>查找</strong></td><td><span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 更快（树更矮）</td><td><span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="math-inline" data-tex="O(\log_m n)" aria-label="O(log_m n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msub><mi>log</mi><mi>m</mi></msub><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（m 路）</td></tr>
               <tr><td><strong>插入/删除</strong></td><td>可能需多次旋转</td><td>最多 2-3 次旋转</td><td>分裂/合并</td></tr>
-              <tr><td><strong>旋转次数</strong></td><td>插入最多 2 次，删除 O(log n)</td><td>插入最多 2 次，删除最多 3 次</td><td>无旋转概念</td></tr>
+              <tr><td><strong>旋转次数</strong></td><td>插入最多 2 次，删除 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>插入最多 2 次，删除最多 3 次</td><td>无旋转概念</td></tr>
               <tr><td><strong>典型应用</strong></td><td>查找密集场景</td><td>Java TreeMap/HashMap、Linux CFS</td><td>MySQL InnoDB 索引、文件系统</td></tr>
               <tr><td><strong>节点结构</strong></td><td>Key + 左右指针 + 高度</td><td>Key + 左右指针 + 颜色 + 父指针</td><td>多 Key + 多子指针 + 叶子链表</td></tr>
             </tbody>
@@ -241,7 +241,7 @@ void preorder(TreeNode root) {
               <ul>
                 <li>使用<strong>队列</strong>，逐层扩展</li>
                 <li>适合求<strong>最短路径</strong>（无权图）</li>
-                <li>空间复杂度 O(V)（队列）</li>
+                <li>空间复杂度 <span class="math-inline" data-tex="O(V)" aria-label="O(V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（队列）</li>
                 <li>应用：最短路径、层序遍历、拓扑排序（Kahn）</li>
               </ul>
             </div>
@@ -250,7 +250,7 @@ void preorder(TreeNode root) {
               <ul>
                 <li>使用<strong>栈</strong>（或递归），深入探索</li>
                 <li>适合求<strong>连通性、回溯</strong></li>
-                <li>空间复杂度 O(V)（递归栈）</li>
+                <li>空间复杂度 <span class="math-inline" data-tex="O(V)" aria-label="O(V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（递归栈）</li>
                 <li>应用：连通分量、环检测、拓扑排序、回溯</li>
               </ul>
             </div>
@@ -262,10 +262,10 @@ void preorder(TreeNode root) {
           <table>
             <thead><tr><th>算法</th><th>适用场景</th><th>时间复杂度</th><th>限制</th></tr></thead>
             <tbody>
-              <tr><td><strong>Dijkstra</strong></td><td>单源最短路径、非负权边</td><td>O((V+E) log V)（优先队列）</td><td>不能处理负权边</td></tr>
-              <tr><td><strong>Bellman-Ford</strong></td><td>单源最短路径、可有负权边</td><td>O(VE)</td><td>不能处理负权环</td></tr>
-              <tr><td><strong>Floyd-Warshall</strong></td><td>所有顶点对最短路径</td><td>O(V^3)</td><td>不能处理负权环</td></tr>
-              <tr><td><strong>SPFA</strong></td><td>单源最短路径、稀疏图</td><td>无一般性线性保证，最坏 O(VE)</td><td>被卡时退化严重</td></tr>
+              <tr><td><strong>Dijkstra</strong></td><td>单源最短路径、非负权边</td><td><span class="math-inline" data-tex="O((V+E)\log V)" aria-label="O((V+E) log V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo><mi>log</mi><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（优先队列）</td><td>不能处理负权边</td></tr>
+              <tr><td><strong>Bellman-Ford</strong></td><td>单源最短路径、可有负权边</td><td><span class="math-inline" data-tex="O(VE)" aria-label="O(VE)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>不能处理负权环</td></tr>
+              <tr><td><strong>Floyd-Warshall</strong></td><td>所有顶点对最短路径</td><td><span class="math-inline" data-tex="O(V^{3})" aria-label="O(V^3)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>3</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>不能处理负权环</td></tr>
+              <tr><td><strong>SPFA</strong></td><td>单源最短路径、稀疏图</td><td>无一般性线性保证，最坏 <span class="math-inline" data-tex="O(VE)" aria-label="O(VE)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td>被卡时退化严重</td></tr>
             </tbody>
           </table>
         </div>
@@ -279,7 +279,7 @@ void preorder(TreeNode root) {
                 <li>从一个顶点出发，每次选最小权边扩展</li>
                 <li>类似 Dijkstra，使用优先队列</li>
                 <li>适合<strong>稠密图</strong></li>
-                <li>时间：O(E log V)</li>
+                <li>时间：<span class="math-inline" data-tex="O(E \log V)" aria-label="O(E log V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>E</mi><mi>log</mi><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></li>
               </ul>
             </div>
             <div class="compare-box" style="border-color:var(--accent3)">
@@ -288,7 +288,7 @@ void preorder(TreeNode root) {
                 <li>按边权排序，依次加入不构成环的边</li>
                 <li>使用<strong>并查集</strong>判断环</li>
                 <li>适合<strong>稀疏图</strong></li>
-                <li>时间：O(E log E)</li>
+                <li>时间：<span class="math-inline" data-tex="O(E \log E)" aria-label="O(E log E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>E</mi><mi>log</mi><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></li>
               </ul>
             </div>
           </div>
@@ -362,7 +362,7 @@ class LRUCache {
     //   若超出容量，删除链表尾部节点（最久未使用）
 }</code></pre>
           <ul>
-            <li><strong>核心思路</strong>：哈希表保证 O(1) 查找，双向链表保证 O(1) 插入/删除</li>
+            <li><strong>核心思路</strong>：哈希表保证 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找，双向链表保证 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 插入/删除</li>
             <li><strong>Java LinkedHashMap</strong>：内置 LRU 支持，<code>accessOrder=true</code></li>
           </ul>
         </div>
@@ -371,13 +371,13 @@ class LRUCache {
         <h3 id="s1-7">1.7 哈希表与字符串</h3>
         <div class="card">
           <h4>哈希表为什么快？冲突怎么解决？</h4>
-          <p>面试不要只回答“平均 O(1)”。哈希表先对 key 计算 hash，再通过 <code>index = (n - 1) &amp; hash</code>（容量为 2 的幂时）定位桶；真正的性能取决于<strong>负载因子、hash 扰动、冲突分布和扩容成本</strong>。</p>
+          <p>面试不要只回答“平均 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>”。哈希表先对 key 计算 hash，再通过 <code>index = (n - 1) &amp; hash</code>（容量为 2 的幂时）定位桶；真正的性能取决于<strong>负载因子、hash 扰动、冲突分布和扩容成本</strong>。</p>
           <table>
             <thead><tr><th>考点</th><th>面试回答要点</th><th>工程影响</th></tr></thead>
             <tbody>
-              <tr><td><strong>链地址法</strong></td><td>桶内挂链表；Java 8 冲突链表过长时树化为红黑树</td><td>平均 O(1)，极端冲突最坏 O(n) / O(log n)</td></tr>
+              <tr><td><strong>链地址法</strong></td><td>桶内挂链表；Java 8 冲突链表过长时树化为红黑树</td><td>平均 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>，极端冲突最坏 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> / <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
               <tr><td><strong>开放寻址</strong></td><td>冲突后按探测序列找下一个空槽，删除通常需要墓碑标记</td><td>缓存友好，但扩容和删除更复杂</td></tr>
-              <tr><td><strong>扩容</strong></td><td>元素数超过 capacity × loadFactor 时扩容并重新分桶</td><td>单次可能 O(n)，高并发初始化应预估容量</td></tr>
+              <tr><td><strong>扩容</strong></td><td>元素数超过 capacity × loadFactor 时扩容并重新分桶</td><td>单次可能 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，高并发初始化应预估容量</td></tr>
               <tr><td><strong>一致性哈希</strong></td><td>节点和 key 映射到哈希环，用虚拟节点改善倾斜</td><td>缓存集群扩缩容时减少迁移数据</td></tr>
             </tbody>
           </table>
@@ -388,10 +388,10 @@ class LRUCache {
           <table>
             <thead><tr><th>算法</th><th>核心思路</th><th>复杂度/常考点</th></tr></thead>
             <tbody>
-              <tr><td><strong>暴力匹配</strong></td><td>主串逐位尝试，失配后回退</td><td>最坏 O(nm)，代码简单但重复比较多</td></tr>
-              <tr><td><strong>KMP</strong></td><td>用 next / lps 表记录模式串最长相等前后缀，主串指针不回退</td><td>预处理 O(m)，匹配 O(n+m)；next 的定义要说清楚</td></tr>
-              <tr><td><strong>Trie</strong></td><td>公共前缀共享路径，节点表示前缀而非完整字符串</td><td>插入/查询 O(L)，适合词频、前缀搜索、敏感词过滤</td></tr>
-              <tr><td><strong>字符串哈希</strong></td><td>前缀哈希 O(1) 判断子串相等</td><td>存在碰撞，工程上可双哈希或与实际比较结合</td></tr>
+              <tr><td><strong>暴力匹配</strong></td><td>主串逐位尝试，失配后回退</td><td>最坏 <span class="math-inline" data-tex="O(nm)" aria-label="O(nm)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，代码简单但重复比较多</td></tr>
+              <tr><td><strong>KMP</strong></td><td>用 next / lps 表记录模式串最长相等前后缀，主串指针不回退</td><td>预处理 <span class="math-inline" data-tex="O(m)" aria-label="O(m)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，匹配 <span class="math-inline" data-tex="O(n+m)" aria-label="O(n+m)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；next 的定义要说清楚</td></tr>
+              <tr><td><strong>Trie</strong></td><td>公共前缀共享路径，节点表示前缀而非完整字符串</td><td>插入/查询 <span class="math-inline" data-tex="O(L)" aria-label="O(L)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>L</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，适合词频、前缀搜索、敏感词过滤</td></tr>
+              <tr><td><strong>字符串哈希</strong></td><td>前缀哈希 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 判断子串相等</td><td>存在碰撞，工程上可双哈希或与实际比较结合</td></tr>
             </tbody>
           </table>
         </div>
@@ -402,13 +402,13 @@ class LRUCache {
           <table>
             <thead><tr><th>结构</th><th>核心操作</th><th>典型题型</th><th>回答时的关键细节</th></tr></thead>
             <tbody>
-              <tr><td><strong>单调栈</strong></td><td>维护单调递增/递减序列</td><td>下一个更大元素、柱状图最大矩形</td><td>每个元素最多入栈出栈一次，总复杂度 O(n)</td></tr>
+              <tr><td><strong>单调栈</strong></td><td>维护单调递增/递减序列</td><td>下一个更大元素、柱状图最大矩形</td><td>每个元素最多入栈出栈一次，总复杂度 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
               <tr><td><strong>单调队列</strong></td><td>队头始终是窗口最值</td><td>滑动窗口最大值</td><td>队列存下标，过期下标从队头删除</td></tr>
-              <tr><td><strong>优先队列</strong></td><td>堆顶优先级最高</td><td>TopK、合并 K 个有序链表、任务调度</td><td>插入/删除 O(log k)，只保留 K 个元素可控内存</td></tr>
-              <tr><td><strong>双端队列</strong></td><td>两端 O(1) 插入删除</td><td>0-1 BFS、LRU、滑动窗口</td><td>与 HashMap 组合可实现 O(1) LRU</td></tr>
+              <tr><td><strong>优先队列</strong></td><td>堆顶优先级最高</td><td>TopK、合并 K 个有序链表、任务调度</td><td>插入/删除 <span class="math-inline" data-tex="O(\log k)" aria-label="O(log k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，只保留 K 个元素可控内存</td></tr>
+              <tr><td><strong>双端队列</strong></td><td>两端 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 插入删除</td><td>0-1 BFS、LRU、滑动窗口</td><td>与 HashMap 组合可实现 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> LRU</td></tr>
             </tbody>
           </table>
-          <div class="warn"><strong>TopK 复杂度：</strong>全量排序 O(n log n)；维护大小 K 的堆为 O(n log K)；若只求第 K 大，可用快速选择平均 O(n)、最坏 O(n²)，需要随机化 pivot。</div>
+          <div class="warn"><strong>TopK 复杂度：</strong>全量排序 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；维护大小 K 的堆为 <span class="math-inline" data-tex="O(n\log K)" aria-label="O(n log K)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>K</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；若只求第 K 大，可用快速选择平均 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、最坏 <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，需要随机化 pivot。</div>
         </div>
 
         <h3 id="s1-9">1.9 并查集与前缀树</h3>
@@ -422,7 +422,7 @@ class LRUCache {
           </div>
           <ul>
             <li><strong>用途</strong>：动态连通分量、Kruskal 最小生成树、岛屿合并、无向图判环。</li>
-            <li><strong>为什么近似 O(1)</strong>：路径压缩 + 按秩合并后，均摊复杂度为 O(α(n))，α(n) 增长极慢。</li>
+            <li><strong>为什么近似 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></strong>：路径压缩 + 按秩合并后，均摊复杂度为 <span class="math-inline" data-tex="O(\alpha(n))" aria-label="O(α(n))"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>&#x003B1;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x00029;</mo></mrow></math></span>，α(n) 增长极慢。</li>
             <li><strong>易错点</strong>：并查集适合“合并后查询”，不擅长删除边；有向图判环不能直接照搬无向图并查集。</li>
           </ul>
         </div>
@@ -455,16 +455,16 @@ class LRUCache {
           <table>
             <thead><tr><th>问题</th><th>状态定义</th><th>转移方程</th><th>复杂度</th></tr></thead>
             <tbody>
-              <tr><td><strong>0-1 背包</strong></td><td>dp[i][w] = 前 i 件物品容量 w 的最大价值</td><td>dp[i][w] = max(dp[i-1][w], dp[i-1][w-wi]+vi)</td><td>O(nW)</td></tr>
-              <tr><td><strong>完全背包</strong></td><td>同上，物品可重复选</td><td>dp[i][w] = max(dp[i-1][w], dp[i][w-wi]+vi)</td><td>O(nW)</td></tr>
-              <tr><td><strong>LCS</strong></td><td>dp[i][j] = s1[0..i] 与 s2[0..j] 的最长公共子序列</td><td>s1[i]==s2[j] ? dp[i-1][j-1]+1 : max(dp[i-1][j],dp[i][j-1])</td><td>O(mn)</td></tr>
-              <tr><td><strong>LIS</strong></td><td>dp[i] = 以 arr[i] 结尾的最长递增子序列</td><td>dp[i] = max(dp[j]+1) for j &lt; i and arr[j] &lt; arr[i]</td><td>O(n^2) / O(n log n)</td></tr>
-              <tr><td><strong>编辑距离</strong></td><td>dp[i][j] = s1[0..i] 转为 s2[0..j] 的最少操作</td><td>s1[i]==s2[j] ? dp[i-1][j-1] : 1+min(增,删,改)</td><td>O(mn)</td></tr>
-              <tr><td><strong>区间 DP</strong></td><td>dp[i][j] = 区间 [i,j] 的最优解</td><td>dp[i][j] = min/max(dp[i][k]+dp[k+1][j]+cost)</td><td>O(n^3)</td></tr>
-              <tr><td><strong>状态压缩 DP</strong></td><td>dp[mask] = 集合 mask 的最优解</td><td>枚举 mask 的子集转移</td><td>O(2^n * n)</td></tr>
+              <tr><td><strong>0-1 背包</strong></td><td>dp[i][w] = 前 i 件物品容量 w 的最大价值</td><td>dp[i][w] = max(dp[i-1][w], dp[i-1][w-wi]+vi)</td><td><span class="math-inline" data-tex="O(nW)" aria-label="O(nW)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>W</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>完全背包</strong></td><td>同上，物品可重复选</td><td>dp[i][w] = max(dp[i-1][w], dp[i][w-wi]+vi)</td><td><span class="math-inline" data-tex="O(nW)" aria-label="O(nW)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>W</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>LCS</strong></td><td>dp[i][j] = s1[0..i] 与 s2[0..j] 的最长公共子序列</td><td>s1[i]==s2[j] ? dp[i-1][j-1]+1 : max(dp[i-1][j],dp[i][j-1])</td><td><span class="math-inline" data-tex="O(mn)" aria-label="O(mn)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>m</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>LIS</strong></td><td>dp[i] = 以 arr[i] 结尾的最长递增子序列</td><td>dp[i] = max(dp[j]+1) for j &lt; i and arr[j] &lt; arr[i]</td><td><span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> / <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>编辑距离</strong></td><td>dp[i][j] = s1[0..i] 转为 s2[0..j] 的最少操作</td><td>s1[i]==s2[j] ? dp[i-1][j-1] : 1+min(增,删,改)</td><td><span class="math-inline" data-tex="O(mn)" aria-label="O(mn)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>m</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>区间 DP</strong></td><td>dp[i][j] = 区间 [i,j] 的最优解</td><td>dp[i][j] = min/max(dp[i][k]+dp[k+1][j]+cost)</td><td><span class="math-inline" data-tex="O(n^{3})" aria-label="O(n^3)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>3</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td><strong>状态压缩 DP</strong></td><td>dp[mask] = 集合 mask 的最优解</td><td>枚举 mask 的子集转移</td><td><span class="math-inline" data-tex="O(2^n \cdot  n)" aria-label="O(2^n * n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mn>2</mn><mi>n</mi></msup><mi>&#x000B7;</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
             </tbody>
           </table>
-          <div class="tip">LIS 的 O(n log n) 优化：维护一个 tails 数组，tails[i] 表示长度为 i+1 的递增子序列的最小末尾元素，用二分查找更新。</div>
+          <div class="tip">LIS 的 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 优化：维护一个 tails 数组，tails[i] 表示长度为 i+1 的递增子序列的最小末尾元素，用二分查找更新。</div>
         </div>
 
         <h3 id="s2-2">2.2 贪心算法</h3>
@@ -571,7 +571,7 @@ int slidingWindow(string s) {
           <ul>
             <li><strong>核心</strong>：右指针扩展窗口，左指针收缩窗口，维护窗口内状态</li>
             <li><strong>适用</strong>：最长/最短子串、包含所有字符的子串</li>
-            <li><strong>复杂度</strong>：O(n)，每个元素最多进出窗口各一次</li>
+            <li><strong>复杂度</strong>：<span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，每个元素最多进出窗口各一次</li>
           </ul>
         </div>
 
@@ -605,8 +605,8 @@ int binarySearch(int[] arr, int target) {
           <div class="a"><strong>参考</strong>：容量为 2 的幂时，<code>(n - 1) &amp; hash</code> 等价于取模，计算快且扩容时只需判断新增的高位是否为 1 来决定留在原桶还是移动 oldCap。Java 8 中一个桶的链表长度达到 8 且容量至少 64 时才树化，容量太小时优先扩容，避免小表因偶发冲突付出红黑树维护成本。<br><strong>追问</strong>：为什么重写 equals 必须重写 hashCode？相等对象必须落到同一桶，否则 Map 会先按 hash 定位失败，违反契约。</div>
         </div>
         <div class="qa">
-          <div class="q">如何在 O(n) 时间内求滑动窗口最大值？为什么不是每次排序？</div>
-          <div class="a"><strong>参考</strong>：使用单调递减双端队列存下标。新元素入队前，从队尾删除所有不可能成为最大值的更小元素；窗口右移时删除队头过期下标，队头即当前最大值。每个下标最多入队和出队一次，因此总复杂度 O(n)，空间 O(k)。每次排序是 O(nk log k)，堆则是 O(n log k)。</div>
+          <div class="q">如何在 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 时间内求滑动窗口最大值？为什么不是每次排序？</div>
+          <div class="a"><strong>参考</strong>：使用单调递减双端队列存下标。新元素入队前，从队尾删除所有不可能成为最大值的更小元素；窗口右移时删除队头过期下标，队头即当前最大值。每个下标最多入队和出队一次，因此总复杂度 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，空间 <span class="math-inline" data-tex="O(k)" aria-label="O(k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。每次排序是 <span class="math-inline" data-tex="O(nk \log k)" aria-label="O(nk log k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>k</mi><mi>log</mi><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，堆则是 <span class="math-inline" data-tex="O(n \log k)" aria-label="O(n log k)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>k</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</div>
         </div>
         <div class="qa">
           <div class="q">如何判断一道题用 DP、贪心还是回溯？</div>
@@ -614,9 +614,9 @@ int binarySearch(int[] arr, int target) {
         </div>
 
         <div class="qa">
-          <div class="q">快速排序的时间复杂度分析？什么情况下退化为 O(n^2)？如何优化？</div>
+          <div class="q">快速排序的时间复杂度分析？什么情况下退化为 <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>？如何优化？</div>
           <div class="a">
-            <strong>参考</strong>：快排平均 O(n log n)，每次 partition 将数组分为大致相等的两部分，递归深度 O(log n)，每层 O(n)。最坏情况是每次选到最小或最大元素（如已排序数组选首元素），退化为 O(n^2)。
+            <strong>参考</strong>：快排平均 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，每次 partition 将数组分为大致相等的两部分，递归深度 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，每层 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。最坏情况是每次选到最小或最大元素（如已排序数组选首元素），退化为 <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>。
             <br><strong>优化</strong>：① 随机化选 pivot；② 三数取中（median-of-three）；③ 三路快排处理大量重复元素；④ 小规模切换插入排序。
           </div>
         </div>
@@ -624,8 +624,8 @@ int binarySearch(int[] arr, int target) {
         <div class="qa">
           <div class="q">如何判断一个二叉树是否是平衡二叉树？</div>
           <div class="a">
-            <strong>参考</strong>：自底向上递归，对每个节点求左右子树高度，若高度差 &gt; 1 返回 -1 表示不平衡，否则返回 max(left, right) + 1。时间 O(n)，避免了自顶向下重复计算。
-            <br><strong>追问</strong>：自顶向下的方法每个节点会重复计算高度，时间 O(n log n) ~ O(n^2)，不如自底向上高效。
+            <strong>参考</strong>：自底向上递归，对每个节点求左右子树高度，若高度差 &gt; 1 返回 -1 表示不平衡，否则返回 max(left, right) + 1。时间 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，避免了自顶向下重复计算。
+            <br><strong>追问</strong>：自顶向下的方法每个节点会重复计算高度，时间 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> ~ <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n^2)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，不如自底向上高效。
           </div>
         </div>
 
@@ -647,15 +647,15 @@ int binarySearch(int[] arr, int target) {
         </div>
 
         <div class="qa">
-          <div class="q">LRU 缓存的实现原理？如何做到 O(1) 的 get 和 put？</div>
+          <div class="q">LRU 缓存的实现原理？如何做到 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 的 get 和 put？</div>
           <div class="a">
-            <strong>参考</strong>：使用<strong>哈希表 + 双向链表</strong>。哈希表存 key 到链表节点的映射，保证 O(1) 查找。双向链表维护访问顺序，最近访问的放头部，最久未使用的在尾部。get 时将节点移到头部；put 时新增到头部，超出容量则删除尾部节点。所有操作都是 O(1)。
-            <br><strong>追问</strong>：为什么用双向链表而不是单向链表？因为删除节点需要 O(1) 访问前驱，双向链表可以直接通过 node.prev 获取。
+            <strong>参考</strong>：使用<strong>哈希表 + 双向链表</strong>。哈希表存 key 到链表节点的映射，保证 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找。双向链表维护访问顺序，最近访问的放头部，最久未使用的在尾部。get 时将节点移到头部；put 时新增到头部，超出容量则删除尾部节点。所有操作都是 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>。
+            <br><strong>追问</strong>：为什么用双向链表而不是单向链表？因为删除节点需要 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 访问前驱，双向链表可以直接通过 node.prev 获取。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q">如何在 O(n log n) 时间内求最长递增子序列（LIS）？</div>
+          <div class="q">如何在 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 时间内求最长递增子序列（LIS）？</div>
           <div class="a">
             <strong>参考</strong>：维护一个 tails 数组，tails[i] 表示长度为 i+1 的递增子序列的最小末尾元素。遍历数组，对每个元素用二分查找在 tails 中找到第一个 &ge; 它的位置：若在末尾则追加（序列变长），否则替换（保持末尾最小）。tails 数组始终有序，最终长度即 LIS 长度。
             <br><strong>注意</strong>：tails 数组不是 LIS 本身，要还原 LIS 需要额外记录前驱。
@@ -673,7 +673,7 @@ int binarySearch(int[] arr, int target) {
         <div class="qa">
           <div class="q">如何用两个栈实现一个队列？用两个队列实现一个栈？</div>
           <div class="a">
-            <strong>参考</strong>：<strong>两栈实现队列</strong>：push 栈负责入队，pop 栈负责出队。出队时若 pop 栈为空，将 push 栈全部倒入 pop 栈。均摊 O(1)。
+            <strong>参考</strong>：<strong>两栈实现队列</strong>：push 栈负责入队，pop 栈负责出队。出队时若 pop 栈为空，将 push 栈全部倒入 pop 栈。均摊 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>。
             <br><strong>两队列实现栈</strong>：每次 push 到非空队列（保证一个队列始终为空），pop 时将非空队列的前 n-1 个元素移到另一个队列，最后一个即栈顶。
           </div>
         </div>
@@ -701,11 +701,11 @@ int binarySearch(int[] arr, int target) {
           </article>
           <article class="lab-concept"><h3>图最短路：边权条件比算法名字更重要</h3>
             <p>大白话：BFS 按经过的边数一层层扩展，适合等权图；Dijkstra 每次确定当前最近点，依赖边权非负；负权边需换算法并考虑负环。</p>
-            <p><strong>边界与易错：</strong>边界：邻接表 BFS 为 O(V+E)；堆优化 Dijkstra 常写 O((V+E)log V)。不可达距离是无穷，松弛前要避免无穷加权溢出。</p>
+            <p><strong>边界与易错：</strong>边界：邻接表 BFS 为 <span class="math-inline" data-tex="O(V+E)" aria-label="O(V+E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；堆优化 Dijkstra 常写 <span class="math-inline" data-tex="O((V+E)\log V)" aria-label="O((V+E)log V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo><mi>log</mi><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。不可达距离是无穷，松弛前要避免无穷加权溢出。</p>
           </article>
           <h3>面试追问：展开查看答题要点</h3>
           <details class="lab-question"><summary>如何口述一道算法题，让面试官相信代码不会卡边界？</summary><p>先给输入规模与目标，再给不变量和复杂度；最后举空输入、单元素、重复值及极值。例如二分下界保持“答案在 [l,r) 中”，每轮必须严格缩小区间。</p></details>
-          <details class="lab-question"><summary>快排平均很快，为什么面试还要说最坏情况？</summary><p>不恰当枢轴可能每轮只排除一个元素，时间退化到 O(n²)，递归栈也可到 O(n)。随机枢轴降低特定输入风险，但不改变理论最坏界；三路划分处理大量重复值更直接。</p></details>
+          <details class="lab-question"><summary>快排平均很快，为什么面试还要说最坏情况？</summary><p>不恰当枢轴可能每轮只排除一个元素，时间退化到 <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，递归栈也可到 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。随机枢轴降低特定输入风险，但不改变理论最坏界；三路划分处理大量重复值更直接。</p></details>
           <h3>笔试单选：先作答，再核对解析</h3>
           <article class="lab-quiz study-question" data-answer="1"><h4>1. 0/1 背包用一维数组时，为防止一件物品重复使用，应如何遍历容量？</h4>
             <ol type="A">

@@ -485,7 +485,7 @@ Follower 校验:
               <tr><td>最终一致性</td><td>不保证强一致，但保证最终所有节点收敛到相同状态</td></tr>
               <tr><td>可扩展性</td><td>新增节点无需特殊处理，自动融入协议</td></tr>
               <tr><td>容错性</td><td>部分节点故障不影响整体传播</td></tr>
-              <tr><td>收敛时间</td><td>O(logN) 轮后所有节点收敛</td></tr>
+              <tr><td>收敛时间</td><td><span class="math-inline" data-tex="O(\log N)" aria-label="O(logN)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 轮后所有节点收敛</td></tr>
             </tbody>
           </table>
         </div>
@@ -525,7 +525,7 @@ Follower 校验:
               <tr><td><strong>Raft</strong></td><td>CFT</td><td>(N-1)/2</td><td>强一致</td><td>高</td><td>配置中心、分布式锁（etcd）</td></tr>
               <tr><td><strong>ZAB</strong></td><td>CFT</td><td>(N-1)/2</td><td>强一致</td><td>中</td><td>分布式协调（ZooKeeper）</td></tr>
               <tr><td><strong>Gossip</strong></td><td>CFT</td><td>—</td><td>最终一致</td><td>极高</td><td>成员管理、状态传播</td></tr>
-              <tr><td><strong>PBFT</strong></td><td>BFT</td><td>(N-1)/3</td><td>强一致</td><td>低（O(N²)）</td><td>区块链、联盟链</td></tr>
+              <tr><td><strong>PBFT</strong></td><td>BFT</td><td>(N-1)/3</td><td>强一致</td><td>低（<span class="math-inline" data-tex="O(N^2)" aria-label="O(N²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>N</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>）</td><td>区块链、联盟链</td></tr>
             </tbody>
           </table>
         </div>
@@ -595,7 +595,7 @@ Follower 校验:
         <div class="qa">
           <div class="q">Gossip 协议的原理是什么？为什么 Redis Cluster 用 Gossip 而不用 Raft？</div>
           <div class="a">
-            <strong>参考：</strong>Gossip 是去中心化的最终一致性协议，节点随机选择其他节点交换信息，像流言传播一样。Push-Pull 模式下，O(logN) 轮后所有节点收敛到相同状态。Redis Cluster 用 Gossip 而非 Raft 的原因：1）Redis Cluster 是 AP 系统，不需要强一致性，最终一致即可；2）Gossip 去中心化，无 Leader 选举，性能更高；3）Redis Cluster 只用 Gossip 传播节点状态和槽位信息（元数据），实际数据由各 Master 节点独立负责，不需要共识。如果用 Raft，每个写操作都需要多数派确认，会严重影响 Redis 的性能。
+            <strong>参考：</strong>Gossip 是去中心化的最终一致性协议，节点随机选择其他节点交换信息，像流言传播一样。Push-Pull 模式下，<span class="math-inline" data-tex="O(\log N)" aria-label="O(logN)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 轮后所有节点收敛到相同状态。Redis Cluster 用 Gossip 而非 Raft 的原因：1）Redis Cluster 是 AP 系统，不需要强一致性，最终一致即可；2）Gossip 去中心化，无 Leader 选举，性能更高；3）Redis Cluster 只用 Gossip 传播节点状态和槽位信息（元数据），实际数据由各 Master 节点独立负责，不需要共识。如果用 Raft，每个写操作都需要多数派确认，会严重影响 Redis 的性能。
           </div>
         </div>
 
@@ -609,7 +609,7 @@ Follower 校验:
         <div class="qa">
           <div class="q">PBFT 是如何实现拜占庭容错的？与 Raft 有什么本质区别？</div>
           <div class="a">
-            <strong>参考：</strong>PBFT 通过三阶段协议（Pre-Prepare、Prepare、Commit）实现拜占庭容错。在 Prepare 阶段收集 2f 个确认，在 Commit 阶段收集 2f+1 个确认，确保即使 f 个节点是恶意的，诚实节点也能达成一致。与 Raft 的本质区别：1）容错模型不同——Raft 容忍崩溃故障（CFT），PBFT 容忍拜占庭故障（BFT）；2）节点数量要求——Raft 需要 N/2+1，PBFT 需要 2N/3+1；3）性能差异——PBFT 需要 O(N²) 消息交换，Raft 只需 O(N)，因此 PBFT 性能较差，不适合大规模集群。
+            <strong>参考：</strong>PBFT 通过三阶段协议（Pre-Prepare、Prepare、Commit）实现拜占庭容错。在 Prepare 阶段收集 2f 个确认，在 Commit 阶段收集 2f+1 个确认，确保即使 f 个节点是恶意的，诚实节点也能达成一致。与 Raft 的本质区别：1）容错模型不同——Raft 容忍崩溃故障（CFT），PBFT 容忍拜占庭故障（BFT）；2）节点数量要求——Raft 需要 N/2+1，PBFT 需要 2N/3+1；3）性能差异——PBFT 需要 <span class="math-inline" data-tex="O(N^2)" aria-label="O(N²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>N</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> 消息交换，Raft 只需 <span class="math-inline" data-tex="O(N)" aria-label="O(N)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，因此 PBFT 性能较差，不适合大规模集群。
           </div>
         </div>
 
@@ -648,7 +648,7 @@ Follower 校验:
               <li>4</li>
               <li>5</li>
             </ol>
-            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。多数严格超过半数，floor(5/2)+1=3，可容忍两个节点崩溃。</p></details>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。多数严格超过半数，<span class="math-inline" data-tex="\left\lfloor\frac{5}{2}\right\rfloor+1=3" aria-label="floor(5/2)+1=3"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mo stretchy="true" fence="true" form="prefix">&#x0230A;</mo><mfrac><mrow><mn>5</mn></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x0230B;</mo></mrow><mo>&#x0002B;</mo><mn>1</mn><mo>&#x0003D;</mo><mn>3</mn></mrow></math></span>，可容忍两个节点崩溃。</p></details>
           </article>
           <article class="lab-quiz study-question" data-answer="0">
             <h4>2. 候选人 A 最后日志(term=4,index=8)，B 为(term=3,index=20)，按 Raft 新旧比较谁更新？</h4>

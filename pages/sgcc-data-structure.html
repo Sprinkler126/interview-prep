@@ -132,10 +132,10 @@
 <p>顺序表像连续的编号储物柜，按号访问快；链表像寻宝纸条，插入只改连线，但找位置得逐个走。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>顺序表按位访问 O(1)，未排序时按值查找 O(n)，中间插删 O(n)。</li>
+<li>顺序表按位访问 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>，未排序时按值查找 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，中间插删 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
 <li>长度 n 的顺序表，在第 i 个位置插入（1≤i≤n+1）移动 n-i+1 项；删除第 i 项移动 n-i 项。</li>
-<li>单链表带头节点时首个数据节点为 head.next；头节点不是头元素。已知前驱时插删 O(1)，找前驱可能 O(n)。</li>
-<li>双向链表删除已知真实节点 O(1)；循环链表的末节点指回头部，遍历终止条件不能再用 null。</li>
+<li>单链表带头节点时首个数据节点为 head.next；头节点不是头元素。已知前驱时插删 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>，找前驱可能 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li>双向链表删除已知真实节点 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>；循环链表的末节点指回头部，遍历终止条件不能再用 null。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
 <pre>
@@ -190,7 +190,7 @@ return pop()  // 合法表达式最终恰剩一项</code>
 <h4>要掌握的规则</h4>
 <ul>
 <li>本页统一采用牺牲一个空槽：数组容量 m，最多存 m-1 项。</li>
-<li>判空 front==rear；判满 (rear+1)%m==front；长度 (rear-front+m)%m。</li>
+<li>判空 front==rear；判满 <span class="math-inline" data-tex="(\mathrm{rear}+1)\bmod m=\mathrm{front}" aria-label="(rear+1)%m==front"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo stretchy="false">&#x00028;</mo><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">r</mi></mrow><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>mod</mo><mi>m</mi><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">f</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi></mrow></mrow></math></span>；长度 <span class="math-inline" data-tex="(\mathrm{rear}-\mathrm{front}+m)\bmod m" aria-label="(rear-front+m)%m"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo stretchy="false">&#x00028;</mo><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">r</mi></mrow><mo>&#x02212;</mo><mrow><mi mathvariant="normal">f</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi></mrow><mo>&#x0002B;</mo><mi>m</mi><mo stretchy="false">&#x00029;</mo><mo>mod</mo><mi>m</mi></mrow></math></span>。</li>
 <li>入队先写 A[rear] 再 rear=(rear+1)%m；出队先取 A[front] 再移动 front。</li>
 <li>双端队列两端均可入队出队；输入受限、输出受限要看题目具体限制哪一端。</li>
 </ul>
@@ -217,9 +217,9 @@ dequeue():
 <p>找座位先数跨过几整行，再加这一行内的偏移。对称矩阵像镜子两边，只存一半就能还原另一半。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>A[L1..U1][L2..U2] 行优先：地址=base+((i-L1)×列数+j-L2)×元素字节数。列优先时先跨列，每列含行数个元素。</li>
-<li>n 阶对称矩阵下三角含主对角线共 n(n+1)/2 项；0 起始 i≥j 时偏移 k=i(i+1)/2+j，i&lt;j 时先交换。</li>
-<li>三角矩阵另一半均为同一常数时，通常额外存一个常数，共 n(n+1)/2+1 项。</li>
+<li>A[L1..U1][L2..U2] 行优先：<span class="math-inline" data-tex="\text{地址}=\mathrm{base}+\bigl((i-L_1)\times\text{列数}+j-L_2\bigr)\times\text{元素字节数}" aria-label="地址=base+((i-L1)×列数+j-L2)×元素字节数"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mtext>地址</mtext><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">b</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">s</mi><mi mathvariant="normal">e</mi></mrow><mo>&#x0002B;</mo><mo stretchy="true" fence="true" minsize="1.2em" maxsize="1.2em">(</mo><mo stretchy="false">&#x00028;</mo><mi>i</mi><mo>&#x02212;</mo><msub><mi>L</mi><mn>1</mn></msub><mo stretchy="false">&#x00029;</mo><mi>&#x000D7;</mi><mtext>列数</mtext><mo>&#x0002B;</mo><mi>j</mi><mo>&#x02212;</mo><msub><mi>L</mi><mn>2</mn></msub><mo stretchy="true" fence="true" minsize="1.2em" maxsize="1.2em">)</mo><mi>&#x000D7;</mi><mtext>元素字节数</mtext></mrow></math></span>。列优先时先跨列，每列含行数个元素。</li>
+<li>n 阶对称矩阵下三角含主对角线共 <span class="math-inline" data-tex="\frac{n(n+1)}{2}" aria-label="n(n+1)/2"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>n</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow><mrow><mn>2</mn></mrow></mfrac></mrow></math></span> 项；0 起始 i≥j 时偏移 <span class="math-inline" data-tex="k=\frac{i(i+1)}{2}+j" aria-label="k=i(i+1)/2+j"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>k</mi><mo>&#x0003D;</mo><mfrac><mrow><mi>i</mi><mo stretchy="false">&#x00028;</mo><mi>i</mi><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow><mrow><mn>2</mn></mrow></mfrac><mo>&#x0002B;</mo><mi>j</mi></mrow></math></span>，i&lt;j 时先交换。</li>
+<li>三角矩阵另一半均为同一常数时，通常额外存一个常数，共 <span class="math-inline" data-tex="\frac{n(n+1)}{2}" aria-label="n(n+1)/2"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>n</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow><mrow><mn>2</mn></mrow></mfrac></mrow></math></span>+1 项。</li>
 <li>三对角矩阵非零项满足 |i-j|≤1，n≥2 时有 3n-2 项；稀疏矩阵可存 (行,列,值) 三元组。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
@@ -243,7 +243,7 @@ symIndex(i,j):  // 0 起始，下三角按行
 <p>匹配失败时，不必把之前的信息全丢掉。KMP 记住已匹配部分结尾能接回哪个开头，让模式串跳过不可能的对齐。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>朴素匹配最坏 O(nm)；KMP 建前缀表 O(m)、匹配 O(n)，总 O(n+m)。</li>
+<li>朴素匹配最坏 <span class="math-inline" data-tex="O(nm)" aria-label="O(nm)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；KMP 建前缀表 <span class="math-inline" data-tex="O(m)" aria-label="O(m)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、匹配 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，总 <span class="math-inline" data-tex="O(n+m)" aria-label="O(n+m)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mi>m</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
 <li>本页 pi 为 0 起始前缀函数：pi[i] 是 P[0..i] 最长公共真前后缀的长度，真前缀不能等于整段。</li>
 <li>失配时 j=pi[j-1]，文本 i 不回退，可能多次回退 j。</li>
 <li>教材 next、nextval 可能使用 -1、0 或 1 起始；必须按定义推导，不要混用表值。</li>
@@ -277,8 +277,8 @@ for i=0..n-1:
 <p>非根节点各自只有一个父亲，数父子连线就能推出很多公式。完全二叉树则像从上到下、从左到右不留空位地坐人。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>n 节点非空树有 n-1 条边；二叉树度为 0、1、2 的节点数 n0,n1,n2 满足 n0=n2+1。</li>
-<li>根为第 1 层，第 i 层最多 2^(i-1) 项，高度 h 最多 2^h-1 项；n 项完全二叉树高度 floor(log2 n)+1。</li>
+<li>n 节点非空树有 n-1 条边；二叉树度为 0、1、2 的节点数 n0,n1,n2 满足 <span class="math-inline" data-tex="n_0=n_2+1" aria-label="n0=n2+1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>n</mi><mn>0</mn></msub><mo>&#x0003D;</mo><msub><mi>n</mi><mn>2</mn></msub><mo>&#x0002B;</mo><mn>1</mn></mrow></math></span>。</li>
+<li>根为第 1 层，第 i 层最多 <span class="math-inline" data-tex="2^{i-1}" aria-label="2^(i-1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mrow><mi>i</mi><mo>&#x02212;</mo><mn>1</mn></mrow></msup></mrow></math></span> 项，高度 h 最多 <span class="math-inline" data-tex="2^h-1" aria-label="2^h-1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mi>h</mi></msup><mo>&#x02212;</mo><mn>1</mn></mrow></math></span> 项；n 项完全二叉树高度 <span class="math-inline" data-tex="\lfloor\log_2 n\rfloor+1" aria-label="floor(log2 n)+1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x0230A;</mi><msub><mi>log</mi><mn>2</mn></msub><mi>n</mi><mi>&#x0230B;</mi><mo>&#x0002B;</mo><mn>1</mn></mrow></math></span>。</li>
 <li>完全二叉树除末层外均满，末层从左到右连续；满二叉树按国内常用定义每层都满。</li>
 <li>完全二叉树 1 起始编号：父 floor(i/2)、左 2i、右 2i+1；叶数 ceil(n/2)，度为 2 的节点数 floor((n-1)/2)。</li>
 <li>树转二叉树使用左孩子右兄弟：左指针连第一个孩子，右指针连下一个兄弟。</li>
@@ -331,8 +331,8 @@ right(i)=2*i+1 if 2*i+1&lt;=n else 不存在</code>
 <p>常用的数据配短编码。每次把最轻的两棵树合并，最常用的数据一般能更靠近根。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>每轮取最小两个权重，合并的和重新参加选择；小顶堆实现 O(n log n)。</li>
-<li>WPL=Σ(叶权×根到叶的边数)，也等于所有合并产生的新权重之和。</li>
+<li>每轮取最小两个权重，合并的和重新参加选择；小顶堆实现 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li><span class="math-inline" data-tex="\mathrm{WPL}=\sum_i w_i l_i" aria-label="WPL=Σ(叶权×根到叶的边数)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi mathvariant="normal">W</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">L</mi></mrow><mo>&#x0003D;</mo><msub><mo>&#x02211;</mo><mi>i</mi></msub><msub><mi>w</mi><mi>i</mi></msub><msub><mi>l</mi><mi>i</mi></msub></mrow></math></span>，其中wᵢ为叶结点权值，lᵢ为根到该叶结点的边数；也等于所有合并产生的新权重之和。</li>
 <li>n≥2 个叶子的哈夫曼树有 n-1 个内部节点，总 2n-1 个节点，无度为 1 的节点。</li>
 <li>叶子路径给出前缀编码，任一码字都不是另一码字的前缀；编码本身可能不唯一。</li>
 </ul>
@@ -360,8 +360,8 @@ return popMin()</code>
 <ul>
 <li>简单无向图最多 V(V-1)/2 条边；简单无自环有向图最多 V(V-1) 条弧。无向度之和=2E，有向入度和=出度和=E。</li>
 <li>无向连通图至少 V-1 条边；边数 V-1 且连通才一定是树。强连通要求有向图任意两点互相可达。</li>
-<li>矩阵空间 O(V²)、判邻接 O(1)；邻接表空间 O(V+E)，无向边一般存两份。</li>
-<li>DFS/BFS 邻接表时间 O(V+E)，矩阵实现 O(V²)；非连通图需从每个未访问点重新启动。</li>
+<li>矩阵空间 <span class="math-inline" data-tex="O(V^{2})" aria-label="O(V²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>、判邻接 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>；邻接表空间 <span class="math-inline" data-tex="O(V+E)" aria-label="O(V+E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，无向边一般存两份。</li>
+<li>DFS/BFS 邻接表时间 <span class="math-inline" data-tex="O(V+E)" aria-label="O(V+E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，矩阵实现 <span class="math-inline" data-tex="O(V^{2})" aria-label="O(V²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>；非连通图需从每个未访问点重新启动。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
 <pre>
@@ -391,8 +391,8 @@ DFS(u):
 <h4>要掌握的规则</h4>
 <ul>
 <li>针对无向连通带权图，生成树含 V-1 边；非连通图得到最小生成森林。负权边也可以。</li>
-<li>Prim 的 dist 是当前树到新点的最小连接边权；矩阵实现 O(V²)。</li>
-<li>Kruskal 按边权排序，并查集判环，通常 O(E log E)。</li>
+<li>Prim 的 dist 是当前树到新点的最小连接边权；矩阵实现 <span class="math-inline" data-tex="O(V^{2})" aria-label="O(V²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li>Kruskal 按边权排序，并查集判环，通常 <span class="math-inline" data-tex="O(E \log E)" aria-label="O(E log E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>E</mi><mi>log</mi><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
 <li>边权互异能保证唯一；有重复权重不代表一定不唯一。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
@@ -418,9 +418,9 @@ for (u,v,w) in edges:
 <p>找家到每站最短路线，和铺路总共最省钱不同。Dijkstra 确认当前最近的站，Floyd 依次试用每个站做中转。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>Dijkstra 要求边权非负；矩阵实现 O(V²)，邻接表配二叉堆通常 O((V+E)log V)。</li>
-<li>Floyd 求所有点对最短路，k 放最外层，O(V³) 时间、O(V²) 空间；可处理负边，不能给受负环影响的路径定义有限最短距离。</li>
-<li>Floyd 结束若 d[i][i]&lt;0 表示有负环。Bellman-Ford 用 V-1 轮松弛，再一轮仍可更新则有源可达负环，O(VE)。</li>
+<li>Dijkstra 要求边权非负；矩阵实现 <span class="math-inline" data-tex="O(V^{2})" aria-label="O(V²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，邻接表配二叉堆通常 <span class="math-inline" data-tex="O((V+E)\log V)" aria-label="O((V+E)log V)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo><mi>log</mi><mi>V</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li>Floyd 求所有点对最短路，k 放最外层，<span class="math-inline" data-tex="O(V^{3})" aria-label="O(V³)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>3</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> 时间、<span class="math-inline" data-tex="O(V^{2})" aria-label="O(V²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>V</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span> 空间；可处理负边，不能给受负环影响的路径定义有限最短距离。</li>
+<li>Floyd 结束若 d[i][i]&lt;0 表示有负环。Bellman-Ford 用 V-1 轮松弛，再一轮仍可更新则有源可达负环，<span class="math-inline" data-tex="O(VE)" aria-label="O(VE)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
 <pre>
@@ -450,8 +450,8 @@ for k in vertices:
 <p>先修课没学完不能上后续课。拓扑排序挑没有前置依赖的任务；关键路径找一旦延误就会拖慢整体的活动链。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>AOV 网顶点表示活动；有向图存在拓扑序当且仅当无环。Kahn 输出少于 V 点说明有环，时间 O(V+E)。</li>
-<li>AOE 网边表示活动时长。最早事件时间 ve[v]=max(ve[u]+w)，按拓扑序算。</li>
+<li>AOV 网顶点表示活动；有向图存在拓扑序当且仅当无环。Kahn 输出少于 V 点说明有环，时间 <span class="math-inline" data-tex="O(V+E)" aria-label="O(V+E)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>V</mi><mo>&#x0002B;</mo><mi>E</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li>AOE 网边表示活动时长。最早事件时间 <span class="math-inline" data-tex="v_e(v)=\max_{u\to v}\{v_e(u)+w(u,v)\}" aria-label="ve[v]=max(ve[u]+w)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>v</mi><mi>e</mi></msub><mo stretchy="false">&#x00028;</mo><mi>v</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><msub><mo>max</mo><mrow><mi>u</mi><mo>&#x02192;</mo><mi>v</mi></mrow></msub><mo stretchy="false">&#x0007B;</mo><msub><mi>v</mi><mi>e</mi></msub><mo stretchy="false">&#x00028;</mo><mi>u</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>w</mi><mo stretchy="false">&#x00028;</mo><mi>u</mi><mo>&#x0002C;</mo><mi>v</mi><mo stretchy="false">&#x00029;</mo><mo stretchy="false">&#x0007D;</mo></mrow></math></span>，按拓扑序算。</li>
 <li>以总工期初始化汇点，逆拓扑序计算 vl[u]=min(vl[v]-w)。活动最早 e=ve[u]，最晚 l=vl[v]-w，e=l 为关键活动。</li>
 <li>关键路径可能多条；缩短其中一条的活动不一定缩短整个工期。</li>
 </ul>
@@ -480,10 +480,10 @@ else: 按 order 算 ve，再按逆序算 vl</code>
 <p>查找效率看平均问几次。有序数据能每问一次就丢掉半边；分块则先查目录，再进小块找。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>等概率成功顺序查找 ASL=(n+1)/2；不带哨兵的失败需比较 n 个数据元素。</li>
-<li>折半要求顺序存储且按键有序；普通链表不能直接 O(1) 访问中点。</li>
-<li>折半最坏成功比较次数 floor(log2 n)+1（n≥1）；需声明中点取整规则。</li>
-<li>分块查找块间有序、块内可无序，先查索引后块内查找。ASL=Σ(概率×比较次数)。</li>
+<li>等概率成功顺序查找 <span class="math-inline" data-tex="\mathrm{ASL}=\frac{n+1}{2}" aria-label="ASL=(n+1)/2"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi mathvariant="normal">A</mi><mi mathvariant="normal">S</mi><mi mathvariant="normal">L</mi></mrow><mo>&#x0003D;</mo><mfrac><mrow><mi>n</mi><mo>&#x0002B;</mo><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac></mrow></math></span>；不带哨兵的失败需比较 n 个数据元素。</li>
+<li>折半要求顺序存储且按键有序；普通链表不能直接 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 访问中点。</li>
+<li>折半最坏成功比较次数 <span class="math-inline" data-tex="\lfloor\log_2 n\rfloor+1" aria-label="floor(log2 n)+1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x0230A;</mi><msub><mi>log</mi><mn>2</mn></msub><mi>n</mi><mi>&#x0230B;</mi><mo>&#x0002B;</mo><mn>1</mn></mrow></math></span>（n≥1）；需声明中点取整规则。</li>
+<li>分块查找块间有序、块内可无序，先查索引后块内查找。<span class="math-inline" data-tex="\mathrm{ASL}=\sum_i p_i c_i" aria-label="ASL=Σ(概率×比较次数)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi mathvariant="normal">A</mi><mi mathvariant="normal">S</mi><mi mathvariant="normal">L</mi></mrow><mo>&#x0003D;</mo><msub><mo>&#x02211;</mo><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>c</mi><mi>i</mi></msub></mrow></math></span>。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
 <pre>
@@ -509,7 +509,7 @@ return 不存在</code>
 <p>把比较过程变成分岔路，平衡树不让路过长。多路树一次看几个分界值，使需要访问的层数更少。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>BST 中序有序，操作 O(h)；平衡时 O(log n)，退化时 O(n)。双孩子删除可用中序前驱或后继替换后再删除。</li>
+<li>BST 中序有序，操作 <span class="math-inline" data-tex="O(h)" aria-label="O(h)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>h</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；平衡时 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，退化时 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。双孩子删除可用中序前驱或后继替换后再删除。</li>
 <li>AVL 平衡因子=左高-右高，允许 -1,0,1；LL 右旋、RR 左旋、LR 先左后右、RL 先右后左。</li>
 <li>m 阶 B 树按最大孩子数定义：至多 m 个孩子、m-1 键；非根内部节点至少 ceil(m/2) 个孩子；内部根至少 2 孩子。</li>
 <li>B+ 内部只存索引，记录在叶子，叶链适合范围查询。B+ 阶数与键数关系依教材定义。</li>
@@ -541,7 +541,7 @@ return 不存在</code>
 <h4>要掌握的规则</h4>
 <ul>
 <li>装填因子 α=n/m；开放定址需 α&lt;1 才有空槽，链地址法 α 可大于 1。</li>
-<li>线性探测 H_i=(H(key)+i)%m；平方探测需按题目明确的增量序列计算。</li>
+<li>线性探测 <span class="math-inline" data-tex="H_i=(H(\mathrm{key})+i)\bmod m" aria-label="H_i=(H(key)+i)%m"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>H</mi><mi>i</mi></msub><mo>&#x0003D;</mo><mo stretchy="false">&#x00028;</mo><mi>H</mi><mo stretchy="false">&#x00028;</mo><mrow><mi mathvariant="normal">k</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">y</mi></mrow><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>i</mi><mo stretchy="false">&#x00029;</mo><mo>mod</mo><mi>m</mi></mrow></math></span>；平方探测需按题目明确的增量序列计算。</li>
 <li>成功 ASL 按每个已存键实际探测次数平均；失败 ASL 按题目规定的散列起点平均。</li>
 <li>开放定址删除需做墓碑，不能直接标成从未使用；相同键更新不增加元素数。</li>
 </ul>
@@ -570,9 +570,9 @@ return 不存在</code>
 <ul>
 <li>直接插入、冒泡、归并（相等先左）以及稳定计数/基数稳定；直接选择、希尔、快速、堆通常不稳定。</li>
 <li>冒泡每趟确定极值；选择每趟选剩余最小；插入维护有序前缀；快排仅保证基准就位，两侧未必有序。</li>
-<li>选择始终比较 n(n-1)/2 次；优化冒泡、直接插入最好 O(n)。希尔复杂度依赖增量序列。</li>
-<li>归并最坏 O(n log n)、辅助空间 O(n)；堆最坏 O(n log n)、空间 O(1)，自底向上建堆 O(n)。</li>
-<li>快排平均 O(n log n)、最坏 O(n²)，递归栈平均 O(log n)、最坏 O(n)。比较排序最坏下界 Ω(n log n) 不约束计数等非比较排序。</li>
+<li>选择始终比较 n(n-1)/2 次；优化冒泡、直接插入最好 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。希尔复杂度依赖增量序列。</li>
+<li>归并最坏 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、辅助空间 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；堆最坏 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、空间 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>，自底向上建堆 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li>快排平均 <span class="math-inline" data-tex="O(n \log n)" aria-label="O(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、最坏 <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>，递归栈平均 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>、最坏 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。比较排序最坏下界 <span class="math-inline" data-tex="\Omega(n \log n)" aria-label="Ω(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x003A9;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 不约束计数等非比较排序。</li>
 <li>LSD 基数按个位到高位，每轮必须稳定；计数适合值域小，稳定实现输出数组也占空间。</li>
 </ul>
 <h4>伪代码 / 操作步骤</h4>
@@ -598,8 +598,8 @@ for i=1..n-1:
 <p>要数输入变大时重复了多少工作。能否拆成独立小问题，复用重复结果，或有把握地排除候选，决定使用哪种策略。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>顺序执行取主导项；嵌套循环先看依赖关系。Σ(i=1..n)i=n(n+1)/2，为 Θ(n²)。每次翻倍为 Θ(log n)。</li>
-<li>T(n)=2T(n/2)+Θ(n) 为 Θ(n log n)；T(n)=T(n/2)+Θ(1) 为 Θ(log n)；T(n)=T(n-1)+Θ(n) 为 Θ(n²)。</li>
+<li>顺序执行取主导项；嵌套循环先看依赖关系。<span class="math-inline" data-tex="\sum_{i=1}^n i=\frac{n(n+1)}{2}" aria-label="Σ(i=1..n)i=n(n+1)/2"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msubsup><mo>&#x02211;</mo><mrow><mi>i</mi><mo>&#x0003D;</mo><mn>1</mn></mrow><mi>n</mi></msubsup><mi>i</mi><mo>&#x0003D;</mo><mfrac><mrow><mi>n</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow><mrow><mn>2</mn></mrow></mfrac></mrow></math></span>，为 <span class="math-inline" data-tex="\Theta(n^{2})" aria-label="Θ(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>。每次翻倍为 <span class="math-inline" data-tex="\Theta(\log n)" aria-label="Θ(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
+<li><span class="math-inline" data-tex="T(n)=2T\left(\frac{n}{2}\right)+\Theta(n)" aria-label="T(n)=2T(n/2)+Θ(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mn>2</mn><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 为 <span class="math-inline" data-tex="\Theta(n \log n)" aria-label="Θ(n log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；<span class="math-inline" data-tex="T(n)=T\left(\frac{n}{2}\right)+\Theta(1)" aria-label="T(n)=T(n/2)+Θ(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>T</mi><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mi>n</mi></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0002B;</mo><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 为 <span class="math-inline" data-tex="\Theta(\log n)" aria-label="Θ(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>；<span class="math-inline" data-tex="T(n)=T(n-1)+\Theta(n)" aria-label="T(n)=T(n-1)+Θ(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>T</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo>&#x02212;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 为 <span class="math-inline" data-tex="\Theta(n^{2})" aria-label="Θ(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</li>
 <li>分治拆独立子问题；DP 利用重叠子问题和合适的最优子结构；贪心必须证明局部选择安全；回溯试选、递归、撤销。</li>
 <li>辅助空间包含递归栈；输入存储是否计入总空间需按题意。0/1 背包一维容量倒序，完全背包通常正序。</li>
 </ul>
@@ -613,7 +613,7 @@ for 每件物品(weight,value):
 </pre>
 <div class="exam-example">
 <strong>手算例子：</strong>
-<p>i=1;i&lt;n;i*=2 在 n&gt;1 时循环 ceil(log2 n) 次。递归阶乘只有 n 层调用，但辅助栈空间仍 Θ(n)。</p>
+<p>i=1;i&lt;n;i*=2 在 n&gt;1 时循环 <span class="math-inline" data-tex="\lceil\log_2 n\rceil" aria-label="ceil(log2 n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x02308;</mi><msub><mi>log</mi><mn>2</mn></msub><mi>n</mi><mi>&#x02309;</mi></mrow></math></span> 次。递归阶乘只有 n 层调用，但辅助栈空间仍 <span class="math-inline" data-tex="\Theta(n)" aria-label="Θ(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x00398;</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</p>
 </div>
 <div class="exam-trap">
 <strong>易错点：</strong>写了 dp 数组不保证正确，状态、转移、初值、遍历顺序都必须成立。</div>
@@ -964,7 +964,7 @@ for 每件物品(weight,value):
 </label>
 <label class="exam-option">
 <input type="radio" name="q7" value="2">
-<span>C. (rear+1)%m==front</span>
+<span>C. <span class="math-inline" data-tex="(\mathrm{rear}+1)\bmod m=\mathrm{front}" aria-label="(rear+1)%m==front"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo stretchy="false">&#x00028;</mo><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">r</mi></mrow><mo>&#x0002B;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo><mo>mod</mo><mi>m</mi><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">f</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi></mrow></mrow></math></span></span>
 </label>
 <label class="exam-option">
 <input type="radio" name="q7" value="3">
@@ -1103,7 +1103,7 @@ for 每件物品(weight,value):
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：C</strong>。n0=n2+1=10，与度为 1 的节点数无关。</p>
+<strong>答案：C</strong>。<span class="math-inline" data-tex="n_0=n_2+1" aria-label="n0=n2+1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>n</mi><mn>0</mn></msub><mo>&#x0003D;</mo><msub><mi>n</mi><mn>2</mn></msub><mo>&#x0002B;</mo><mn>1</mn></mrow></math></span>=10，与度为 1 的节点数无关。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="1">
@@ -1134,7 +1134,7 @@ for 每件物品(weight,value):
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。floor(log2 10)+1=4，前三层最多 7 项。</p>
+<strong>答案：B</strong>。<span class="math-inline" data-tex="\lfloor\log_2 10\rfloor+1=4" aria-label="floor(log2 10)+1=4"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>&#x0230A;</mi><msub><mi>log</mi><mn>2</mn></msub><mn>10</mn><mi>&#x0230B;</mi><mo>&#x0002B;</mo><mn>1</mn><mo>&#x0003D;</mo><mn>4</mn></mrow></math></span>，前三层最多 7 项。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="2">
@@ -1421,19 +1421,19 @@ for 每件物品(weight,value):
 <legend>22. i=1; i&lt;n; i*=2 的数量级？</legend>
 <label class="exam-option">
 <input type="radio" name="q22" value="0">
-<span>A. O(1)</span>
+<span>A. <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span>
 </label>
 <label class="exam-option">
 <input type="radio" name="q22" value="1">
-<span>B. O(log n)</span>
+<span>B. <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span>
 </label>
 <label class="exam-option">
 <input type="radio" name="q22" value="2">
-<span>C. O(n)</span>
+<span>C. <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span>
 </label>
 <label class="exam-option">
 <input type="radio" name="q22" value="3">
-<span>D. O(n²)</span>
+<span>D. <span class="math-inline" data-tex="O(n^{2})" aria-label="O(n²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>n</mi><mrow><mn>2</mn></mrow></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></span>
 </label>
 </fieldset>
 <div class="exam-controls">
@@ -1444,7 +1444,7 @@ for 每件物品(weight,value):
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。每次翻倍，大约 log2 n 次。</p>
+<strong>答案：B</strong>。每次翻倍，大约 <span class="math-inline" data-tex="\log_2 n" aria-label="log2 n"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>log</mi><mn>2</mn></msub><mi>n</mi></mrow></math></span> 次。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="1">

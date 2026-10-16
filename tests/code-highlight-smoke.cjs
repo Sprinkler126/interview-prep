@@ -15,7 +15,11 @@ async function main() {
     for(const file of files) {
       await page.goto(pathToFileURL(path.join(root,file)).href);
       const before=await page.locator('pre,div.code').allTextContents();
-      await page.addScriptTag({path:path.join(root,'js/code-highlight.js')});
+      if(await page.evaluate(()=>typeof window.hljs!=='undefined')) {
+        await page.addScriptTag({path:path.join(root,'js/code-highlight.js')});
+      } else {
+        assert.equal(before.length,0,`${file}: code blocks require the local highlighter`);
+      }
       const after=await page.locator('pre,div.code').allTextContents();
       assert.deepEqual(after,before,`${file}: displayed text changed`);
       const blocks=page.locator('pre,div.code');

@@ -82,13 +82,13 @@
 <h4>要掌握的规则</h4>
 <ul>
 <li>经典五部件：运算器、控制器、存储器、输入、输出；CPU 主要含运算器与控制器。</li>
-<li>CPU 时间=指令数 IC×平均 CPI/时钟频率 f；平均 CPI 由各类指令比例加权。</li>
+<li><span class="math-inline" data-tex="T_{\mathrm{CPU}}=\frac{\mathrm{IC}\times\mathrm{CPI}}{f}" aria-label="CPU 时间=指令数 IC×平均 CPI/时钟频率 f"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>T</mi><mrow><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">U</mi></mrow></mrow></msub><mo>&#x0003D;</mo><mfrac><mrow><mrow><mi mathvariant="normal">I</mi><mi mathvariant="normal">C</mi></mrow><mi>&#x000D7;</mi><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">I</mi></mrow></mrow><mrow><mi>f</mi></mrow></mfrac></mrow></math></span>；平均 CPI 由各类指令比例加权。</li>
 <li>主频不是单独充分的性能指标，指令数、CPI、存储与 I/O 都可能影响任务时间。</li>
 <li>吞吐率是单位时间完成任务量，响应时间是某任务开始到结束，两个指标可能有不同优化方向。</li>
 </ul>
 <div class="exam-example">
 <strong>手算例子：</strong>
-<p>IC=10^8，CPI=2，f=2 GHz：CPU时间=10^8×2/(2×10^9)=0.1 s。</p>
+<p>IC=<span class="math-inline" data-tex="10^8" aria-label="10^8"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mn>8</mn></msup></mrow></math></span>，CPI=2，f=2 GHz：<span class="math-inline" data-tex="T_{\mathrm{CPU}}=\frac{10^8\times2}{2\times10^9}=0.1\,\mathrm{s}" aria-label="CPU时间=10^8×2/(2×10^9)=0.1 s"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>T</mi><mrow><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">U</mi></mrow></mrow></msub><mo>&#x0003D;</mo><mfrac><mrow><msup><mn>10</mn><mn>8</mn></msup><mi>&#x000D7;</mi><mn>2</mn></mrow><mrow><mn>2</mn><mi>&#x000D7;</mi><msup><mn>10</mn><mn>9</mn></msup></mrow></mfrac><mo>&#x0003D;</mo><mn>0.1</mn><mspace width="0.167em" /><mi>&#x00073;</mi></mrow></math></span>。</p>
 </div>
 <div class="exam-trap">
 <strong>易错点：</strong>比较不同 ISA 机器时，MIPS 数字不能直接代替执行同一程序的时间。</div>
@@ -100,7 +100,7 @@
 <p>机器用固定格数存数，超出边界不会自动多长一格。补码把加减统一到同一个加法器；浮点数像科学计数法。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>n 位无符号范围 0..2^n-1；n 位补码范围 -2^(n-1)..2^(n-1)-1；补码零唯一。</li>
+<li>n 位无符号范围 <span class="math-inline" data-tex="0\sim2^n-1" aria-label="0..2^n-1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mn>0</mn><mi>&#x0007E;</mi><msup><mn>2</mn><mi>n</mi></msup><mo>&#x02212;</mo><mn>1</mn></mrow></math></span>；n 位补码范围 <span class="math-inline" data-tex="-2^{n-1}\sim2^{n-1}-1" aria-label="-2^(n-1)..2^(n-1)-1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mo>&#x02212;</mo><msup><mn>2</mn><mrow><mi>n</mi><mo>&#x02212;</mo><mn>1</mn></mrow></msup><mi>&#x0007E;</mi><msup><mn>2</mn><mrow><mi>n</mi><mo>&#x02212;</mo><mn>1</mn></mrow></msup><mo>&#x02212;</mo><mn>1</mn></mrow></math></span>；补码零唯一。</li>
 <li>负整数补码可由对应正数逐位取反再加1；符号扩展复制最高位，不能给负数一律补零。</li>
 <li>同号相加得到异号结果表示有符号溢出；最高位进位不等于有符号溢出。</li>
 <li>IEEE 754 binary32 为符号1、指数8、尾数23位；正规数指数偏置127，隐含前导1；特殊指数编码表示零、非正规、无穷或NaN等。</li>
@@ -123,7 +123,7 @@
 <li>时间局部性是最近用过容易再用，空间局部性是相邻地址容易接着用。</li>
 <li>直接映射：主存块号 mod Cache行数；组相联则 mod组数；全相联可放任意行。</li>
 <li>地址划分为标记、组/行索引、块内偏移，位数由地址空间、组数、块字节数决定。</li>
-<li>AMAT=命中时间+失效率×失效额外代价；若题中给“失效总访问时间”，不能再重复叠加命中时间。</li>
+<li><span class="math-inline" data-tex="\mathrm{AMAT}=\text{命中时间}+\text{失效率}\times\text{失效额外代价}" aria-label="AMAT=命中时间+失效率×失效额外代价"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi mathvariant="normal">A</mi><mi mathvariant="normal">M</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">T</mi></mrow><mo>&#x0003D;</mo><mtext>命中时间</mtext><mo>&#x0002B;</mo><mtext>失效率</mtext><mi>&#x000D7;</mi><mtext>失效额外代价</mtext></mrow></math></span>；若题中给“失效总访问时间”，不能再重复叠加命中时间。</li>
 <li>写直达同时更新下层，写回在脏块换出时更新；写分配是写失效时是否调入，两者不同维度。</li>
 </ul>
 <div class="exam-example">
@@ -142,7 +142,7 @@
 <ul>
 <li>操作码表示操作，地址码表示操作数或其定位方式；零/一/二/三地址形式影响显式操作数数量。</li>
 <li>立即寻址操作数就在指令中；直接寻址 EA=A；间接寻址 EA=M[A]；寄存器间接 EA=R；基址/变址为寄存器值加位移。</li>
-<li>相对寻址 EA=PC+有符号位移，PC 取值按题目约定，常是下一条指令地址。</li>
+<li>相对寻址 <span class="math-inline" data-tex="\mathrm{EA}=\mathrm{PC}+\text{有符号位移}" aria-label="EA=PC+有符号位移"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi mathvariant="normal">E</mi><mi mathvariant="normal">A</mi></mrow><mo>&#x0003D;</mo><mrow><mi mathvariant="normal">P</mi><mi mathvariant="normal">C</mi></mrow><mo>&#x0002B;</mo><mtext>有符号位移</mtext></mrow></math></span>，PC 取值按题目约定，常是下一条指令地址。</li>
 <li>RISC 常见 load/store、规则编码和较多寄存器；CISC 常见更丰富复杂指令。不是 RISC 的每条指令永远一周期。</li>
 </ul>
 <div class="exam-example">
@@ -181,7 +181,7 @@
 <ul>
 <li>地址线宽度决定寻址单位数量，数据线宽度影响一次传输宽度；按字节还是按字编址必须明确。</li>
 <li>同步总线统一时钟，异步总线用握手协调；突发传输减少重复控制开销。</li>
-<li>总线带宽=每次数据位宽×每秒有效传输次数，若每时钟多次传输需计入。</li>
+<li><span class="math-inline" data-tex="\text{总线带宽}=\text{每次数据位宽}\times\text{每秒有效传输次数}" aria-label="总线带宽=每次数据位宽×每秒有效传输次数"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mtext>总线带宽</mtext><mo>&#x0003D;</mo><mtext>每次数据位宽</mtext><mi>&#x000D7;</mi><mtext>每秒有效传输次数</mtext></mrow></math></span>，若每时钟多次传输需计入。</li>
 <li>中断响应顺序和中断处理嵌套优先级可能由不同机制决定；屏蔽位控制是否响应对应中断。</li>
 <li>DMA申请总线与CPU协调搬块，完成后仍可能中断通知；不代表CPU永远不参与。</li>
 </ul>
@@ -200,13 +200,13 @@
 <h4>要掌握的规则</h4>
 <ul>
 <li>Flynn 分类看指令流与数据流：SISD、SIMD、MISD、MIMD；多核多任务常归 MIMD，向量化体现 SIMD 思路。</li>
-<li>并行比例 p、并行部分加速 s，总加速 S=1/((1-p)+p/s)，假设额外开销忽略。</li>
+<li>并行比例 p、并行部分加速 s，总加速 <span class="math-inline" data-tex="S=\frac{1}{(1-p)+p/s}" aria-label="S=1/((1-p)+p/s)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>S</mi><mo>&#x0003D;</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo>&#x02212;</mo><mi>p</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0002B;</mo><mi>p</mi><mo>&#x0002F;</mo><mi>s</mi></mrow></mfrac></mrow></math></span>，假设额外开销忽略。</li>
 <li>s趋无穷时上限 1/(1-p)；有通信、同步开销时实际通常更低。</li>
 <li>共享内存与分布式内存的数据访问、通信方式不同；并行度不自动消除数据依赖和竞争。</li>
 </ul>
 <div class="exam-example">
 <strong>手算例子：</strong>
-<p>80%工作可加速，使用4倍并行：S=1/(0.2+0.8/4)=2.5；无限并行上限5。</p>
+<p>80%工作可加速，使用4倍并行：<span class="math-inline" data-tex="S=\frac{1}{0.2+0.8/4}=2.5" aria-label="S=1/(0.2+0.8/4)=2.5"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>S</mi><mo>&#x0003D;</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>0.2</mn><mo>&#x0002B;</mo><mn>0.8</mn><mo>&#x0002F;</mo><mn>4</mn></mrow></mfrac><mo>&#x0003D;</mo><mn>2.5</mn></mrow></math></span>；无限并行上限5。</p>
 </div>
 <div class="exam-trap">
 <strong>易错点：</strong>只看80%部分快4倍，不能把整个程序也说成快4倍。</div>
@@ -288,7 +288,7 @@
 <h3>性能与并行比例</h3>
 <p class="exam-meta">固定例子回放：前进、回退、重置；观察状态与每一步原因。</p>
 <ol>
-<li>先算串行时间：IC=10^8,CPI=2,f=2GHz，时间0.1秒。</li>
+<li>先算串行时间：IC=<span class="math-inline" data-tex="10^8" aria-label="10^8"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mn>8</mn></msup></mrow></math></span>,CPI=2,f=2GHz，时间0.1秒。</li>
 <li>若80%时间能在4个执行单元上理想分担，串行部分仍0.02秒。</li>
 <li>并行部分0.08/4=0.02秒，总0.04秒。</li>
 <li>加速0.1/0.04=2.5，不是4；无限加速也受0.02秒串行部分限制，上限5。</li>
@@ -304,7 +304,7 @@
 </div>
 <article class="card" data-question data-answer="1">
 <fieldset class="exam-question">
-<legend>1. 10^8条指令，CPI=2，2GHz，CPU时间？</legend>
+<legend>1. <span class="math-inline" data-tex="10^8" aria-label="10^8"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mn>8</mn></msup></mrow></math></span>条指令，CPI=2，2GHz，CPU时间？</legend>
 <label class="exam-option">
 <input type="radio" name="q1" value="0">
 <span>A. 0.01s</span>
@@ -330,7 +330,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。IC×CPI/f=10^8×2/(2×10^9)=0.1秒。</p>
+<strong>答案：B</strong>。<span class="math-inline" data-tex="\frac{\mathrm{IC}\times\mathrm{CPI}}{f}=\frac{10^8\times2}{2\times10^9}=0.1\,\mathrm{s}" aria-label="IC×CPI/f=10^8×2/(2×10^9)=0.1秒"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mrow><mi mathvariant="normal">I</mi><mi mathvariant="normal">C</mi></mrow><mi>&#x000D7;</mi><mrow><mi mathvariant="normal">C</mi><mi mathvariant="normal">P</mi><mi mathvariant="normal">I</mi></mrow></mrow><mrow><mi>f</mi></mrow></mfrac><mo>&#x0003D;</mo><mfrac><mrow><msup><mn>10</mn><mn>8</mn></msup><mi>&#x000D7;</mi><mn>2</mn></mrow><mrow><mn>2</mn><mi>&#x000D7;</mi><msup><mn>10</mn><mn>9</mn></msup></mrow></mfrac><mo>&#x0003D;</mo><mn>0.1</mn><mspace width="0.167em" /><mi>&#x00073;</mi></mrow></math></span>。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="2">
@@ -423,7 +423,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：C</strong>。偏移6，行索引log2(16384/64)=8，标记32-6-8=18。</p>
+<strong>答案：C</strong>。偏移6，行索引<span class="math-inline" data-tex="\log_2\left(\frac{16384}{64}\right)=8" aria-label="log2(16384/64)=8"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>log</mi><mn>2</mn></msub><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><mn>16384</mn></mrow><mrow><mn>64</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mo>&#x0003D;</mo><mn>8</mn></mrow></math></span>，标记32-6-8=18。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="2">
@@ -516,7 +516,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：C</strong>。64/8×100×10^6=800×10^6 B/s。</p>
+<strong>答案：C</strong>。<span class="math-inline" data-tex="\frac{64}{8}\times100\times10^6=800\times10^6\,\mathrm{B/s}" aria-label="64/8×100×10^6=800×10^6 B/s"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mn>64</mn></mrow><mrow><mn>8</mn></mrow></mfrac><mi>&#x000D7;</mi><mn>100</mn><mi>&#x000D7;</mi><msup><mn>10</mn><mn>6</mn></msup><mo>&#x0003D;</mo><mn>800</mn><mi>&#x000D7;</mi><msup><mn>10</mn><mn>6</mn></msup><mspace width="0.167em" /><mrow><mi mathvariant="normal">B</mi><mo>&#x0002F;</mo><mi mathvariant="normal">s</mi></mrow></mrow></math></span>。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="1">
@@ -547,7 +547,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。1/(0.2+0.8/4)=2.5。</p>
+<strong>答案：B</strong>。<span class="math-inline" data-tex="\frac{1}{0.2+0.8/4}=2.5" aria-label="1/(0.2+0.8/4)=2.5"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mn>1</mn></mrow><mrow><mn>0.2</mn><mo>&#x0002B;</mo><mn>0.8</mn><mo>&#x0002F;</mo><mn>4</mn></mrow></mfrac><mo>&#x0003D;</mo><mn>2.5</mn></mrow></math></span>。</p>
 </details>
 </article>
 </div>

@@ -440,7 +440,7 @@ PUT /v1/connect/intentions
         <div class="qa">
           <div class="q">Consul 的 KV 存储可以用来做什么？CAS 操作是什么？</div>
           <div class="a">
-            <strong>参考：</strong>Consul 的 KV 存储是内置的分布式 KV 数据库，用途：1）配置管理 — 存储应用配置，通过阻塞查询（Long Polling）实现配置变更通知；2）分布式锁 — 结合 Session 实现（acquire/release）；3）Leader 选举 — 利用 CAS + Session；4）服务标记 — 存储服务的动态标记信息。CAS（Check-And-Set）是乐观锁操作：PUT 时指定 ModifyIndex，只有当前 ModifyIndex 匹配时才更新。阻塞查询（?index=N&wait=30s）在数据变更时立即返回，是实现配置实时推送的基础。
+            <strong>参考：</strong>Consul 的 KV 存储是内置的分布式 KV 数据库，用途：1）配置管理 — 存储应用配置，通过阻塞查询（Long Polling）实现配置变更通知；2）分布式锁 — 结合 Session 实现（acquire/release）；3）Leader 选举 — 利用 CAS + Session；4）服务标记 — 存储服务的动态标记信息。CAS（Check-And-Set）是乐观锁操作：PUT 时指定 ModifyIndex，只有当前 ModifyIndex 匹配时才更新。阻塞查询（?index=N&wait;=30s）在数据变更时立即返回，是实现配置实时推送的基础。
           </div>
         </div>
 
@@ -483,7 +483,7 @@ PUT /v1/connect/intentions
               <li>3</li>
               <li>5</li>
             </ol>
-            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>多数派为 floor(5/2)+1=3；并非所有节点都确认才能提交，也不是任意一台存活即可。</p></details>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>多数派为 <span class="math-inline" data-tex="\left\lfloor\frac{5}{2}\right\rfloor+1=3" aria-label="floor(5/2)+1=3"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mo stretchy="true" fence="true" form="prefix">&#x0230A;</mo><mfrac><mrow><mn>5</mn></mrow><mrow><mn>2</mn></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x0230B;</mo></mrow><mo>&#x0002B;</mo><mn>1</mn><mo>&#x0003D;</mo><mn>3</mn></mrow></math></span>；并非所有节点都确认才能提交，也不是任意一台存活即可。</p></details>
           </article>
           <article class="lab-quiz study-question" data-answer="1">
             <h4>2. 下列哪一项主要负责 Consul Server 间目录写入的一致性？</h4>

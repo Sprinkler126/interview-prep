@@ -15,8 +15,11 @@
     const options=el('fieldset','study-options'),legend=el('legend','','请选择一个选项');options.append(legend);
     [...list.children].forEach((item,i)=> {
       const label=el('label','study-option'),input=el('input');input.type='radio';input.name=`study-question-${index}`;input.value=String(i);
-      const text=item.textContent.trim();
-      label.append(input,el('span','',/^[A-D][.、．：:]/.test(text)?text:`${String.fromCharCode(65+i)}. ${text}`));options.append(label);
+      const content=el('span');
+      if(!/^[A-D][.、．：:]/.test(item.textContent.trim()))content.append(`${String.fromCharCode(65+i)}. `);
+      // Keep authored formulas and emphasis when presenting the same option.
+      content.append(...[...item.childNodes].map(node=>node.cloneNode(true)));
+      label.append(input,content);options.append(label);
     });
     const controls=el('div','study-controls'),check=el('button','','检查答案'),reset=el('button','','重做本题'),feedback=el('p','study-feedback');
     feedback.setAttribute('role','status');check.type=reset.type='button';controls.append(check,reset);

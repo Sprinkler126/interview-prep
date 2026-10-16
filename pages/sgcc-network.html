@@ -86,12 +86,12 @@
 <ul>
 <li>OSI 七层：物理、链路、网络、传输、会话、表示、应用；TCP/IP 常用四层模型，教材也常按五层讲解。</li>
 <li>交换机主要看链路地址，路由器按 IP 转发；端口区分主机上的应用进程。</li>
-<li>发送时延 L/R，传播时延 d/v；带宽影响发送时延，不直接改变介质传播速度。</li>
-<li>存储转发路径若各链路速率相同，一个完整分组跨 k 条链路的发送时延共 kL/R，再加传播、处理、排队；多分组还可流水。</li>
+<li>发送时延 <span class="math-inline" data-tex="\frac{L}{R}" aria-label="L/R"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>L</mi></mrow><mrow><mi>R</mi></mrow></mfrac></mrow></math></span>，传播时延 <span class="math-inline" data-tex="\frac{d}{v}" aria-label="d/v"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>d</mi></mrow><mrow><mi>v</mi></mrow></mfrac></mrow></math></span>；带宽影响发送时延，不直接改变介质传播速度。</li>
+<li>存储转发路径若各链路速率相同，一个完整分组跨 k 条链路的发送时延共 k<span class="math-inline" data-tex="\frac{L}{R}" aria-label="L/R"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>L</mi></mrow><mrow><mi>R</mi></mrow></mfrac></mrow></math></span>，再加传播、处理、排队；多分组还可流水。</li>
 </ul>
 <div class="exam-example">
 <strong>手算例子：</strong>
-<p>1500 B 分组在 100 Mb/s 链路发送需 1500×8/10^8=120 μs。1000 km 介质传播速度 2×10^8 m/s，传播需 5 ms。</p>
+<p>1500 B 分组在 100 Mb/s 链路发送需 <span class="math-inline" data-tex="\frac{1500\times8}{10^8}=120\,\mathrm{\mu s}" aria-label="1500×8/10^8=120 μs"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mn>1500</mn><mi>&#x000D7;</mi><mn>8</mn></mrow><mrow><msup><mn>10</mn><mn>8</mn></msup></mrow></mfrac><mo>&#x0003D;</mo><mn>120</mn><mspace width="0.167em" /><mrow><mi mathvariant="normal">&#x003BC;</mi><mi mathvariant="normal">s</mi></mrow></mrow></math></span>。1000 km 介质传播速度 <span class="math-inline" data-tex="2\times10^8" aria-label="2×10^8"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mn>2</mn><mi>&#x000D7;</mi><msup><mn>10</mn><mn>8</mn></msup></mrow></math></span> m/s，传播需 5 ms。</p>
 </div>
 <div class="exam-trap">
 <strong>易错点：</strong>Mb/s 的 b 是位；MB 的 B 是字节；不能把发送与传播时延当成一个概念。</div>
@@ -103,9 +103,9 @@
 <p>道路每秒能变多少次信号、每次能表达多少信息，还受噪声限制。两种容量公式是在不同假设下给上限。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>码元速率单位 Baud，数据速率 bit/s；M 种码元理想携带 log2 M bit/码元。</li>
-<li>奈奎斯特无噪理想低通信道上限 C=2B log2 M；香农带限有噪信道 C=B log2(1+S/N)。</li>
-<li>S/N 为线性功率比；给 dB 时 S/N=10^(dB/10)。不能把 30 dB 直接当 30 代入。</li>
+<li>码元速率单位 Baud，数据速率 bit/s；M 种码元理想携带 <span class="math-inline" data-tex="\log_2 M" aria-label="log2 M"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msub><mi>log</mi><mn>2</mn></msub><mi>M</mi></mrow></math></span> bit/码元。</li>
+<li>奈奎斯特无噪理想低通信道上限 <span class="math-inline" data-tex="C=2B\log_2 M" aria-label="C=2B log2 M"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>C</mi><mo>&#x0003D;</mo><mn>2</mn><mi>B</mi><msub><mi>log</mi><mn>2</mn></msub><mi>M</mi></mrow></math></span>；香农带限有噪信道 <span class="math-inline" data-tex="C=B\log_2\left(1+\frac{S}{N}\right)" aria-label="C=B log2(1+S/N)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>C</mi><mo>&#x0003D;</mo><mi>B</mi><msub><mi>log</mi><mn>2</mn></msub><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mn>1</mn><mo>&#x0002B;</mo><mfrac><mrow><mi>S</mi></mrow><mrow><mi>N</mi></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow></mrow></math></span>。</li>
+<li>S/N 为线性功率比；给 dB 时 <span class="math-inline" data-tex="\frac{S}{N}=10^{\mathrm{dB}/10}" aria-label="S/N=10^(dB/10)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mi>S</mi></mrow><mrow><mi>N</mi></mrow></mfrac><mo>&#x0003D;</mo><msup><mn>10</mn><mrow><mrow><mi mathvariant="normal">d</mi><mi mathvariant="normal">B</mi></mrow><mo>&#x0002F;</mo><mn>10</mn></mrow></msup></mrow></math></span>。不能把 30 dB 直接当 30 代入。</li>
 <li>FDM 按频段、TDM 按时隙、WDM 按光波长、CDM 按码字共享资源。</li>
 </ul>
 <div class="exam-example">
@@ -124,12 +124,12 @@
 <ul>
 <li>CRC 把位串当 GF(2) 多项式，模 2 除法用异或；r 阶生成多项式附 r 位余数。CRC 本身是检测机制，不自动纠错。</li>
 <li>停等每次只发一帧，理想无差错忽略 ACK 发送时长时效率 Tframe/(Tframe+2Tprop)。</li>
-<li>GBN 用 k 位序号时发送窗≤2^k-1、接收窗为 1；SR 在相同发送接收窗大小时窗≤2^(k-1)。</li>
+<li>GBN 用 k 位序号时发送窗≤<span class="math-inline" data-tex="2^k-1" aria-label="2^k-1"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mi>k</mi></msup><mo>&#x02212;</mo><mn>1</mn></mrow></math></span>、接收窗为 1；SR 在相同发送接收窗大小时窗≤<span class="math-inline" data-tex="2^{k-1}" aria-label="2^(k-1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mrow><mi>k</mi><mo>&#x02212;</mo><mn>1</mn></mrow></msup></mrow></math></span>。</li>
 <li>共享半双工以太网使用 CSMA/CD；现代交换全双工以太网不靠碰撞检测争用链路；无线常用 CSMA/CA。</li>
 </ul>
 <div class="exam-example">
 <strong>手算例子：</strong>
-<p>3 位序号共 8 个号码，GBN 最大发送窗 7，SR 等大窗口上限 4。发帧 1 ms、单程传播 4 ms，停等效率 1/(1+8)=1/9。</p>
+<p>3 位序号共 8 个号码，GBN 最大发送窗 7，SR 等大窗口上限 4。发帧 1 ms、单程传播 4 ms，停等效率 <span class="math-inline" data-tex="\frac{1}{1+8}=\frac{1}{9}" aria-label="1/(1+8)=1/9"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mn>1</mn></mrow><mrow><mn>1</mn><mo>&#x0002B;</mo><mn>8</mn></mrow></mfrac><mo>&#x0003D;</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>9</mn></mrow></mfrac></mrow></math></span>。</p>
 </div>
 <div class="exam-trap">
 <strong>易错点：</strong>不能把 GBN 和 SR 窗口公式互换，也不能把 CA 说成“检测到碰撞后再发”。</div>
@@ -141,7 +141,7 @@
 <p>IP 地址像街区加门牌，掩码划出街区；路由表里有多条可用规则时，先选描述范围最具体的一条。</p>
 <h4>要掌握的规则</h4>
 <ul>
-<li>IPv4 共 32 位，/p 的主机位是 32-p；常规子网地址数 2^(32-p)，通常可用主机数减去网络和广播地址。/31 点到点、/32 主机路由另按用途。</li>
+<li>IPv4 共 32 位，/p 的主机位是 32-p；常规子网地址数 <span class="math-inline" data-tex="2^{32-p}" aria-label="2^(32-p)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mrow><mn>32</mn><mo>&#x02212;</mo><mi>p</mi></mrow></msup></mrow></math></span>，通常可用主机数减去网络和广播地址。/31 点到点、/32 主机路由另按用途。</li>
 <li>网络地址=IP 按位 AND 掩码；广播地址把主机位全置 1；跨子网通信交给网关，不能把网关当 DNS。</li>
 <li>路由转发采用最长前缀匹配；ARP 用于 IPv4 同链路 IP 到 MAC 解析，跨网段时解析的是下一跳。</li>
 <li>IPv6 地址 128 位，无广播，邻居发现使用 ICMPv6；NAT 地址转换与路由转发不是同一功能。</li>
@@ -352,7 +352,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。1500×8/100000000=0.00012 秒=120 μs。</p>
+<strong>答案：B</strong>。<span class="math-inline" data-tex="\frac{1500\times8}{100000000}=0.00012\,\mathrm{s}=120\,\mathrm{\mu s}" aria-label="1500×8/100000000=0.00012 秒=120 μs"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mfrac><mrow><mn>1500</mn><mi>&#x000D7;</mi><mn>8</mn></mrow><mrow><mn>100000000</mn></mrow></mfrac><mo>&#x0003D;</mo><mn>0.00012</mn><mspace width="0.167em" /><mi>&#x00073;</mi><mo>&#x0003D;</mo><mn>120</mn><mspace width="0.167em" /><mrow><mi mathvariant="normal">&#x003BC;</mi><mi mathvariant="normal">s</mi></mrow></mrow></math></span>。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="3">
@@ -383,7 +383,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：D</strong>。10^(30/10)=1000。</p>
+<strong>答案：D</strong>。<span class="math-inline" data-tex="10^{30/10}=1000" aria-label="10^(30/10)=1000"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>10</mn><mrow><mn>30</mn><mo>&#x0002F;</mo><mn>10</mn></mrow></msup><mo>&#x0003D;</mo><mn>1000</mn></mrow></math></span>。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="1">
@@ -414,7 +414,7 @@
 <details class="exam-answer">
 <summary>答案与推导</summary>
 <p>
-<strong>答案：B</strong>。2^(3-1)=4，防止新旧序号窗口混淆。</p>
+<strong>答案：B</strong>。<span class="math-inline" data-tex="2^{3-1}=4" aria-label="2^(3-1)=4"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mrow><mn>3</mn><mo>&#x02212;</mo><mn>1</mn></mrow></msup><mo>&#x0003D;</mo><mn>4</mn></mrow></math></span>，防止新旧序号窗口混淆。</p>
 </details>
 </article>
 <article class="card" data-question data-answer="2">

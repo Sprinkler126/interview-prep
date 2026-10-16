@@ -781,7 +781,7 @@ message UserResponse {
           <div class="q">Go 的 interface 底层是怎么实现的？类型断言的性能如何？</div>
           <div class="a">
             <strong>参考：</strong>Go 的 interface 底层有两种结构。空接口（interface{} / any）使用 eface 结构体（类型指针 + 数据指针）。非空接口使用 iface 结构体（itab + 数据指针），其中 itab 包含接口类型、动态类型和方法地址表。<br>
-            类型断言的性能：直接断言 <code>i.(T)</code> 会比较 eface 的 _type 或 iface 的 itab._type，O(1) 操作。类型 switch 底层也是类型比较。安全断言（comma-ok）比直接断言略慢（需要返回 ok 值），但避免了 panic 的开销。<br>
+            类型断言的性能：直接断言 <code>i.(T)</code> 会比较 eface 的 _type 或 iface 的 itab._type，<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 操作。类型 switch 底层也是类型比较。安全断言（comma-ok）比直接断言略慢（需要返回 ok 值），但避免了 panic 的开销。<br>
             <strong>追问：interface 的零值是什么？</strong> nil interface 的 _type 和 data 都为 nil。注意：将一个非 nil 的值赋给 interface 后，即使值本身为 nil，interface 也不等于 nil（因为 _type 不为 nil）。这是 Go 的常见坑。
           </div>
         </div>

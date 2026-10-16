@@ -34,7 +34,6 @@
 .bank-page .bank-nest { border:2px solid #8b78bf; padding:1rem; background:#26233c; border-radius:12px; margin:1rem 0; }
 .bank-page .bank-nest .bank-nest { border-color:#3e9d97; background:#153838; margin-bottom:0; }
 .bank-page .bank-nest .bank-nest .bank-nest { border-color:#d9b768; background:#3e3521; }
-.bank-page .formula { background:#102c3b; padding:.75rem 1rem; border-radius:8px; margin:.8rem 0; color:#bcf1ff; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .bank-page .table-wrap { overflow-x:auto; margin:1rem 0; }
 .bank-page table { display:table; width:100%; min-width:450px; margin:0; font-size:.92rem; }
 .bank-page th,.bank-page td { padding:.7rem; vertical-align:top; }

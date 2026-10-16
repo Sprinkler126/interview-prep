@@ -1,0 +1,21 @@
+/* Native MathML: formulas remain readable offline and with JavaScript disabled. */
+.math-inline, .math-block { color:inherit; font-variant-numeric:lining-nums tabular-nums; }
+.math-inline { display:inline-block; max-width:100%; vertical-align:middle; padding:.08em .12em; overflow-x:auto; overflow-y:hidden; }
+.math-inline math { font-size:1.05em; }
+.math-block { display:block; max-width:100%; min-width:0; overflow-x:auto; padding:1.1rem .9rem; margin:.85rem 0; background:rgba(56,189,248,.055); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px; }
+.math-block math { display:block; width:max-content; min-width:100%; margin:0; font-size:1.13em; }
+math { font-family:"Cambria Math","STIX Two Math","Latin Modern Math",math; text-indent:0; word-spacing:normal; letter-spacing:normal; overflow-wrap:normal; white-space:nowrap; }
+math mtext { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
+.math-inline:focus-visible,.math-block:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.formula-group { margin:1rem 0; }
+.formula-group .math-block { margin:.55rem 0; }
+.math-definitions { display:flex; flex-wrap:wrap; gap:.8rem 1.3rem; padding:1rem; border:1px solid var(--border); border-radius:8px; background:rgba(56,189,248,.055); }
+.formula-note { color:var(--text-dim); font-size:.9rem; margin:.4rem 0 .8rem; }
+td .math-inline, th .math-inline { max-width:min(100%,32rem); }
+td .math-block { min-width:12rem; }
+/* Prevent inline powers from changing prose line spacing. */
+sup,sub { font-size:.75em; line-height:0; position:relative; vertical-align:baseline; }
+sup { top:-.5em; }
+sub { bottom:-.2em; }
+@media(max-width:600px) { .math-block { padding:1rem .65rem; } .math-block math { font-size:1.05em; } .math-inline { padding:.06em .08em; } }
+@media print { .math-block,.math-inline { overflow:visible; } .math-block { break-inside:avoid; background:transparent; } }

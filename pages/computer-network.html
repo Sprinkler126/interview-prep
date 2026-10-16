@@ -485,7 +485,7 @@
           <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
           <article class="lab-concept"><h3>子网划分：先看掩码，再判断是否同一网络</h3>
             <p>大白话：IP 像门牌号，掩码规定前多少位是街道。主机把目的地址与掩码按位与；同网段通常直接 ARP 找对方，不同网段则找下一跳网关的 MAC。</p>
-            <p><strong>边界与易错：</strong>易错：跨路由转发时通常逐跳更换链路层地址；IP 目的地址并不会因此变成网关地址。传统 IPv4 普通子网可用主机数为 2^h−2，/31 点对点等情况另有规则。</p>
+            <p><strong>边界与易错：</strong>易错：跨路由转发时通常逐跳更换链路层地址；IP 目的地址并不会因此变成网关地址。传统 IPv4 普通子网可用主机数为 <span class="math-inline" data-tex="2^h-2" aria-label="2^h−2"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><msup><mn>2</mn><mi>h</mi></msup><mo>&#x02212;</mo><mn>2</mn></mrow></math></span>，/31 点对点等情况另有规则。</p>
           </article>
           <article class="lab-concept"><h3>TCP 序号：确认的是字节，不是第几个包</h3>
             <p>大白话：收件人说“下次从第1005个字节给我”，意思是1005之前的连续字节已收到。发送方按序号识别丢失和重复，不需要假定一次 write 对应一次 read。</p>

@@ -152,7 +152,7 @@
               </div>
               <div class="arch-box" style="border-color:var(--accent4);background:rgba(251,146,60,0.06);">
                 <strong>Adaptive Hash</strong>
-                <div class="arch-label">自动将热点页构建<br>为哈希索引 O(1)</div>
+                <div class="arch-label">自动将热点页构建<br>为哈希索引 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></div>
               </div>
             </div>
             <div class="arch-connector">⬇️ 脏页刷盘 / 刷日志</div>
@@ -417,7 +417,7 @@ WHERE a=1 AND c=3       -- ⚠️ 只用 a</code></pre>
             <thead><tr><th>数据结构</th><th>每个节点存储</th><th>树高(千万级)</th><th>范围查询</th><th>磁盘友好度</th></tr></thead>
             <tbody>
               <tr><td><span class="badge badge-red">红黑树</span></td><td>1 个 key + 2 指针</td><td>约 23 层</td><td>❌ 需中序遍历回溯</td><td>❌ 二叉，每层只存 1 个 key，树太高</td></tr>
-              <tr><td><span class="badge badge-orange">Hash</span></td><td>哈希桶</td><td>O(1) 一次</td><td>❌ 不支持范围/排序</td><td>⚠️ 仅等值查询，无法 ORDER BY</td></tr>
+              <tr><td><span class="badge badge-orange">Hash</span></td><td>哈希桶</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 一次</td><td>❌ 不支持范围/排序</td><td>⚠️ 仅等值查询，无法 ORDER BY</td></tr>
               <tr><td><span class="badge badge-blue">B 树</span></td><td>key + data + 指针</td><td>约 4 层</td><td>⚠️ 中序遍历，跨节点回溯</td><td>⚠️ 节点存数据→扇出低→树偏高</td></tr>
               <tr><td><span class="badge badge-green">B+ 树</span></td><td>非叶子只存 key+指针</td><td>约 3 层</td><td>✅ 叶子双向链表顺序扫</td><td>✅ 扇出极高，树矮，IO 少</td></tr>
             </tbody>
@@ -447,7 +447,7 @@ WHERE a=1 AND c=3       -- ⚠️ 只用 a</code></pre>
 ↑ 叶子链表 → 范围扫描一气呵成</pre>
             </div>
           </div>
-          <div class="warn"><strong>面试追问</strong>：为什么 InnoDB 选 B+ 树而 Memory 引擎选 Hash？Memory 是内存引擎无磁盘 IO，Hash 的 O(1) 等值查询优势放大；而 InnoDB 面向磁盘，B+ 树的"低树高 + 范围查询 + 顺序 IO"才是关键。</div>
+          <div class="warn"><strong>面试追问</strong>：为什么 InnoDB 选 B+ 树而 Memory 引擎选 Hash？Memory 是内存引擎无磁盘 IO，Hash 的 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 等值查询优势放大；而 InnoDB 面向磁盘，B+ 树的"低树高 + 范围查询 + 顺序 IO"才是关键。</div>
         </div>
 
         <div class="card">
@@ -954,7 +954,7 @@ min_examined_row_limit = 100              # 扫描超过 100 行才记录</code>
           <div class="q">MySQL 的索引为什么使用 B+ 树而不是 B 树、红黑树或 Hash？</div>
           <div class="a">
             <strong>参考</strong>：① B+ 树叶子节点用链表连接，支持高效范围查询，B 树不支持；② B+ 树非叶子节点不存数据，扇出更高，树更矮，IO 次数更少；③ 红黑树是二叉树，数据量大时树过高导致大量 IO；④ Hash 索引不支持范围查询和排序，且存在哈希冲突。
-            <br><strong>追问：Hash 索引在什么场景下有用？</strong>InnoDB 的自适应哈希索引（AHI）自动对热点等值查询建立 Hash 索引，O(1) 查找。Memory 引擎也支持显式 Hash 索引，适合纯等值查询场景。
+            <br><strong>追问：Hash 索引在什么场景下有用？</strong>InnoDB 的自适应哈希索引（AHI）自动对热点等值查询建立 Hash 索引，<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找。Memory 引擎也支持显式 Hash 索引，适合纯等值查询场景。
           </div>
         </div>
 

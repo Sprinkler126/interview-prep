@@ -213,7 +213,7 @@
         <div class="card">
           <h4>5.0 版本：任意时间延迟</h4>
           <p>RocketMQ 5.0 引入<strong>任意时间延迟</strong>，支持秒级精度的任意延迟时间。使用 <code>message.setDeliveryTimestamp(timestamp)</code> 设置投递时间戳。底层基于时间轮（TimingWheel）实现，精度更高、资源消耗更少。</p>
-          <p class="tip">时间轮算法是延迟消息的核心数据结构。相比优先级队列，时间轮在大量延迟任务场景下插入和删除都是 O(1)。</p>
+          <p class="tip">时间轮算法是延迟消息的核心数据结构。相比优先级队列，时间轮在大量延迟任务场景下插入和删除都是 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</p>
         </div>
 
         <h3 id="p1-5">5. 事务消息</h3>

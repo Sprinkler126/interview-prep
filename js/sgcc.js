@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   document.querySelectorAll('[data-trace]').forEach(host => {
-    const steps=[...host.querySelectorAll('li')].map(li=>li.textContent.trim());
+    const steps=[...host.querySelectorAll('li')];
     if(!steps.length)return;
     const controls=document.createElement('div');controls.className='exam-controls';
     const view=document.createElement('div');view.className='trace-view';view.setAttribute('aria-live','polite');view.setAttribute('aria-atomic','true');
@@ -11,7 +11,7 @@
     const next=button('下一步 →',()=>{position++;render();});
     button('重置',()=>{position=0;render();});controls.append(counter);
     host.querySelector('ol').hidden=true;host.append(controls,view);
-    function render() {prev.disabled=position===0;next.disabled=position===steps.length-1;counter.textContent=`步骤 ${position+1} / ${steps.length}`;view.textContent=steps[position];}
+    function render() {prev.disabled=position===0;next.disabled=position===steps.length-1;counter.textContent=`步骤 ${position+1} / ${steps.length}`;view.replaceChildren(...[...steps[position].childNodes].map(node=>node.cloneNode(true)));}
     render();
   });
   const quiz=document.querySelector('[data-quiz]');

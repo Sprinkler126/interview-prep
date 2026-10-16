@@ -189,10 +189,10 @@
           <table>
             <thead><tr><th>类型</th><th>路由规则</th><th>匹配算法</th><th>典型场景</th></tr></thead>
             <tbody>
-              <tr><td><span class="badge badge-blue">Direct</span></td><td>精确匹配 routing key</td><td>O(1) 哈希查找</td><td>点对点、任务分发</td></tr>
-              <tr><td><span class="badge badge-green">Fanout</span></td><td>广播到所有绑定队列（忽略 routing key）</td><td>O(n) 遍历绑定列表</td><td>广播通知、日志分发</td></tr>
-              <tr><td><span class="badge badge-orange">Topic</span></td><td>通配符匹配：<code>*</code> 匹配一个词，<code>#</code> 匹配零或多个词</td><td>O(n) 逐个模式匹配</td><td>按规则订阅、分类路由</td></tr>
-              <tr><td><span class="badge badge-purple">Headers</span></td><td>根据消息 header 属性匹配（x-match=all/any）</td><td>O(n) 遍历 header</td><td>复杂属性匹配（少用）</td></tr>
+              <tr><td><span class="badge badge-blue">Direct</span></td><td>精确匹配 routing key</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 哈希查找</td><td>点对点、任务分发</td></tr>
+              <tr><td><span class="badge badge-green">Fanout</span></td><td>广播到所有绑定队列（忽略 routing key）</td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 遍历绑定列表</td><td>广播通知、日志分发</td></tr>
+              <tr><td><span class="badge badge-orange">Topic</span></td><td>通配符匹配：<code>*</code> 匹配一个词，<code>#</code> 匹配零或多个词</td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 逐个模式匹配</td><td>按规则订阅、分类路由</td></tr>
+              <tr><td><span class="badge badge-purple">Headers</span></td><td>根据消息 header 属性匹配（x-match=all/any）</td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 遍历 header</td><td>复杂属性匹配（少用）</td></tr>
             </tbody>
           </table>
         </div>

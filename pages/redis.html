@@ -118,7 +118,7 @@
               <tr><td><span class="badge badge-green">List</span></td><td>listpack → quicklist</td><td>Redis 7+ 统一使用 quicklist（listpack + 双向链表）</td></tr>
               <tr><td><span class="badge badge-orange">Hash</span></td><td>listpack → hashtable</td><td>小数据 listpack 压缩存储，超过阈值转 hashtable</td></tr>
               <tr><td><span class="badge badge-purple">Set</span></td><td>intset / listpack → hashtable</td><td>纯整数用 intset，小集合用 listpack，大集合用 hashtable</td></tr>
-              <tr><td><span class="badge badge-red">ZSet</span></td><td>listpack → skiplist + hashtable</td><td>跳表支持范围查询 O(logN)，hashtable 支持精确查找 O(1)</td></tr>
+              <tr><td><span class="badge badge-red">ZSet</span></td><td>listpack → skiplist + hashtable</td><td>跳表支持范围查询 <span class="math-inline" data-tex="O(\log N)" aria-label="O(logN)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，hashtable 支持精确查找 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
             </tbody>
           </table>
         </div>
@@ -135,7 +135,7 @@
             </div>
           </div>
           <ul>
-            <li><strong>O(1) 获取长度</strong>：C 原生字符串需 O(n) 遍历到 '\0'</li>
+            <li><strong><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 获取长度</strong>：C 原生字符串需 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 遍历到 '\0'</li>
             <li><strong>杜绝缓冲区溢出</strong>：自动检查和扩容</li>
             <li><strong>减少内存重分配</strong>：空间预分配 + 惰性释放</li>
             <li><strong>二进制安全</strong>：可存储任意二进制数据</li>
@@ -154,7 +154,7 @@
             </div>
           </div>
           <ul>
-            <li>查找 O(logN)，与平衡树相当；实现简单，范围查询天然支持</li>
+            <li>查找 <span class="math-inline" data-tex="O(\log N)" aria-label="O(logN)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>，与平衡树相当；实现简单，范围查询天然支持</li>
             <li>每个节点层高随机（<code>zslRandomLevel</code>，P=0.25），概率性平衡</li>
             <li>Redis 选跳表而非红黑树：<strong>实现简单、范围查询高效、易做 ZRANGEBYSCORE</strong></li>
           </ul>
@@ -171,7 +171,7 @@
               <ul>
                 <li>前一节点 &lt;254B → 占 1 字节；≥254B → 占 5 字节</li>
                 <li>若某节点从 253→254B，其后所有节点 prevlen 都需 1B→5B 扩展</li>
-                <li>连锁反应：后续每个节点变大 → 再触发后续 prevlen 扩展 → <strong>最坏 O(N²)</strong></li>
+                <li>连锁反应：后续每个节点变大 → 再触发后续 prevlen 扩展 → <strong>最坏 <span class="math-inline" data-tex="O(N^2)" aria-label="O(N²)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><msup><mi>N</mi><mn>2</mn></msup><mo stretchy="false">&#x00029;</mo></mrow></math></span></strong></li>
               </ul>
               <p class="warn" style="margin-top:0.4rem">概率极低（需连续多个 ~252B 节点），但一旦触发<strong>阻塞主线程</strong></p>
             </div>
@@ -212,7 +212,7 @@
 
         <div class="card">
           <h4>intset — 纯整数集合的连续内存编码</h4>
-          <p>Set 全是整数且数量 ≤512（<code>set-max-intset-entries</code>）时用 intset：连续内存数组，按值升序，二分查找 O(logN)。</p>
+          <p>Set 全是整数且数量 ≤512（<code>set-max-intset-entries</code>）时用 intset：连续内存数组，按值升序，二分查找 <span class="math-inline" data-tex="O(\log N)" aria-label="O(logN)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>。</p>
           <div class="diagram">
             <div class="diagram-title">intset 升级过程</div>
             <div class="flow" style="flex-wrap:wrap">
@@ -227,7 +227,7 @@
           </div>
           <ul>
             <li><strong>只升不降</strong>：int16→int32→int64 升级后即使删除大值也不降级</li>
-            <li><strong>升级代价</strong>：重新分配整个数组并逐个转换，O(N) 操作</li>
+            <li><strong>升级代价</strong>：重新分配整个数组并逐个转换，<span class="math-inline" data-tex="O(N)" aria-label="O(N)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>N</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 操作</li>
             <li>超 512 元素或加入非整数 → 转 hashtable</li>
           </ul>
         </div>
@@ -383,7 +383,7 @@
         </div>
         <div class="card">
           <h4>设计动机：为什么 Redis 的 LRU/LFU 是"近似"而非精确？</h4>
-          <p><strong>设计起点</strong>：精确 LRU 需要维护全局双向链表，每次访问都要移动节点到头部——这是 O(1) 但<strong>每次操作都有额外开销</strong>，且链表节点本身占内存。Redis 的核心卖点是"<strong>单线程极致性能</strong>"，不能为淘汰策略拖慢每条命令。Redis 的解法：<strong>随机采样</strong>——淘汰时随机抽 N 个 key（<code>maxmemory-samples</code>，默认 5），从中选最该淘汰的，近似 LRU/LFU。</p>
+          <p><strong>设计起点</strong>：精确 LRU 需要维护全局双向链表，每次访问都要移动节点到头部——这是 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 但<strong>每次操作都有额外开销</strong>，且链表节点本身占内存。Redis 的核心卖点是"<strong>单线程极致性能</strong>"，不能为淘汰策略拖慢每条命令。Redis 的解法：<strong>随机采样</strong>——淘汰时随机抽 N 个 key（<code>maxmemory-samples</code>，默认 5），从中选最该淘汰的，近似 LRU/LFU。</p>
           <div class="compare-row" style="margin-top:1rem">
             <div class="compare-box" style="border-color:var(--accent4)">
               <h4 style="color:var(--accent4)">精确 LRU 的代价</h4>
@@ -614,7 +614,7 @@
         <div class="card">
           <h4>设计起点：为什么 Redis 要「渐进式」rehash？</h4>
           <p>Redis 的 dict（hashtable）会随数据增长触发 <code>rehash</code> 扩容（负载因子过高）。传统一次性 rehash 要把<strong>全部键值对</strong>从旧表 ht[0] 迁到新表 ht[1]，如果字典有上百万个 key，这一次集中迁移会<strong>阻塞主线程数秒</strong>——对 Redis 这种内存数据库是灾难性的。Redis 的解决方案：<strong>把 rehash 摊平到每次字典操作上</strong>，每次只迁移一小部分，让长任务变成"看不见"的背景工作。</p>
-          <div class="tip">渐进式 rehash 的哲学：将一个长阻塞操作拆成无数个 O(1) 微操作，附着在正常读写上顺带完成。这是 Redis 「绝不阻塞主线程」设计理念的一个缩影。</div>
+          <div class="tip">渐进式 rehash 的哲学：将一个长阻塞操作拆成无数个 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 微操作，附着在正常读写上顺带完成。这是 Redis 「绝不阻塞主线程」设计理念的一个缩影。</div>
         </div>
         <div class="card">
           <h4>渐进式 rehash 实现机制</h4>
@@ -644,7 +644,7 @@
             <thead><tr><th>类型</th><th>小数据编码</th><th>大数据编码</th><th>转换阈值（默认）</th><th>设计动机</th></tr></thead>
             <tbody>
               <tr><td>String</td><td>int / embstr</td><td>raw (SDS)</td><td>&gt;44字节转 raw</td><td>embstr 头与数据连续内存，一次 malloc，缓存友好</td></tr>
-              <tr><td>Hash</td><td>listpack</td><td>hashtable</td><td>hash-max-listpack-entries 128 / value 64</td><td>小哈希紧凑存，大哈希要 O(1) 查找</td></tr>
+              <tr><td>Hash</td><td>listpack</td><td>hashtable</td><td>hash-max-listpack-entries 128 / value 64</td><td>小哈希紧凑存，大哈希要 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找</td></tr>
               <tr><td>List</td><td>listpack(节点内)</td><td>quicklist</td><td>list-max-listpack-size -2(8KB)</td><td>小列表压一节点，长列表分多个节点防压缩过大</td></tr>
               <tr><td>Set</td><td>intset / listpack</td><td>hashtable</td><td>set-max-intset-entries 512 / listpack 128</td><td>纯整数集合连续内存，混合类型转哈希</td></tr>
               <tr><td>ZSet</td><td>listpack</td><td>skiplist+hashtable</td><td>zset-max-listpack-entries 128 / value 64</td><td>小有序集省内存，大集合要范围查+点查双高效</td></tr>

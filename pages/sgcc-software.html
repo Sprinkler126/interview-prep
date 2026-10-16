@@ -201,7 +201,7 @@
 <li>黑盒从规格出发，用等价类、边界值、决策表等；白盒从结构出发，看语句、分支、条件、路径。</li>
 <li>语句覆盖不保证分支覆盖；分支覆盖不保证每个原子条件均取过真假。复合条件、短路执行需仔细分析。</li>
 <li>单元→集成→系统→验收面向不同层级；回归测试检查修改是否破坏已有功能，确认修复要复现原缺陷。</li>
-<li>独立路径数常以圈复杂度 V(G)=E-N+2P 估计，单连通控制流图 P=1；常见规范图也可用判定节点数+1。</li>
+<li>独立路径数常以圈复杂度 <span class="math-inline" data-tex="V(G)=E-N+2P" aria-label="V(G)=E-N+2P"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>V</mi><mo stretchy="false">&#x00028;</mo><mi>G</mi><mo stretchy="false">&#x00029;</mo><mo>&#x0003D;</mo><mi>E</mi><mo>&#x02212;</mo><mi>N</mi><mo>&#x0002B;</mo><mn>2</mn><mi>P</mi></mrow></math></span> 估计，单连通控制流图 P=1；常见规范图也可用判定节点数+1。</li>
 <li>穷尽全部路径往往不可行，特别是循环；测试能发现缺陷，不能一般性证明不存在缺陷。</li>
 </ul>
 <div class="exam-example">

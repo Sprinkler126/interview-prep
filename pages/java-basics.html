@@ -136,11 +136,11 @@
             </thead>
             <tbody>
               <tr><td>底层结构</td><td>Object[] 数组</td><td>双向链表（Node）</td></tr>
-              <tr><td>随机访问（get/set）</td><td><span class="badge badge-green">O(1)</span> 实现 RandomAccess</td><td><span class="badge badge-red">O(n)</span> 需遍历</td></tr>
-              <tr><td>头部插入（addFirst）</td><td><span class="badge badge-red">O(n)</span> 数组拷贝</td><td><span class="badge badge-green">O(1)</span></td></tr>
-              <tr><td>尾部插入（add）</td><td><span class="badge badge-green">O(1) 均摊</span> 扩容时 O(n)</td><td><span class="badge badge-green">O(1)</span></td></tr>
-              <tr><td>中间插入（add(index)）</td><td><span class="badge badge-red">O(n)</span> 移动元素</td><td><span class="badge badge-orange">O(n)</span> 遍历 + 插入</td></tr>
-              <tr><td>删除（remove）</td><td><span class="badge badge-red">O(n)</span> 移动元素</td><td><span class="badge badge-green">O(1)</span> 已知节点时</td></tr>
+              <tr><td>随机访问（get/set）</td><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 实现 RandomAccess</td><td><span class="badge badge-red"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 需遍历</td></tr>
+              <tr><td>头部插入（addFirst）</td><td><span class="badge badge-red"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 数组拷贝</td><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td></tr>
+              <tr><td>尾部插入（add）</td><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 均摊</span> 扩容时 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span></td></tr>
+              <tr><td>中间插入（add(index)）</td><td><span class="badge badge-red"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 移动元素</td><td><span class="badge badge-orange"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 遍历 + 插入</td></tr>
+              <tr><td>删除（remove）</td><td><span class="badge badge-red"><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 移动元素</td><td><span class="badge badge-green"><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></span> 已知节点时</td></tr>
               <tr><td>内存占用</td><td>较少（数组紧凑存储）</td><td>较多（每个节点额外 prev + next 指针）</td></tr>
               <tr><td>缓存友好性</td><td><span class="badge badge-green">好</span> 连续内存</td><td><span class="badge badge-red">差</span> 内存不连续</td></tr>
               <tr><td>适用场景</td><td>频繁随机访问、尾部增删</td><td>频繁头部/中间插入删除、队列/双端队列</td></tr>
@@ -207,9 +207,9 @@ public class LinkedList&lt;E&gt; extends AbstractSequentialList&lt;E&gt;
           <div class="diagram-title">Map 体系实现对比</div>
           <div class="arch-container">
             <div class="arch-row">
-              <div class="arch-box">HashMap<br><small>数组+链表+红黑树</small><br><small>O(1) 查找</small></div>
+              <div class="arch-box">HashMap<br><small>数组+链表+红黑树</small><br><small><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找</small></div>
               <div class="arch-box" style="margin-left:1rem">LinkedHashMap<br><small>HashMap+双向链表</small><br><small>保持插入顺序</small></div>
-              <div class="arch-box" style="margin-left:1rem">TreeMap<br><small>红黑树</small><br><small>有序 O(log n)</small></div>
+              <div class="arch-box" style="margin-left:1rem">TreeMap<br><small>红黑树</small><br><small>有序 <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></small></div>
               <div class="arch-box" style="margin-left:1rem">ConcurrentHashMap<br><small>线程安全</small><br><small>CAS+synchronized</small></div>
             </div>
           </div>
@@ -351,11 +351,11 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
               <tr><th>实现类</th><th>底层结构</th><th>有序性</th><th>Null 值</th><th>线程安全</th><th>时间复杂度</th></tr>
             </thead>
             <tbody>
-              <tr><td>HashSet</td><td>HashMap</td><td>无序</td><td>允许 1 个</td><td>否</td><td>O(1)</td></tr>
-              <tr><td>LinkedHashSet</td><td>LinkedHashMap</td><td>插入有序</td><td>允许 1 个</td><td>否</td><td>O(1)</td></tr>
-              <tr><td>TreeSet</td><td>红黑树（TreeMap）</td><td>自然排序/自定义</td><td>不允许</td><td>否</td><td>O(log n)</td></tr>
-              <tr><td>CopyOnWriteArraySet</td><td>CopyOnWriteArrayList</td><td>插入有序</td><td>允许</td><td>是</td><td>O(n)</td></tr>
-              <tr><td>ConcurrentSkipListSet</td><td>跳表</td><td>有序</td><td>不允许</td><td>是</td><td>O(log n)</td></tr>
+              <tr><td>HashSet</td><td>HashMap</td><td>无序</td><td>允许 1 个</td><td>否</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td>LinkedHashSet</td><td>LinkedHashMap</td><td>插入有序</td><td>允许 1 个</td><td>否</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td>TreeSet</td><td>红黑树（TreeMap）</td><td>自然排序/自定义</td><td>不允许</td><td>否</td><td><span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td>CopyOnWriteArraySet</td><td>CopyOnWriteArrayList</td><td>插入有序</td><td>允许</td><td>是</td><td><span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
+              <tr><td>ConcurrentSkipListSet</td><td>跳表</td><td>有序</td><td>不允许</td><td>是</td><td><span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span></td></tr>
             </tbody>
           </table>
           <div class="tip">HashSet 底层就是 HashMap，元素作为 Key 存储，Value 统一使用一个 static final 的 Object 对象（PRESENT）。</div>
@@ -781,12 +781,12 @@ public class BizException extends RuntimeException {
               <tr><th>需求</th><th>推荐方案</th><th>理由</th></tr>
             </thead>
             <tbody>
-              <tr><td>快速查找键值对</td><td>HashMap</td><td>O(1) 查找，最常用</td></tr>
+              <tr><td>快速查找键值对</td><td>HashMap</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 查找，最常用</td></tr>
               <tr><td>有序键值对</td><td>TreeMap / LinkedHashMap</td><td>TreeMap 按 Key 排序，LinkedHashMap 按插入顺序</td></tr>
               <tr><td>线程安全 Map</td><td>ConcurrentHashMap</td><td>分段锁/CAS，高并发首选</td></tr>
-              <tr><td>频繁随机访问 List</td><td>ArrayList</td><td>O(1) 随机访问，缓存友好</td></tr>
-              <tr><td>频繁头部增删</td><td>LinkedList / ArrayDeque</td><td>O(1) 头尾操作</td></tr>
-              <tr><td>去重集合</td><td>HashSet</td><td>基于 HashMap，O(1) 去重</td></tr>
+              <tr><td>频繁随机访问 List</td><td>ArrayList</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 随机访问，缓存友好</td></tr>
+              <tr><td>频繁头部增删</td><td>LinkedList / ArrayDeque</td><td><span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 头尾操作</td></tr>
+              <tr><td>去重集合</td><td>HashSet</td><td>基于 HashMap，<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 去重</td></tr>
               <tr><td>排序去重</td><td>TreeSet</td><td>红黑树，自然排序</td></tr>
               <tr><td>线程安全 List</td><td>CopyOnWriteArrayList</td><td>读多写少场景</td></tr>
               <tr><td>高并发队列</td><td>ConcurrentLinkedQueue</td><td>CAS 无锁队列</td></tr>
@@ -1012,7 +1012,7 @@ String json = """
         <div class="qa">
           <div class="q">HashMap 的底层数据结构是什么？JDK 1.8 做了哪些优化？</div>
           <div class="a">
-            <strong>参考：</strong>JDK 1.8 中 HashMap 底层是数组 + 链表 + 红黑树。数组默认容量 16，负载因子 0.75。通过 key 的 hashCode 经过扰动函数（高 16 位异或低 16 位）计算 hash，再与 (n-1) 与运算定位桶位。哈希冲突时使用链表存储，当链表长度 >= 8 且数组长度 >= 64 时，链表转为红黑树（O(n) → O(log n)）。当红黑树节点 <= 6 时退化为链表。<br>
+            <strong>参考：</strong>JDK 1.8 中 HashMap 底层是数组 + 链表 + 红黑树。数组默认容量 16，负载因子 0.75。通过 key 的 hashCode 经过扰动函数（高 16 位异或低 16 位）计算 hash，再与 (n-1) 与运算定位桶位。哈希冲突时使用链表存储，当链表长度 >= 8 且数组长度 >= 64 时，链表转为红黑树（<span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> → <span class="math-inline" data-tex="O(\log n)" aria-label="O(log n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>log</mi><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>）。当红黑树节点 <= 6 时退化为链表。<br>
             <strong>JDK 1.8 优化：</strong>1）数据结构从数组+链表改为数组+链表+红黑树；2）插入方式从头插法改为尾插法，解决扩容并发死循环问题；3）扩容时通过 hash & oldCap 判断新位置，避免 rehash；4）插入时先插后判断是否扩容（1.7 先判断再插入）。
           </div>
         </div>
@@ -1029,8 +1029,8 @@ String json = """
         <div class="qa">
           <div class="q">ArrayList 和 LinkedList 怎么选？实际开发中 ArrayList 为什么用得更多？</div>
           <div class="a">
-            <strong>参考：</strong>ArrayList 底层数组，O(1) 随机访问，尾部 O(1) 增删（均摊），中间增删 O(n)（数组拷贝）。LinkedList 底层双向链表，O(n) 随机访问，头尾 O(1) 增删，但内存不连续导致缓存命中率低。<br>
-            实际开发中 ArrayList 用得更多：1）大多数场景是随机访问或尾部增删，ArrayList 更优；2）CPU 缓存友好，连续内存局部性好；3）内存占用少（无额外指针开销）；4）即使中间插入，O(n) 的数组拷贝利用 System.arraycopy（native 方法），实际性能不一定比 LinkedList 差。LinkedList 只在频繁头部插入删除（如实现 Deque）时才有优势。
+            <strong>参考：</strong>ArrayList 底层数组，<span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 随机访问，尾部 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 增删（均摊），中间增删 <span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span>（数组拷贝）。LinkedList 底层双向链表，<span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 随机访问，头尾 <span class="math-inline" data-tex="O(1)" aria-label="O(1)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mn>1</mn><mo stretchy="false">&#x00029;</mo></mrow></math></span> 增删，但内存不连续导致缓存命中率低。<br>
+            实际开发中 ArrayList 用得更多：1）大多数场景是随机访问或尾部增删，ArrayList 更优；2）CPU 缓存友好，连续内存局部性好；3）内存占用少（无额外指针开销）；4）即使中间插入，<span class="math-inline" data-tex="O(n)" aria-label="O(n)"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mi>O</mi><mo stretchy="false">&#x00028;</mo><mi>n</mi><mo stretchy="false">&#x00029;</mo></mrow></math></span> 的数组拷贝利用 System.arraycopy（native 方法），实际性能不一定比 LinkedList 差。LinkedList 只在频繁头部插入删除（如实现 Deque）时才有优势。
           </div>
         </div>
 
