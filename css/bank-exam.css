@@ -1,0 +1,51 @@
+.bank-page { --bank-gold:#f5c875; }
+.bank-page .container { max-width:1200px; }
+.bank-page a { color:var(--accent); }
+.bank-page p + p { margin-top:.7rem; }
+.bank-page h2,.bank-page h3,.bank-page article { scroll-margin-top:95px; }
+.bank-page .bank-hero { padding:2rem; border:1px solid #476176; border-radius:16px; background:linear-gradient(120deg,#1e3446,#192337); }
+.bank-page .bank-eyebrow { color:var(--bank-gold); font-size:.85rem; letter-spacing:.12em; margin-bottom:.6rem; }
+.bank-page .bank-hero h1 { font-size:clamp(1.8rem,4vw,2.7rem); }
+.bank-page .bank-hero .subtitle { margin-bottom:1rem; }
+.bank-page .bank-tags { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; }
+.bank-page .bank-tags span { padding:.2rem .7rem; border:1px solid #526477; border-radius:20px; font-size:.85rem; }
+.bank-page .bank-layout { display:grid; grid-template-columns:215px minmax(0,1fr); gap:2rem; margin-top:2rem; align-items:start; }
+.bank-page .bank-toc { position:sticky; top:90px; border-left:2px solid var(--border); padding-left:1rem; font-size:.9rem; }
+.bank-page .bank-toc a { display:block; padding:.4rem 0; text-decoration:none; }
+.bank-page .bank-toc strong { color:var(--bank-gold); }
+.bank-page .bank-content { min-width:0; overflow-wrap:anywhere; }
+.bank-page .bank-content > h2:first-child { margin-top:0; }
+.bank-page .bank-card { border:1px solid var(--border); border-radius:12px; padding:1.35rem; margin:1rem 0; background:var(--surface); }
+.bank-page .bank-card h4 { margin:.6rem 0; color:var(--text); font-size:1.15rem; }
+.bank-page .bank-meta { color:var(--bank-gold); font-size:.8rem; letter-spacing:.03em; }
+.bank-page .plain { padding:.7rem 1rem; border-left:3px solid var(--accent3); background:#122e2c; margin:.8rem 0; }
+.bank-page .example { padding:.8rem 1rem; background:#162133; border-radius:8px; margin:.8rem 0; }
+.bank-page .pitfall { color:#ffd2a2; font-size:.92rem; }
+.bank-page .bank-note { margin:1rem 0; padding:1rem; border:1px solid #756444; border-radius:9px; background:#302b21; }
+.bank-page .bank-map { display:grid; gap:10px; margin:1rem 0; }
+.bank-page .bank-lane { display:grid; grid-template-columns:100px minmax(0,1fr); border:1px solid var(--border); border-radius:9px; overflow:hidden; }
+.bank-page .bank-lane strong { padding:1rem .7rem; background:#25374c; color:var(--bank-gold); }
+.bank-page .bank-lane p { padding:.8rem 1rem; margin:0; background:#192536; }
+.bank-page .bank-flow { display:flex; align-items:stretch; gap:.65rem; margin:1rem 0; }
+.bank-page .bank-node { flex:1; min-width:0; padding:.85rem .65rem; border:1px solid #50728b; background:#132638; border-radius:9px; text-align:center; }
+.bank-page .bank-node b { display:block; color:var(--accent); }
+.bank-page .bank-node small { display:block; color:#c1d0df; margin-top:.3rem; }
+.bank-page .bank-arrow { align-self:center; color:var(--bank-gold); }
+.bank-page .bank-nest { border:2px solid #8b78bf; padding:1rem; background:#26233c; border-radius:12px; margin:1rem 0; }
+.bank-page .bank-nest .bank-nest { border-color:#3e9d97; background:#153838; margin-bottom:0; }
+.bank-page .bank-nest .bank-nest .bank-nest { border-color:#d9b768; background:#3e3521; }
+.bank-page .formula { background:#102c3b; padding:.75rem 1rem; border-radius:8px; margin:.8rem 0; color:#bcf1ff; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.bank-page .table-wrap { overflow-x:auto; margin:1rem 0; }
+.bank-page table { display:table; width:100%; min-width:450px; margin:0; font-size:.92rem; }
+.bank-page th,.bank-page td { padding:.7rem; vertical-align:top; }
+.bank-page details { margin:.7rem 0; border:1px solid var(--border); border-radius:8px; padding:.8rem; }
+.bank-page summary { color:var(--accent); cursor:pointer; font-weight:600; }
+.bank-page details[open] summary { margin-bottom:.6rem; }
+.bank-page .bank-calculator { display:grid; gap:.85rem; padding:1rem; background:#122936; border:1px solid #3f7284; border-radius:10px; }
+.bank-page .bank-calculator label { display:grid; grid-template-columns:minmax(0,1fr) 115px; align-items:center; gap:.7rem; }
+.bank-page input[type=number] { width:100%; font:inherit; padding:.4rem; color:var(--text); background:var(--bg); border:1px solid #668396; border-radius:5px; }
+.bank-page output { display:block; padding:.9rem; background:#0e1b2b; border-radius:7px; color:#a4efdc; }
+.bank-page :focus-visible { outline:2px solid var(--bank-gold); outline-offset:3px; }
+.bank-page .bank-sources { font-size:.9rem; color:#c1d0df; }
+@media(max-width:900px) { .bank-page .bank-layout { grid-template-columns:1fr; gap:1.3rem; } .bank-page .bank-toc { position:static; display:flex; flex-wrap:wrap; gap:.2rem 1rem; } .bank-page .bank-toc strong { width:100%; } }
+@media(max-width:600px) { .bank-page .container { padding:1rem; } .bank-page .bank-hero { padding:1.2rem; } .bank-page .bank-card { padding:1rem; } .bank-page .bank-flow { flex-direction:column; } .bank-page .bank-arrow { transform:rotate(90deg); } .bank-page .bank-lane { grid-template-columns:1fr; } .bank-page .bank-lane strong { padding:.5rem .8rem; } .bank-page .bank-nest { padding:.7rem; } .bank-page .nav-brand { font-size:.9rem; } }
