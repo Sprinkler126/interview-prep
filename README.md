@@ -91,7 +91,15 @@ interview-prep/
 
 验证命令：`node tests/study-lab-smoke.cjs`（需Playwright与已安装的Edge，或通过 `BROWSER_CHANNEL` 指定浏览器）。检查所有页面的数据、播放暂停、回退、拖动、重置、判题和手机布局；`STUDY_PAGE_FILTER` 可筛选文件名。国网题库回归仍使用 `node tests/sgcc-smoke.cjs`。
 
-### 7. 使用方法
+### 7. 全站代码语法高亮
+
+所有 `pre` 与 `div.code` 代码块统一使用本地 vendored highlight.js 11.12.0（BSD-3-Clause，许可证与来源见 `js/vendor/highlight/`）。不请求外部CDN，直接打开HTML也可使用。
+
+`js/code-highlight.js` 根据显式 `language-*` / `data-language`、片段语法和受限语言识别选择语法，并补充中文伪代码；`css/code-highlight.css` 区分关键字、注释、字符串、数值、类型与函数颜色。新增或更新的动态代码块自动处理，保留原文字与缩进。需要准确指定语言时可直接在 code 上添加例如 `class="language-java"`。
+
+验证：`node tests/code-highlight-smoke.cjs`，检查68个页面的代码块覆盖、文本一致、多色、动态更新及移动布局，运行环境与其他Playwright检查一致。
+
+### 8. 使用方法
 
 直接在浏览器中打开 `index.html` 即可开始复习。
 

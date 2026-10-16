@@ -1,0 +1,15 @@
+/* 深色底，注释/关键字/字符串/数值/函数分别着色；保留所有缩进。 */
+pre.syntax-highlighted,div.code.syntax-highlighted { background:#162033; }
+pre code.hljs,div.code.hljs { color:#d8e2f1; background:none; }
+div.code.syntax-highlighted { font-family:Consolas,'SF Mono',monospace; white-space:pre; overflow-x:auto; padding:1rem; border:1px solid var(--border); border-radius:8px; }
+.syntax-highlighted .hljs-comment,.syntax-highlighted .hljs-quote { color:#95a8c0; font-style:italic; }
+.syntax-highlighted .hljs-keyword,.syntax-highlighted .hljs-selector-tag,.syntax-highlighted .hljs-doctag { color:#c4a7ff; }
+.syntax-highlighted .hljs-string,.syntax-highlighted .hljs-regexp,.syntax-highlighted .hljs-addition { color:#a3dc9a; }
+.syntax-highlighted .hljs-number,.syntax-highlighted .hljs-literal,.syntax-highlighted .hljs-symbol,.syntax-highlighted .hljs-bullet { color:#ffc785; }
+.syntax-highlighted .hljs-title,.syntax-highlighted .hljs-section,.syntax-highlighted .hljs-name { color:#79ceff; }
+.syntax-highlighted .hljs-attr,.syntax-highlighted .hljs-attribute,.syntax-highlighted .hljs-property,.syntax-highlighted .hljs-selector-attr { color:#8cddda; }
+.syntax-highlighted .hljs-type,.syntax-highlighted .hljs-built_in,.syntax-highlighted .hljs-variable,.syntax-highlighted .hljs-template-variable { color:#ffe399; }
+.syntax-highlighted .hljs-meta,.syntax-highlighted .hljs-deletion { color:#ff9da9; }
+.syntax-highlighted .hljs-operator,.syntax-highlighted .hljs-punctuation { color:#abbddb; }
+.syntax-highlighted .hljs-emphasis { font-style:italic; }
+.syntax-highlighted .hljs-strong { font-weight:700; }
