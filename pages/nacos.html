@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nacos - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">服务治理实践</a></li>
           <li class="sub"><a href="#s2-4">与 Spring Cloud 集成</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -546,6 +549,127 @@ private int timeout;</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：注册缓存与配置变更的边界</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>注册中心像通讯录，不在每个业务请求中转发</h4>
+            <p><strong>大白话：</strong>实例向 Nacos 报告地址，消费者订阅或查询地址列表，再直接调用目标实例。</p>
+            <p><strong>边界与易错：</strong>客户端缓存使注册中心短暂故障时已有调用可能继续，但新地址变化无法保证及时获取；地址存在不等于业务一定成功。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>连接存活不等于业务健康</h4>
+            <p><strong>大白话：</strong>不同版本和 SDK 的健康维护机制不同；Nacos 2.x/3.x 常见 SDK 使用长连接，不能把旧版固定心跳流程当成所有版本通则。</p>
+            <p><strong>边界与易错：</strong>临时与持久实例、服务端探测和客户端连接状态需按版本区分；先核对实际客户端/服务端协议，再谈失效摘除时间。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>配置下发不是全应用原子切换</h4>
+            <p><strong>大白话：</strong>配置像更新的说明书：服务端保存版本，客户端接收变化后更新本地，再由应用决定哪些组件重新加载。</p>
+            <p><strong>边界与易错：</strong>把多个相关参数分散更新可能短暂不一致；数据库连接池、线程池等不一定随字符串刷新自动重建，敏感变更应做灰度和回滚。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>发布配置(namespace, group, dataId, version)
+客户端收到变化并更新缓存
+触发应用刷新逻辑
+若资源不支持动态更新：受控重建
+验证实例版本与实际行为</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>Nacos 故障，为什么部分老业务还能跑？</summary><p>消费者可能继续使用已缓存的健康地址直接调用，已加载配置也可留在进程内。新实例发现、旧实例摘除和新客户端启动可能受影响；不能据此宣称注册中心不需要高可用。</p></details>
+          <details><summary>控制台配置已变，应用为什么仍用旧值？</summary><p>沿服务端版本、客户端订阅、命名空间/Group/DataId、刷新事件、Bean 是否支持动态更新逐层检查。配置送达只是前半程，应用读取和资源重建决定最终生效。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. Nacos 返回实例地址后，业务请求通常如何到达提供者？</h4>
+            <ol type="A">
+              <li>必须由 Nacos 转发每次业务请求</li>
+              <li>消费者直接调用实例</li>
+              <li>必须通过配置数据库</li>
+              <li>只能用 DNS 轮询</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>注册中心解决发现问题，普通 RPC/HTTP 业务流量不必经 Nacos 中转。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 配置中心显示新值，是否保证所有实例同一瞬间完成资源重建？</h4>
+            <ol type="A">
+              <li>保证</li>
+              <li>只要刷新页面就保证</li>
+              <li>不保证，需考虑传播及应用刷新机制</li>
+              <li>只对任意线程池保证</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>配置发布、传播、本地刷新和组件重建是不同阶段；需要版本、灰度和验证。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：注册缓存与配置变更的边界</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "配置发布者",
+    "Nacos",
+    "客户端缓存",
+    "业务 Bean"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "准备版本 V2",
+      "detail": "示例修改超时参数，由 500ms 变为 800ms。",
+      "state": [
+        "提交 V2",
+        "当前 V1",
+        "本地 V1",
+        "仍用 500ms"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "服务端保存变更",
+      "detail": "服务端成功不代表每个应用已执行更新。",
+      "state": [
+        "收到发布成功",
+        "保存 V2",
+        "等待通知",
+        "仍用 500ms"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "客户端获得变化",
+      "detail": "订阅路径匹配后下载或接收新配置并刷新本地。",
+      "state": [
+        "观察发布状态",
+        "V2 可查询",
+        "已更新为 V2",
+        "尚待刷新"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "应用应用新值",
+      "detail": "支持刷新且正确接入的 Bean 才会切到新值；资源对象可能需显式重建。",
+      "state": [
+        "检查灰度实例",
+        "保存 V2",
+        "V2",
+        "使用 800ms"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "核验并推广",
+      "detail": "用实际请求与实例配置版本验证，不只看控制台文本。",
+      "state": [
+        "验证通过后推广",
+        "记录变更",
+        "上报 V2",
+        "请求按 800ms 执行"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://nacos.io/en/docs/latest/architecture/" target="_blank" rel="noopener noreferrer">Nacos 官方：架构与组件职责</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

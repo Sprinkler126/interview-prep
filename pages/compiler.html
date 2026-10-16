@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>编译原理 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">双亲委派模型</a></li>
           <li class="sub"><a href="#s2-4">字节码增强</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -403,6 +406,104 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>FIRST 与 FOLLOW：一个看开头，一个看后面</h3>
+            <p>大白话：FIRST(X)是X推导出的串可能以什么终结符开头；FOLLOW(A)是某句型里A后面可能紧接什么终结符。空串只可能进 FIRST，不放进 FOLLOW。</p>
+            <p><strong>边界与易错：</strong>边界：对 A→α 的预测分析表，先看 FIRST(α)；若 α 可为空，还要把 FOLLOW(A) 对应的表项填上。同一格出现多个产生式说明该文法不满足LL(1)。</p>
+          </article>
+          <article class="lab-concept"><h3>左递归与左因子：解决不同的“选不出来”</h3>
+            <p>大白话：A→Aα会让朴素递归下降还没消耗输入就再次调用自己；提取左因子则把公共开头先吃掉，再根据后面的符号分支。</p>
+            <p><strong>边界与易错：</strong>易错：消除直接左递归 A→Aα|β 可写为 A→βA′、A′→αA′|ε。改写后要重新处理结合性与语义动作，不能只改语法不管AST。</p>
+          </article>
+          <article class="lab-concept"><h3>优化合法性：结果相同还要考虑副作用</h3>
+            <p>大白话：编译器会删除没用的计算、合并重复表达式，但不能随意删掉文件写入、抛异常或有可观察副作用的调用。</p>
+            <p><strong>边界与易错：</strong>边界：常量折叠受语言溢出规则、浮点精度、求值顺序约束；循环外提要求被提表达式在循环中保持不变并且移动不改变可观察行为。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>词法错误、语法错误、语义错误怎样举例？</summary><p>非法字符属于词法层；括号不匹配属于语法层；语法正确却给未定义变量赋值或类型不兼容通常属于语义检查。实际语言可能把部分检查延后到运行时，要说明语言上下文。</p></details>
+          <details class="lab-question"><summary>AST为什么不把每个括号都保留？</summary><p>语法树描述推导过程，AST保留运算与层级，把无关的括号、分号等语法糖去掉。括号的作用已体现在子树结构中；源码格式工具可能另保留具体语法树和位置信息。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="2"><h4>1. 关于 FOLLOW 集，下列哪项正确？</h4>
+            <ol type="A">
+              <li>必须包含空串</li>
+              <li>只含非终结符</li>
+              <li>可以包含输入结束标记</li>
+              <li>等于FIRST集</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>FOLLOW保存可跟在非终结符后的终结符及结束标记，空串不是后续输入符号，不放入FOLLOW。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0"><h4>2. 文法 E→E+T|T 的直接左递归来自哪一项？</h4>
+            <ol type="A">
+              <li>E→E+T</li>
+              <li>E→T</li>
+              <li>T是终结符</li>
+              <li>加号优先级太高</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：A。</strong>产生式右侧第一个符号就是左侧E，不消耗输入就再次展开E，属于直接左递归。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>表达式 a+2*3：从字符到中间代码</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "字符流",
+    "Token",
+    "AST",
+    "三地址码"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "读取源代码",
+      "detail": "输入按字符排列，尚未确定运算层级。",
+      "state": [
+        "a+2*3",
+        "待扫描",
+        "待构建",
+        "未生成"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "词法分析",
+      "detail": "标识符、运算符与整数成为独立Token。",
+      "state": [
+        "扫描完成",
+        "id(a),+,2,*,3",
+        "待构建",
+        "未生成"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "语法与语义分析",
+      "detail": "乘法优先于加法，检查a已声明且类型兼容。",
+      "state": [
+        "完成",
+        "消费Token",
+        "+(a,*(2,3))",
+        "未生成"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "生成并优化IR",
+      "detail": "先算乘法；在整数语义允许下可把2*3折叠为6。",
+      "state": [
+        "完成",
+        "完成",
+        "结构已确定",
+        "t1=6; t2=a+t1"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://llvm.org/docs/tutorial/" target="_blank" rel="noopener noreferrer">LLVM 编译器教程</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyWalking - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">与其他工具对比</a></li>
           <li class="sub"><a href="#s2-4">插件开发与日志集成</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -317,7 +320,7 @@ storage:
         </div>
 
         <div class="qa">
-          <div class="q>Trace、Segment、Span 分别是什么？它们的关系是怎样的？</div>
+          <div class="q">Trace、Segment、Span 分别是什么？它们的关系是怎样的？</div>
           <div class="a">
             <strong>参考：</strong>Trace 是一次完整的请求链路，全局唯一 TraceId，跨多个服务。Segment 是一个服务内的链路片段，是 SkyWalking 的基本传输单元。Span 是链路中的一个操作单元（如一次 HTTP 调用、一次 DB 查询）。关系：一个 Trace 由多个 Segment 组成（每个服务一个），一个 Segment 由多个 Span 组成。Span 类型有 Entry Span（服务入口）、Exit Span（服务出口）、Local Span（本地操作）。
           </div>
@@ -353,6 +356,127 @@ storage:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：追踪上下文与耗时判读</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>Trace 是整趟旅程，Span 是其中一段工作</h4>
+            <p><strong>大白话：</strong>请求从网关到订单再到数据库，每段调用记录起止时间和关系；多个进程各自产生片段，由上下文把它们接起来。</p>
+            <p><strong>边界与易错：</strong>父 Span 已经包含子调用等待时间，不能把所有 Span 耗时简单相加当总耗时；并发分支还需看关键路径。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>跨线程要带上“行李牌”</h4>
+            <p><strong>大白话：</strong>线程局部变量像每位员工桌上的便签，换线程后新员工不会自动拿到。框架插件或显式上下文传递帮助建立父子关系。</p>
+            <p><strong>边界与易错：</strong>线程池复用还要正确清理上下文，避免串链；插件支持范围、异步类型与消息传播方式需按实际版本检查。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>采样降低成本，也会留下盲区</h4>
+            <p><strong>大白话：</strong>全量追踪成本高，采样只保留部分请求的详细行程；聚合指标、日志和 Trace 各有覆盖范围。</p>
+            <p><strong>边界与易错：</strong>搜不到某条 Trace 不证明请求没发生；可能没采到、上报丢失或时间范围不对。优先关联业务流水、日志 trace_id 与指标变化。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>入口提取或创建 Trace 上下文
+调用前创建 Span
+跨线程：捕获 → 传递 → 恢复
+跨进程：注入 → 提取
+结束上报并清理线程上下文</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>父 Span 100ms，两个并发子 Span 各 80ms，总耗时是 260ms 吗？</summary><p>不是。父 Span 的墙钟时长约为 100ms，两个子调用可以并行且已包含在父区间里。应看时间轴的重叠和关键路径；累计工作量与用户感知延迟不是同一个数。</p></details>
+          <details><summary>调用下游后生成另一条 Trace，怎么排？</summary><p>检查入站提取与出站注入协议是否一致，网关是否过滤上下文头，异步任务/消息是否传递快照，并核对对应插件支持。还要区分协议不兼容与采样导致的片段缺失。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 父 Span 120ms，子 Span 在父区间内耗时 90ms，端到端延迟最合理是多少？</h4>
+            <ol type="A">
+              <li>210ms</li>
+              <li>90ms</li>
+              <li>约 120ms</li>
+              <li>无法存在父子关系</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>父 Span 包含子调用等待时间，不能重复相加；这里父区间代表该段端到端墙钟时长。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 某订单查不到 Trace，哪项推断成立？</h4>
+            <ol type="A">
+              <li>订单一定没创建</li>
+              <li>服务从未启动</li>
+              <li>可能未被采样或上报失败，需结合日志和业务流水</li>
+              <li>数据库一定回滚</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>追踪不是业务事实的唯一账本，采样与上报链路都可能导致缺失。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：追踪上下文与耗时判读</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "订单服务",
+    "异步线程",
+    "库存服务",
+    "OAP 分析端"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "入站创建链路",
+      "detail": "订单请求建立 Trace T9 与入口 Span。",
+      "state": [
+        "Trace T9，入口 Span",
+        "未执行",
+        "尚未调用",
+        "等待上报"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "提交异步任务并捕获上下文",
+      "detail": "把关联信息交给工作线程，不能只传业务参数。",
+      "state": [
+        "捕获 T9 上下文",
+        "任务携带快照",
+        "尚未调用",
+        "等待上报"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "工作线程恢复上下文",
+      "detail": "正确接入后，异步 Span 能与原请求关联。",
+      "state": [
+        "继续处理",
+        "恢复 T9，创建子 Span",
+        "待调用",
+        "等待上报"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "传播到下游",
+      "detail": "出站注入、入站提取上下文，库存服务延续 T9。",
+      "state": [
+        "Trace T9",
+        "发起库存 RPC",
+        "提取 T9，记录耗时",
+        "接收各端片段"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "重建调用关系",
+      "detail": "分析端根据引用关联片段；最后工作线程还需清理上下文。",
+      "state": [
+        "完成并上报",
+        "完成并清理",
+        "完成并上报",
+        "展示 T9 调用链"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://skywalking.apache.org/docs/main/latest/en/concepts-and-designs/overview/" target="_blank" rel="noopener noreferrer">Apache SkyWalking 官方：整体架构</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

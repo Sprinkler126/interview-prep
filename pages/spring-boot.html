@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spring Boot - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -31,6 +33,7 @@
           <li class="sub"><a href="#s2-3">Profile 机制</a></li>
           <li class="sub"><a href="#s2-4">启动流程</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -467,42 +470,42 @@ public class Application {
         </div>
 
         <div class="qa">
-          <div class="q>如何自定义一个 Spring Boot Starter？</div>
+          <div class="q">如何自定义一个 Spring Boot Starter？</div>
           <div class="a">
             <strong>参考：</strong>自定义 Starter 需要两个模块：1）autoconfigure 模块：创建 @ConfigurationProperties 属性类、@Configuration 自动配置类（使用 @Conditional 注解控制条件）、@Bean 定义默认实现；2）starter 模块：空模块，仅引入 autoconfigure 和必要的第三方依赖。注册：在 autoconfigure 模块的 META-INF/spring.factories 中注册自动配置类。命名规范：官方 spring-boot-starter-xxx，第三方 xxx-spring-boot-starter。最佳实践：自动配置类使用 @ConditionalOnMissingBean 保证可被覆盖；属性类使用 @ConfigurationProperties 绑定配置；提供 spring-configuration-metadata.json 支持 IDE 提示。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring Boot 的配置文件加载优先级是怎样的？</div>
+          <div class="q">Spring Boot 的配置文件加载优先级是怎样的？</div>
           <div class="a">
             <strong>参考：</strong>优先级从高到低：1）命令行参数（--key=value）；2）Java 系统属性（-Dkey=value）；3）操作系统环境变量（大写下划线格式）；4）application-{profile}.yml；5）application.yml；6）@PropertySource 注解引入的配置；7）默认属性。同级目录下 jar 包外的配置优先于 jar 包内。查找路径优先级：file:./config/ > file:./ > classpath:/config/ > classpath:/。配置属性支持松散绑定（server.port = SERVER_PORT = server_port 都可以绑定）。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring Boot 中 @ConditionalOnMissingBean 的作用是什么？为什么自动配置中大量使用？</div>
+          <div class="q">Spring Boot 中 @ConditionalOnMissingBean 的作用是什么？为什么自动配置中大量使用？</div>
           <div class="a">
             <strong>参考：</strong>@ConditionalOnMissingBean 表示"当容器中不存在指定类型的 Bean 时才生效"。自动配置中大量使用是因为 Spring Boot 的设计理念是"提供默认实现，允许用户覆盖"。如果用户没有自定义 Bean，自动配置提供默认实现；如果用户自己定义了同类型的 Bean，自动配置就不会生效。例如 DataSourceAutoConfiguration 使用 @ConditionalOnMissingBean(DataSource.class)，当用户自己配置了数据源时，Spring Boot 的默认数据源配置就会被跳过。这保证了 Starter 的开箱即用同时又足够灵活。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring Boot 内嵌 Tomcat 的工作原理是什么？如何自定义配置？</div>
+          <div class="q">Spring Boot 内嵌 Tomcat 的工作原理是什么？如何自定义配置？</div>
           <div class="a">
             <strong>参考：</strong>Spring Boot 通过 ServletWebServerFactory 创建内嵌的 Tomcat 实例。TomcatServletWebServerFactory 在 refresh() 阶段创建 Tomcat 实例、配置 Connector（端口/线程池/协议）、部署 Web 应用（DispatcherServlet）。自定义配置方式：1）application.yml 中通过 server.tomcat.* 配置线程池、连接数等；2）实现 WebServerFactoryCustomizer&lt;TomcatServletWebServerFactory&gt; 编程式自定义；3）注册 TomcatConnectorCustomizer 自定义 Connector。切换容器：排除 spring-boot-starter-tomcat，引入 spring-boot-starter-undertow 或 jetty。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring Boot 的 Profile 机制是如何工作的？</div>
+          <div class="q">Spring Boot 的 Profile 机制是如何工作的？</div>
           <div class="a">
             <strong>参考：</strong>Profile 是 Spring 提供的多环境配置机制。Spring Boot 扩展了它：1）通过 spring.profiles.active 激活指定 Profile；2）加载对应的 application-{profile}.yml 配置文件；3）@Profile 注解控制 Bean 只在特定 Profile 下创建。激活方式：命令行参数（最高优先级）、环境变量、配置文件、代码方式。Spring Boot 2.4+ 支持 Profile 分组（spring.profiles.group）和多文档 YAML（---分隔）。Spring Profiles 与 @Conditional 不同：Profile 控制"环境"，@Conditional 控制"条件"。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring Boot Actuator 的 health 端点如何自定义健康检查？</div>
+          <div class="q">Spring Boot Actuator 的 health 端点如何自定义健康检查？</div>
           <div class="a">
             <strong>参考：</strong>实现 HealthIndicator 接口或继承 AbstractHealthIndicator：重写 doHealthCheck() 方法，检查自定义资源（如数据库连接、Redis 连接、外部 API 可用性），返回 Builder.up() 或 down() 状态。复合健康检查使用 CompositeHealthContributor。可通过 management.endpoint.health.show-details=always 显示详细信息。禁用默认健康检查：management.health.defaults.enabled=false。自定义健康状态码映射：management.endpoint.health.status.http-mapping.down=503。
           </div>
@@ -510,6 +513,127 @@ public class Application {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：自动配置退让与启动诊断</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>Starter 是材料包，自动配置是装配规则</h4>
+            <p><strong>大白话：</strong>Starter 汇集依赖；自动配置根据 classpath、属性和已存在的 Bean 决定是否提供默认装配。</p>
+            <p><strong>边界与易错：</strong>“加依赖就一定生效”是错的：条件不满足就不创建 Bean。诊断时看 Conditions 报告，而不是一味调整包扫描范围。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>用户 Bean 优先要靠条件退让</h4>
+            <p><strong>大白话：</strong>自动配置常用 @ConditionalOnMissingBean 表示“用户没提供，我再给一个默认件”。</p>
+            <p><strong>边界与易错：</strong>它判断处理到当前阶段已知的定义，排序与扫描边界会影响结果。自动配置排序主要影响定义应用顺序，不等价于任意指定所有 Bean 的实例化顺序。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>现代候选清单与旧机制要分版本</h4>
+            <p><strong>大白话：</strong>现代 Spring Boot 自动配置候选使用 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports；旧版本资料常讲 spring.factories。</p>
+            <p><strong>边界与易错：</strong>不要据此宣称 spring.factories 在所有功能中完全消失；候选导入、组件扫描、条件判定和 Bean 生命周期是四件事。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>读取自动配置候选清单
+检查 classpath / 属性 / Bean 条件
+若用户已有同类型 Bean：默认实现退让
+注册通过条件的 Bean 定义
+按依赖关系创建并注入</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>自定义了 DataSource，为什么默认配置不再创建？</summary><p>如果对应自动配置以缺失 Bean 为条件，用户提供后会退让；这是可覆盖的默认约定。确认 Bean 类型、定义时机和条件报告，避免同名冲突或多个数据源导致注入歧义。</p></details>
+          <details><summary>项目启动失败，排查顺序如何组织？</summary><p>先读根异常和引发失败的 Bean 依赖链，再区分配置绑定、条件缺失、循环依赖、外部连接或端口冲突。需要时查看条件评估报告与实际配置来源；不要通过捕获异常伪造启动成功。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 默认 Bean 标注 @ConditionalOnMissingBean(Foo.class)，用户已提供 Foo 时，预期是什么？</h4>
+            <ol type="A">
+              <li>无条件再建一个</li>
+              <li>默认定义通常退让</li>
+              <li>删除用户 Bean</li>
+              <li>强制启动两个容器</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>条件化默认装配尊重用户提供的组件；实际以条件评估时可见的 Bean 定义为准。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. 现代 Boot 自动配置候选的标准资源清单是？</h4>
+            <ol type="A">
+              <li>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</li>
+              <li>任何 application.txt</li>
+              <li>pom.xml 中所有 class</li>
+              <li>必须只用 component-scan.xml</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A。</strong>现代 Boot 使用 AutoConfiguration.imports 列候选类，随后仍要进行条件判定。旧版机制需分版本回答。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：自动配置退让与启动诊断</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "依赖与清单",
+    "条件评估",
+    "用户容器",
+    "默认自动配置"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发现候选类",
+      "detail": "本例 Starter 带入 FooAutoConfiguration 候选清单。",
+      "state": [
+        "发现 Foo 候选",
+        "尚未评估",
+        "已有用户 Foo Bean",
+        "尚未装配"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "检查 classpath",
+      "detail": "依赖类存在，只代表类条件满足。",
+      "state": [
+        "Foo 类存在",
+        "OnClass 通过",
+        "已有用户 Foo Bean",
+        "继续评估"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "检查缺失 Bean 条件",
+      "detail": "容器中已经有用户 Foo，因此缺失条件不成立。",
+      "state": [
+        "候选已发现",
+        "OnMissingBean 未通过",
+        "用户 Foo 可用",
+        "不注册默认 Foo"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "默认装配退让",
+      "detail": "自动配置并不是扫描到就无条件创建。",
+      "state": [
+        "依赖仍在",
+        "条件结果可诊断",
+        "保留用户 Foo",
+        "默认 Foo 跳过"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "注入用户实现",
+      "detail": "业务依赖最终获得用户自定义的 Foo。",
+      "state": [
+        "材料包已加载",
+        "评估结束",
+        "注入用户 Foo",
+        "没有重复 Bean"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html" target="_blank" rel="noopener noreferrer">Spring Boot 官方：自定义自动配置</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Python - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#s2-3">装饰器实战</a></li>
           <li class="sub"><a href="#s2-4">Python 性能优化</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -177,7 +180,7 @@ class Countdown:
             <li><strong>GIL 释放：</strong>IO 操作时会释放 GIL（如文件读写、网络请求、time.sleep），所以 IO 密集型任务多线程仍然有效</li>
             <li><strong>切换机制：</strong>Python 3.2+ 使用基于时间片的 GIL 切换（默认 5ms sys.setswitchinterval()）</li>
           </ul>
-          <div class="warn">GIL 是 CPython 特有的，Jython、PyPy（可选）、IronPython 没有 GIL。Python 3.13 实验性支持禁用 GIL（--disable-gil 编译选项），Python 3.14 进一步优化。</div>
+          <div class="warn">GIL 需要按解释器和构建方式区分：常规 CPython 与普通 PyPy 都不能一概视为无 GIL。CPython 3.13 提供实验性 free-threaded 构建，3.14 将其作为受支持的可选构建；扩展兼容性及实际 GIL 状态仍需核对。</div>
         </div>
 
         <div class="card">
@@ -190,7 +193,7 @@ class Countdown:
               <tr><td><span class="badge badge-blue">多进程 multiprocessing</span></td><td>每个进程独立解释器，绕过 GIL</td><td>CPU 密集型任务</td></tr>
               <tr><td><span class="badge badge-green">C 扩展</span></td><td>C 代码执行时释放 GIL（Py_BEGIN_ALLOW_THREADS）</td><td>NumPy/Pandas 等科学计算</td></tr>
               <tr><td><span class="badge badge-orange">异步 asyncio</span></td><td>单线程并发，IO 切换不涉及 GIL</td><td>IO 密集型任务</td></tr>
-              <tr><td><span class="badge badge-purple">其他解释器</span></td><td>PyPy STM / Jython / GraalPy 无 GIL</td><td>对 C 扩展依赖少的场景</td></tr>
+              <tr><td><span class="badge badge-purple">其他解释器</span></td><td>按具体解释器和构建核实 GIL 状态</td><td>对 C 扩展依赖少的场景</td></tr>
             </tbody>
           </table>
         </div>
@@ -816,8 +819,8 @@ s = "".join(str(i) for i in range(10000))</code></pre>
           <div class="a">
             <strong>参考：</strong>GIL（Global Interpreter Lock）是 CPython 解释器的全局互斥锁，同一时刻只有一个线程能执行 Python 字节码。它存在的原因是 CPython 的内存管理（引用计数）不是线程安全的。<br>
             影响：多线程无法利用多核 CPU 并行计算。CPU 密集型任务多线程可能更慢（上下文切换开销 > 并发收益）。但 IO 操作时会释放 GIL，所以 IO 密集型任务多线程仍然有效。<br>
-            绕过方案：1）多进程（multiprocessing），每个进程独立解释器；2）C 扩展（NumPy 等计算时释放 GIL）；3）asyncio 单线程异步（IO 并发）；4）使用无 GIL 的解释器（PyPy、Jython）。<br>
-            <strong>追问：Python 3.13 的 no-GIL 是什么？</strong> 是 CPython 的实验性构建选项（--disable-gil），允许每个线程独立获取 GIL，实现真正的多线程并行。但目前仍处于实验阶段。
+            绕过方案：1）多进程（multiprocessing），每个进程独立解释器；2）C 扩展（NumPy 等计算时释放 GIL）；3）asyncio 单线程异步（IO 并发）；4）按兼容性选择 free-threaded CPython 或其他确实支持目标并行模型的解释器。<br>
+            <strong>追问：Python 3.13 的 no-GIL 是什么？</strong> 是 CPython 的实验性构建选项（--disable-gil），允许在禁用 GIL 时并行执行 Python 线程，并非每个线程各拿一把 GIL；3.14 已将 free-threaded 作为受支持的可选构建，需核对扩展兼容性。
           </div>
         </div>
 
@@ -843,7 +846,7 @@ s = "".join(str(i) for i in range(10000))</code></pre>
           <div class="q">async/await 的原理是什么？和多线程有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>async def 定义协程函数，调用返回协程对象。await 暂停当前协程，将控制权交给事件循环，事件循环调度其他就绪的协程。底层通过生成器（yield from）实现状态保存和恢复。<br>
-            和多线程的区别：1）协程是协作式调度（主动 await 让出），线程是抢占式调度（操作系统强制切换）；2）协程运行在单线程上，无锁竞争，无线程安全问题；3）协程切换开销极小（用户态切换），线程切换涉及内核态（~1us vs ~1ms）；4）协程适合 IO 密集型，多线程受 GIL 限制。<br>
+            和多线程的区别：1）协程是协作式调度（主动 await 让出），线程是抢占式调度（操作系统强制切换）；2）协程运行在单线程上协作执行，但跨 await 的共享状态仍可能出现逻辑竞态；3）协程切换开销极小（用户态切换），线程切换涉及内核态（~1us vs ~1ms）；4）协程适合 IO 密集型，多线程受 GIL 限制。<br>
             <strong>追问：什么时候不该用 asyncio？</strong> CPU 密集型任务（计算时无法 await 让出）、使用不支持异步的阻塞库时。
           </div>
         </div>
@@ -878,6 +881,104 @@ s = "".join(str(i) for i in range(10000))</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>默认参数：定义时创建一次，调用时重复使用</h3>
+            <p>大白话：def f(x, bag=[])里的列表不是每次调用都新建；它像函数随身携带的同一本记事本，前一次append的内容下一次还在。</p>
+            <p><strong>边界与易错：</strong>易错：通常用None作为哨兵，在函数体里新建列表。浅拷贝仍共享嵌套对象；复制外层容器不能自动隔离所有状态。</p>
+          </article>
+          <article class="lab-concept"><h3>GIL答题必须说明解释器和构建方式</h3>
+            <p>大白话：常规启用GIL的CPython同一时刻通常只有一个线程执行Python代码，IO等待及部分扩展可释放它；所以CPU与IO负载的并发方案不同。</p>
+            <p><strong>边界与易错：</strong>版本边界：CPython从3.13提供free-threaded构建，3.14已作为受支持的可选构建，仍需检查扩展兼容和GIL运行状态。不能说“所有Python多线程必然无法多核”，也不能把普通PyPy当成无GIL保证。</p>
+          </article>
+          <article class="lab-concept"><h3>asyncio：协作让出，不是自动变并行</h3>
+            <p>大白话：协程在可挂起的await处把执行权交回事件循环，等待网络时能服务其他任务；直接在协程里跑长CPU循环仍会堵住循环。</p>
+            <p><strong>边界与易错：</strong>易错：await不代表一定挂起，异步函数也不能随便调用阻塞库。取消需正确清理资源；协程跨await共享可变状态同样可能发生逻辑竞态。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>生成器比列表省内存，代价是什么？</summary><p>生成器按需产出，不一次物化全部结果；通常只能消费一次，后续值计算可能抛异常，也可能持续持有文件或上下文。需要重复遍历时应明确重建还是缓存。</p></details>
+          <details class="lab-question"><summary>为什么is不能替代==比较字符串？</summary><p>is检查是否同一对象，==比较值。驻留和优化可能让部分字符串恰好是同一对象，但不应依赖这种现象；与None比较通常用is None。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. def f(x, bag=[]): bag.append(x); return bag，连续调用 f(1)、f(2)，第二次结果通常是？</h4>
+            <ol type="A">
+              <li>[2]</li>
+              <li>[1,2]</li>
+              <li>[]</li>
+              <li>抛出语法错误</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>默认列表在函数定义时创建，两个调用复用同一个列表。用None默认值并在函数内创建可避免跨调用状态滞留。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. async函数中直接执行耗时CPU循环且没有挂起点，单个事件循环通常会怎样？</h4>
+            <ol type="A">
+              <li>自动转到其他CPU</li>
+              <li>阻塞其他任务获得执行机会</li>
+              <li>自动创建进程</li>
+              <li>自动释放所有锁</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>事件循环在同一线程中协作调度，长时间不让出执行权会拖延其他协程。需按负载选择进程或其他执行器。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>可变默认参数：同一个列表跨调用保留</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "函数默认值",
+    "第一次调用",
+    "第二次调用",
+    "安全写法"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "定义函数",
+      "detail": "默认参数bag=[]在定义时创建。",
+      "state": [
+        "同一列表[]",
+        "未调用",
+        "未调用",
+        "bag=None"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "执行f(1)",
+      "detail": "append修改默认列表本身。",
+      "state": [
+        "[1]",
+        "返回[1]",
+        "未调用",
+        "每次调用再新建"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "执行f(2)",
+      "detail": "未传bag，继续使用原来的列表。",
+      "state": [
+        "[1,2]",
+        "同一对象也变了",
+        "返回[1,2]",
+        "避免跨调用共享"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "改用None哨兵",
+      "detail": "函数内if bag is None: bag=[]，每次缺省调用独立。",
+      "state": [
+        "不再共享列表",
+        "独立[1]",
+        "独立[2]",
+        "状态隔离"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.python.org/3.14/howto/free-threading-python.html" target="_blank" rel="noopener noreferrer">Python 3.14 free-threading 官方说明</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

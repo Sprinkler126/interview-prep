@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HBase - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -37,6 +39,7 @@
           <li class="sub"><a href="#s2-3">HBase vs Cassandra</a></li>
           <li class="sub"><a href="#s2-4">适用场景</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -543,6 +546,105 @@ ResultScanner scanner = table.getScanner(scan);</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>RowKey 就是物理排队方式</h3>
+            <p>同前缀数据会挨着放，范围扫描因此高效；按递增时间直接写可能让最新写入挤在尾部 Region。加盐分散写也会把一次范围查询拆成多路扫描，需要合并结果。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>墓碑不等于立刻删文件</h3>
+            <p>删除先写删除标记，读时过滤旧数据，合并时在满足版本、TTL 等规则后才能清理。大量墓碑与小文件会放大读取和合并成本。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>行原子性有明确边界</h3>
+            <p>同一行内的原子修改不代表跨行跨表事务。把余额和流水拆到不同行后，不能仅靠一次批处理 RPC 推导全有全无；必要时采用上层协议或重新建模。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>Bloom Filter 能替代索引吗？</summary><p>它主要回答某个 StoreFile 很可能没有目标键，减少无效文件读取；可能误报，不能直接返回目标值。</p></details>
+          <details class="study-followup"><summary>预分区后还会热点吗？</summary><p>会。Region 边界只切空间，实际访问分布可能仍偏斜；需要结合 RowKey、热租户与 RegionServer 指标定位。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 按时间递增 RowKey 导致写热点，直接加盐的主要代价是？</h4>
+            <ol type="A">
+              <li>无法再存数字</li>
+              <li>时间范围查询需跨多个盐桶合并</li>
+              <li>失去所有持久化</li>
+              <li>WAL 自动关闭</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。盐打散连续键，改善分散写，同时削弱单一路径的有序范围访问。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. Delete 后磁盘文件立即同比缩小的说法？</h4>
+            <ol type="A">
+              <li>恒成立</li>
+              <li>错误，通常先写墓碑并等待合并回收</li>
+              <li>仅由客户端内存决定</li>
+              <li>取决于列名长度</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。LSM 文件通常不可原地改写，回收受合并与保留规则约束。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>LSM 写入、刷盘与合并</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端",
+    "WAL",
+    "MemStore",
+    "HFile"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "写入到达",
+      "detail": "先记录可恢复的写入；假设启用正常 WAL 持久化策略。",
+      "state": [
+        "put k=v",
+        "追加日志",
+        "空",
+        "旧文件"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "更新内存",
+      "detail": "内存按键排序承接最新值，后续读需要合并多层。",
+      "state": [
+        "等待确认",
+        "已记录",
+        "k=v",
+        "旧文件"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "刷盘",
+      "detail": "MemStore 达到条件后形成新的不可变文件。",
+      "state": [
+        "写成功",
+        "可回收范围推进",
+        "新活跃区",
+        "增加新 HFile"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "合并",
+      "detail": "多个文件归并，按保留规则处理旧版本与墓碑。",
+      "state": [
+        "无需介入",
+        "保留恢复所需",
+        "继续接收写",
+        "更少的大文件"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://hbase.apache.org/book.html" target="_blank" rel="noopener noreferrer">HBase 官方参考指南</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

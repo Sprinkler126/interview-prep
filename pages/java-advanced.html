@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Java 高级 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">异步编排</a></li>
           <li class="sub"><a href="#s2-4">并发安全最佳实践</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -856,7 +859,7 @@ public class PaddedCounter {
         </div>
 
         <div class="qa">
-          <div class="q>AQS 的原理是什么？ReentrantLock 是怎么基于 AQS 实现的？</div>
+          <div class="q">AQS 的原理是什么？ReentrantLock 是怎么基于 AQS 实现的？</div>
           <div class="a">
             <strong>参考：</strong>AQS（AbstractQueuedSynchronizer）是 JUC 并发工具的基础框架。核心是一个 volatile int state（表示锁状态）和一个 CLH 双向队列（存放等待获取锁的线程）。<br>
             ReentrantLock 的实现：lock() 时尝试 CAS 修改 state（0→1），成功则获取锁并记录持有线程；失败则将当前线程封装为 Node 加入 CLH 队列，通过 LockSupport.park() 阻塞。unlock() 时将 state 减 1（可重入），为 0 时释放锁并唤醒队列中的下一个线程。<br>
@@ -894,7 +897,7 @@ public class PaddedCounter {
         </div>
 
         <div class="qa">
-          <div class="q>Java SPI 和 Dubbo SPI 有什么区别？</div>
+          <div class="q">Java SPI 和 Dubbo SPI 有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>Java SPI（ServiceLoader）通过 META-INF/services/ 下的配置文件加载接口的所有实现类，全量加载，无法按名获取，遍历所有实现。典型应用：JDBC 驱动加载。<br>
             Dubbo SPI 改进：1）配置文件改为 key=value 形式（META-INF/dubbo/），支持按名获取；2）支持 AOP（自动 Wrapper 装饰器链）；3）支持 IoC（setter 依赖注入）；4）@Adaptive 自适应扩展（根据 URL 参数动态选择实现）；5）支持自动激活扩展 @Activate（如 Filter 链）。<br>
@@ -903,7 +906,7 @@ public class PaddedCounter {
         </div>
 
         <div class="qa">
-          <div class="q>CAS 的原理是什么？ABA 问题怎么解决？LongAdder 为什么比 AtomicLong 快？</div>
+          <div class="q">CAS 的原理是什么？ABA 问题怎么解决？LongAdder 为什么比 AtomicLong 快？</div>
           <div class="a">
             <strong>参考：</strong>CAS（Compare And Swap）是一种无锁并发原语，操作包含三个值：内存值 V、期望值 A、新值 B。当 V == A 时，将 V 更新为 B，否则不做操作。整个操作是 CPU 级别的原子指令（x86 的 CMPXCHG）。<br>
             ABA 问题：值从 A 变为 B 再变回 A，CAS 检测不到变化。解决：AtomicStampedReference 加版本号（stamp），每次修改版本号递增；AtomicMarkableReference 加布尔标记。<br>
@@ -913,6 +916,104 @@ public class PaddedCounter {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>volatile：看得到不等于加得对</h3>
+            <p>大白话：volatile保证相关写入对后续读取的可见性与规定的顺序，但i++仍是读、加、写三步。两线程可同时读到0，最后只写出1。</p>
+            <p><strong>边界与易错：</strong>边界：计数用AtomicInteger或锁；多字段不变量通常需要把检查与更新放在同一同步边界里，分别volatile并不能自动组成事务。</p>
+          </article>
+          <article class="lab-concept"><h3>线程池：队列决定压力是排队还是扩线程</h3>
+            <p>大白话：常见ThreadPoolExecutor流程是先补核心线程，再入队，队满后尝试补非核心线程，仍放不下则拒绝。</p>
+            <p><strong>边界与易错：</strong>易错：无界队列可能让maximumPoolSize难以发挥作用，并把过载变成内存和长尾问题。拒绝策略要与业务语义匹配，不能悄悄丢掉扣款任务。</p>
+          </article>
+          <article class="lab-concept"><h3>锁与条件等待：等的是条件，不是一次通知</h3>
+            <p>大白话：wait/await像拿号后去休息区，醒来必须重新检查“轮到我了吗”。所以用while包住等待，不用if。</p>
+            <p><strong>边界与易错：</strong>边界：可能虚假唤醒，也可能别人先拿走资源。等待会释放对应锁；sleep不会。持锁做慢IO会放大排队，锁范围需覆盖不变量而非整个业务。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>CAS没有锁，为什么仍然可能很慢？</summary><p>热点位置竞争时反复失败重试，CPU消耗和缓存一致性流量会上升。要看冲突率，可考虑分片计数、批量聚合或降低共享；CAS还可能遇到ABA，必要时加版本标记。</p></details>
+          <details class="lab-question"><summary>CompletableFuture异步任务里用ThreadLocal会发生什么？</summary><p>线程池任务可能在其他线程执行，普通ThreadLocal不会自动传递业务上下文。显式传参或使用有边界的上下文传播，并在finally清理，避免线程复用串数据。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 两个线程各执行一次volatile int x的x++，初值0，缺少其他同步时哪种结果可能出现？</h4>
+            <ol type="A">
+              <li>只能2</li>
+              <li>可能1或2</li>
+              <li>只能0</li>
+              <li>编译失败</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>两线程可能都读取0并各写1，产生丢失更新；volatile没有把读取、加法和写回合为一个原子动作。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 核心线程均忙、队列未满时，常见ThreadPoolExecutor接收新任务通常先做什么？</h4>
+            <ol type="A">
+              <li>立刻扩到最大线程数</li>
+              <li>尝试入队</li>
+              <li>直接拒绝</li>
+              <li>关闭线程池</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>通常先尝试队列；队列放不下时才尝试新增非核心线程，因此队列设计直接影响扩容时机。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>volatile自增：可见性挡不住丢失更新</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "线程A",
+    "共享x",
+    "线程B",
+    "结果"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A读取",
+      "detail": "初始x=0，A拿到局部旧值0。",
+      "state": [
+        "读到0",
+        "0",
+        "未读取",
+        "待定"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B读取",
+      "detail": "A尚未写回，B也读到0。",
+      "state": [
+        "本地0",
+        "0",
+        "读到0",
+        "待定"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "A写回1",
+      "detail": "A把本地值加1再写回。",
+      "state": [
+        "写1",
+        "1",
+        "本地仍0",
+        "完成一次"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B也写回1",
+      "detail": "B根据自己的旧值0计算，不会自动重新加一次。",
+      "state": [
+        "结束",
+        "1",
+        "写1",
+        "最终1／丢失一次"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html" target="_blank" rel="noopener noreferrer">Java 21 并发内存一致性文档</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

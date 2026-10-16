@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -204,6 +206,68 @@
 <div class="exam-trap">
 <strong>易错点：</strong>只看80%部分快4倍，不能把整个程序也说成快4倍。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "地址",
+    "Cache索引",
+    "标记比较",
+    "访问结果"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "给定存储条件",
+      "detail": "32位字节地址，16KiB直接映射Cache，块64B。",
+      "state": [
+        "0x1234=4660",
+        "256行",
+        "每行保存标记与有效位",
+        "尚未判断"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "划分地址字段",
+      "detail": "块内偏移6位，行索引8位，标记18位。",
+      "state": [
+        "4660",
+        "floor(4660/64)%256=72",
+        "floor(4660/16384)=0",
+        "偏移52"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "检查行72",
+      "detail": "假设行72当前有效，但存的是标记1；目标标记0不匹配。",
+      "state": [
+        "目标标记0",
+        "选中行72",
+        "有效=true，标记1≠0",
+        "失效"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "调入目标块",
+      "detail": "简化只读场景，从下层载入主存块72。以后同一块的访问才可能命中。",
+      "state": [
+        "主存块72",
+        "更新行72",
+        "标记0，有效=true",
+        "返回块内偏移52的字节"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>Cache 地址拆分与命中</h3>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kafka - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#p2-6">消息积压</a></li>
           <li class="sub"><a href="#p2-7">多数据中心</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -614,6 +617,105 @@ T5: m6 完整保留，无丢失 ✅</pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>提交位移是在记“下次从哪读”</h3>
+            <p>位移提交不是业务数据库提交。先记位移再扣款会漏处理，先扣款再记位移可能重复；外部数据库需业务唯一键或把消费记录与业务修改放同一本地事务。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>顺序的单位是分区</h3>
+            <p>同业务键路由同分区只是第一步，消费者若把记录并发丢给线程池仍会乱序。扩分区可能改变键映射，重试也要确保不会跨越前序业务事件。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>acks=all 也有前提</h3>
+            <p>它等待当前 ISR 满足确认，并非所有配置副本无条件到齐。min.insync.replicas、失败重试、非同步副本选主和磁盘故障模型共同决定风险，不能靠单参数承诺永不丢。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>幂等生产者能消除扣款数据库的重复吗？</summary><p>不能。它控制生产重试在日志中的重复；数据库副作用属于下游边界，仍需原子幂等处理。</p></details>
+          <details class="study-followup"><summary>消费组成员数大于分区数能继续提速吗？</summary><p>同组一个分区同一时刻通常由一个消费者负责，多出的成员可能空闲；应先定位分区倾斜、处理慢与下游瓶颈。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. 消费位移 12 提交为 13 通常表示？</h4>
+            <ol type="A">
+              <li>下次从 13 继续</li>
+              <li>删除 13 以前所有消息</li>
+              <li>分区数变为 13</li>
+              <li>事务已写入任意外部库</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。提交的是恢复读取位置，并非消息删除命令或外部业务提交证明。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 分区有 4 个，同组有 6 个消费者，标准分配下最多有多少消费者可同时拥有分区？</h4>
+            <ol type="A">
+              <li>2</li>
+              <li>4</li>
+              <li>6</li>
+              <li>24</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。每分区只交给一个组内消费者，额外成员无法凭空增加分区并行度。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>扣款成功但位移未提交的重放</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "Kafka 分区",
+    "消费者",
+    "业务数据库",
+    "提交位移"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "拉取订单事件",
+      "detail": "读取 offset=7；已提交位置仍是 7。",
+      "state": [
+        "事件 e7",
+        "接收 e7",
+        "余额 100",
+        "7"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "执行业务事务",
+      "detail": "业务记录和幂等键一同提交。",
+      "state": [
+        "e7 保留",
+        "处理成功",
+        "余额 90；e7 已处理",
+        "7"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "提交前宕机",
+      "detail": "数据库已成功，但 Kafka 位移未前进。",
+      "state": [
+        "e7 可重放",
+        "宕机",
+        "余额 90",
+        "7"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "恢复并去重",
+      "detail": "重读 e7，唯一键识别已处理，跳过扣款后提交 8。",
+      "state": [
+        "继续下一条",
+        "重复被识别",
+        "仍 90",
+        "8"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://kafka.apache.org/35/design/design/" target="_blank" rel="noopener noreferrer">Kafka 投递语义设计</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

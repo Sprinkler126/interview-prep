@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>分布式理论 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">数据分片策略</a></li>
           <li class="sub"><a href="#s2-4">分布式系统常见问题</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -799,6 +802,105 @@ spring:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>CAP 先给出分区场景</h3>
+            <p>两个机房断联时，两边都答复写成功可能产生冲突；拒绝一边写可保持线性一致但该边不可用。CAP 的 C 是单对象操作的线性一致性含义，不能与数据库 ACID 的 C 混为一谈。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>超时表示不知道结果</h3>
+            <p>请求没收到响应，可能尚未到达，也可能已提交但回包丢了。客户端不能把超时直接当失败再创建新订单，应携带同一幂等键查询或重试。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>一致性模型决定能观察什么</h3>
+            <p>线性一致要求尊重真实时间先后；因果一致只保证因果相关顺序；最终一致还要说明无新写入且修复传播继续时才会收敛。最终一致不等于任何时候都随便返回。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>N=3,W=2,R=2 就必定线性一致吗？</summary><p>仅交集条件不足，还要考虑版本选择、并发写、故障节点替换和读写协议，不能用一个不等式替代完整模型。</p></details>
+          <details class="study-followup"><summary>数据库有事务，跨服务流程为什么仍可能不一致？</summary><p>本地事务只保护单资源边界；跨服务网络失败与多份提交需要协调、消息、补偿或业务重构。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 客户端写超时，下列最严谨的判断是？</h4>
+            <ol type="A">
+              <li>一定没写</li>
+              <li>一定成功</li>
+              <li>结果未知，应以同一业务键确认</li>
+              <li>必须新建另一订单</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C</strong>。超时只描述等待结果，不描述远端提交事实。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. CAP 中网络分区发生时，维持线性一致通常意味着？</h4>
+            <ol type="A">
+              <li>所有节点永远都可成功读写</li>
+              <li>可能拒绝部分请求</li>
+              <li>自动没有网络延迟</li>
+              <li>事务隔离级别变为 RU</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。无法通信时仍保证单一一致视图，可能需要牺牲分区一侧的可用性。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>网络分区时的 CP 写入选择</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端 A",
+    "多数派",
+    "少数派",
+    "客户端 B"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "网络正常",
+      "detail": "五节点示例按 3+2 分组观察；当前互通。",
+      "state": [
+        "读 x=0",
+        "x=0",
+        "x=0",
+        "读 x=0"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "网络断开",
+      "detail": "两组互不可达，多数派可继续形成法定人数。",
+      "state": [
+        "请求 x=1",
+        "3 节点连通",
+        "2 节点孤立",
+        "请求 x=2"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "多数派提交",
+      "detail": "写 1 获多数确认，示例维持单一历史。",
+      "state": [
+        "成功",
+        "x=1 已提交",
+        "无提交权限",
+        "等待"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "少数派拒绝",
+      "detail": "不能形成法定人数，拒绝线性一致写入，避免双边成功。",
+      "state": [
+        "可读新值",
+        "x=1",
+        "拒绝 x=2",
+        "不可用/重试"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://raft.github.io/raft.pdf" target="_blank" rel="noopener noreferrer">Raft 多数派故障模型</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

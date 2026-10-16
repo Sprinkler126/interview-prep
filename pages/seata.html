@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seata - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">AT 脏读问题</a></li>
           <li class="sub"><a href="#s2-4">高可用</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -478,6 +481,105 @@ registry:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>AT 的一阶段是本地先提交</h3>
+            <p>业务数据与 undo_log 一起在本地事务提交，全局事务仍可能未定。全局锁协调参与框架的写冲突，但普通数据库读者仍可能读到全局未完成的值，不能宣称所有访问都自动全局隔离。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>回滚前要检查后镜像</h3>
+            <p>undo 不只是拿旧值覆盖回去。若当前数据不再等于本分支记录的修改后值，说明可能被其他路径改变；直接恢复会覆盖合法新写，应暴露冲突并恢复处理。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>TCC 的三个难题要进数据库</h3>
+            <p>空回滚是 Try 未成功也收到 Cancel，幂等是确认/取消被重复调用，悬挂是 Cancel 后迟到 Try。用持久状态机和唯一事务键约束迁移，不能只在内存标志位判断。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>AT 本地事务提交后，全局回滚怎么撤销？</summary><p>读取持久 undo_log 并校验数据镜像，在可安全补偿时执行反向更新；不能把全局回滚理解成本地事务一直没提交。</p></details>
+          <details class="study-followup"><summary>引入 Seata 就能任意混用直连 SQL 和框架事务吗？</summary><p>不行。绕过全局锁协议的写入可能造成补偿冲突，需明确所有写路径、隔离需求、支持的 SQL 与异常恢复策略。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. AT 一阶段正常提交时通常必须与业务修改一起保存什么？</h4>
+            <ol type="A">
+              <li>undo_log</li>
+              <li>仅进程内变量</li>
+              <li>浏览器 cookie</li>
+              <li>消费者 offset</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。持久化前后镜像等恢复信息，使后续全局失败可执行补偿。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 回滚检查发现当前值不等于后镜像，应？</h4>
+            <ol type="A">
+              <li>无条件覆盖旧值</li>
+              <li>识别脏写冲突并进入恢复处理</li>
+              <li>删除所有 undo_log 假装成功</li>
+              <li>再扣减一次</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。盲目覆盖会破坏其他写入，必须明确暴露和解决冲突。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>AT 一阶段提交后执行全局补偿</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "事务协调器",
+    "订单分支",
+    "库存分支",
+    "undo_log"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发起全局事务",
+      "detail": "各分支关联同一 XID，示例扣减库存 1。",
+      "state": [
+        "全局进行中",
+        "待提交",
+        "库存 10",
+        "空"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "库存本地提交",
+      "detail": "业务与 undo 处于同一本地事务。",
+      "state": [
+        "等待分支结果",
+        "处理中",
+        "库存 9",
+        "before=10,after=9"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "订单分支失败",
+      "detail": "协调器决定全局回滚，不能仅依赖抛异常自动恢复所有库。",
+      "state": [
+        "决定 ROLLBACK",
+        "失败",
+        "仍为 9",
+        "等待补偿"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "校验并补偿",
+      "detail": "当前值为 9 与后镜像一致，安全恢复为 10。",
+      "state": [
+        "回滚完成",
+        "已结束",
+        "库存 10",
+        "恢复记录处理完"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://seata.apache.org/docs/dev/mode/at-mode/" target="_blank" rel="noopener noreferrer">Seata AT 模式</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

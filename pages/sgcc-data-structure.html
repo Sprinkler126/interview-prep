@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -611,6 +613,79 @@ for 每件物品(weight,value):
 <div class="exam-trap">
 <strong>易错点：</strong>写了 dp 数组不保证正确，状态、转移、初值、遍历顺序都必须成立。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "队头 front",
+    "循环槽位",
+    "队尾 rear",
+    "操作结果"
+  ],
+  "frames": [
+    {
+      "active": 1,
+      "title": "初始为空",
+      "detail": "数组5槽，牺牲1槽，front=rear=0；最多存4项。",
+      "state": [
+        "0",
+        "[·,·,·,·,·]",
+        "0",
+        "长度0"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "先写入，再移动 rear",
+      "detail": "依次入队1、2、3、4，rear指向下一个空槽4。",
+      "state": [
+        "0",
+        "[1,2,3,4,·]",
+        "4",
+        "长度4，已满"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "出队释放空间",
+      "detail": "先取槽0的1，再把front移到1。",
+      "state": [
+        "1",
+        "[·,2,3,4,·]",
+        "4",
+        "返回1，长度3"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "入队绕回",
+      "detail": "把5写入槽4，rear=(4+1)%5=0。",
+      "state": [
+        "1",
+        "[·,2,3,4,5]",
+        "0",
+        "长度(0-1+5)%5=4"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "再次判满",
+      "detail": "(rear+1)%5=1等于front，下一次入队应拒绝，不能覆盖队头。",
+      "state": [
+        "1",
+        "[·,2,3,4,5]",
+        "0",
+        "队列顺序2→3→4→5"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>KMP：文本 abababaca，模式 ababaca</h3>

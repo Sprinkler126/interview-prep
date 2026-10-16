@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nginx - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -35,6 +37,7 @@
           <li class="sub"><a href="#s2-4">4. 限流与安全</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
           <li class="sub"><a href="#s3-1">高频 Q&amp;A</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
 
@@ -721,6 +724,127 @@ location ~* \.(jpg|jpeg|png|gif|mp4)$ {
         <!-- Footer -->
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：反向代理的路径、超时与连接数</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>proxy_pass 的 URI 要按替换规则推导</h4>
+            <p><strong>大白话：</strong>在普通前缀 location /api/ 中，proxy_pass http://backend/ 会把匹配的 /api/ 换成 /；不带 URI 的 http://backend 通常保留原请求 URI。</p>
+            <p><strong>边界与易错：</strong>例：/api/users 分别变成 /users 与 /api/users。正则 location、rewrite 和变量形式存在额外规则，不能只背“有无斜杠”。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>读超时是两次读取之间的等待</h4>
+            <p><strong>大白话：</strong>proxy_connect_timeout 管建连，proxy_read_timeout 管上游两次读操作之间的空闲等待。</p>
+            <p><strong>边界与易错：</strong>read_timeout 不是整个响应的绝对时长；持续发少量数据的长响应可能超过它。业务总截止时间需由网关/应用协议另外设计。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>连接预算不能直接当并发用户数</h4>
+            <p><strong>大白话：</strong>Worker 的连接包含客户端和上游连接；反向代理一个请求可能占两端连接，还要考虑 keepalive 和文件描述符。</p>
+            <p><strong>边界与易错：</strong>worker_connections × worker_processes 是连接容量粗略上界，并非请求吞吐保证；慢客户端、上游延迟、CPU 与限流都会成为瓶颈。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>匹配普通前缀 location /api/
+proxy_pass 带 URI /
+上游路径 = / + 原路径去除 /api/ 前缀
+连接上游并传递请求
+按连接/读写超时分别监测</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>为什么出现 502 和 504，分别查什么？</summary><p>502 常提示上游连接或响应不合法等网关错误，先查连接拒绝、进程退出、协议/端口不匹配；504 常指网关等待上游超时，查 upstream 耗时及超时配置。最终以 error_log 与 upstream 状态计时字段为准，不能仅凭状态码断定业务根因。</p></details>
+          <details><summary>增加 worker_connections 就能提高 QPS 吗？</summary><p>只能提高可持有连接的配置上限，还受进程打开文件数、内核、CPU、内存和上游能力限制。先看连接利用率与 upstream_response_time，再判断瓶颈；后端很慢时放大连接数反而可能放大排队。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 普通 location /api/ 内配置 proxy_pass http://backend/;，请求 /api/users 上游 URI 是？</h4>
+            <ol type="A">
+              <li>/api/users</li>
+              <li>/users</li>
+              <li>/api/api/users</li>
+              <li>/backend/api/users</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>带 URI 的 proxy_pass 用其 URI 替换匹配的 location 前缀：/api/ 被 / 替换。此题限定无 rewrite、正则和变量。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. proxy_read_timeout=10s 的准确含义更接近？</h4>
+            <ol type="A">
+              <li>整个响应必须 10 秒完成</li>
+              <li>客户端只能连接 10 秒</li>
+              <li>两次上游读取之间最长等待 10 秒</li>
+              <li>后端进程最多运行 10 秒</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>它衡量上游读取空闲间隔，不是整个请求端到端硬截止时间。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：反向代理的路径、超时与连接数</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端",
+    "Location 匹配",
+    "反向代理",
+    "上游应用"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "请求 /api/users",
+      "detail": "本例使用普通前缀 location /api/，没有 rewrite 或变量。",
+      "state": [
+        "GET /api/users",
+        "待匹配",
+        "待转发",
+        "等待请求"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "命中 /api/",
+      "detail": "匹配的前缀长度确定，随后按 proxy_pass 的 URI 规则替换。",
+      "state": [
+        "等待",
+        "命中前缀 /api/",
+        "配置 http://backend/",
+        "等待请求"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "替换 URI 前缀",
+      "detail": "将 /api/ 替换为 /，不是简单拼接全部原路径。",
+      "state": [
+        "等待",
+        "/api/ → /",
+        "转发 GET /users",
+        "收到 /users"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "应用返回响应",
+      "detail": "上游按 /users 路由处理；若后端只认识 /api/users 就会出现路由错误。",
+      "state": [
+        "等待结果",
+        "匹配完成",
+        "读取响应",
+        "返回用户列表"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "响应返回客户端",
+      "detail": "客户端看见的请求路径仍是 /api/users，上游内部路径不同。",
+      "state": [
+        "收到 200",
+        "规则可复查",
+        "完成转发",
+        "完成请求"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html" target="_blank" rel="noopener noreferrer">Nginx 官方：proxy_pass 与代理超时</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

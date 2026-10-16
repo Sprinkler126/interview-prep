@@ -143,6 +143,8 @@
       .summary-table td, .summary-table th { padding: 0.4rem; }
     }
   </style>
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -155,6 +157,7 @@
 
   <div class="container">
     <h1>📊 可观测性对比</h1>
+    <p><a href="#interview-lab" style="color:var(--accent)">面试与笔试实战 · 互动练习和动画 →</a></p>
     <p class="subtitle">Prometheus vs Zabbix · SkyWalking vs Zipkin vs Jaeger · ELK vs Loki — 三大支柱，各有所长</p>
 
     <!-- TOC -->
@@ -671,6 +674,127 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：把指标、日志与链路串成排障证据</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>先用指标发现，再用追踪定位，最后用日志取细节</h4>
+            <p><strong>大白话：</strong>指标告诉你何时、哪个服务异常；Trace 告诉你请求在哪段等待；日志给出当时的错误栈和业务条件。</p>
+            <p><strong>边界与易错：</strong>三者互补，不能由一条慢 Trace 推断全站故障率。聚合统计覆盖率与采样链路覆盖率可能不同，结论要匹配样本范围。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>关联靠统一上下文与时间</h4>
+            <p><strong>大白话：</strong>服务名、环境、实例、Trace ID 和规范化时间像统一的档案索引，让不同系统能定位同一次请求。</p>
+            <p><strong>边界与易错：</strong>Trace ID 适合日志字段和追踪索引，通常不适合作常规指标标签；系统时钟偏差也会让跨服务时间轴产生误导。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>选型比较数据模型而非界面截图</h4>
+            <p><strong>大白话：</strong>时序指标适合趋势和聚合，日志库适合检索文本与字段，追踪系统适合调用关系和采样明细；OpenTelemetry 提供采集和传输规范及组件。</p>
+            <p><strong>边界与易错：</strong>OpenTelemetry 本身不等于自动提供完整长期存储和可视化后端。选型需核对查询需求、保留周期、基数、采样、运维成本与权限隔离。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>指标确认异常范围与时间
+Trace 定位慢调用关键路径
+以 trace_id 关联日志
+结合资源指标验证根因
+修复后对照同口径指标</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>P99 上升但平均值正常，如何排？</summary><p>先确认请求量和错误率、按服务/接口分组，再查看慢请求 Trace 的关键路径；用 Trace ID 关联日志确认是连接等待、锁竞争还是依赖变慢。同时核对采样偏差，不能只挑最慢一条就概括全部流量。</p></details>
+          <details><summary>怎样控制观测成本又保留可排查性？</summary><p>指标控制标签基数，日志按价值分级与设置保留期，Trace 采用有明确边界的采样，并统一服务名/环境/上下文。对关键业务保留可靠业务流水；不能把采样遥测作为完整审计账本。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 发现某接口错误率上涨，首先用什么判断影响范围最合适？</h4>
+            <ol type="A">
+              <li>单条随机日志</li>
+              <li>按接口聚合的请求数与错误率指标</li>
+              <li>一个进程的堆栈截图</li>
+              <li>某一条 Trace 的 Span 数</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>聚合指标更适合判断影响比例与时间范围；追踪和日志随后用于定位具体原因。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 关于 OpenTelemetry，正确的是？</h4>
+            <ol type="A">
+              <li>天然等于完整长期日志数据库</li>
+              <li>只支持 Java</li>
+              <li>用于遥测采集、处理和导出，通常仍需存储/查询后端</li>
+              <li>所有请求必须全量记录且永不采样</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>OpenTelemetry 提供标准化仪表化与数据传输生态，后端存储和查询需另行选择。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：把指标、日志与链路串成排障证据</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "聚合指标",
+    "慢请求 Trace",
+    "业务日志",
+    "排障结论"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发现尾延迟恶化",
+      "detail": "先看总体量和错误率，确认影响范围与开始时间。",
+      "state": [
+        "/pay P99 从 200ms 到 2s",
+        "待选择样本",
+        "待查询",
+        "已确认性能异常"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "查看慢链路关键路径",
+      "detail": "定位延迟主要在数据库连接等待，而不是盲目累加所有 Span。",
+      "state": [
+        "错误率尚低",
+        "连接池等待 1.7s",
+        "待关联",
+        "怀疑连接池饱和"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "关联同一请求日志",
+      "detail": "用 Trace ID 和环境等条件匹配具体事件。",
+      "state": [
+        "连接池在用数达上限",
+        "Trace T21",
+        "T21 获取连接等待超时",
+        "获得具体异常证据"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "结合资源指标验证",
+      "detail": "把个例与总体指标对齐，再检查慢 SQL 或泄漏导致的占用。",
+      "state": [
+        "活跃连接持续满额",
+        "多条慢链路相似",
+        "慢 SQL 占用时间长",
+        "根因指向连接长期占用"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "修复后验证",
+      "detail": "同时间窗口观察分位数、错误率、连接池和日志变化。",
+      "state": [
+        "P99 恢复且错误率下降",
+        "关键路径缩短",
+        "异常数量下降",
+        "证据支持修复有效"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://opentelemetry.io/docs/concepts/signals/" target="_blank" rel="noopener noreferrer">OpenTelemetry 官方：遥测信号</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

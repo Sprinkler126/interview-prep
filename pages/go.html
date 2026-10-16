@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Go - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#s2-3">性能调优</a></li>
           <li class="sub"><a href="#s2-4">微服务开发</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -809,6 +812,104 @@ message UserResponse {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>slice：复制的是窗口描述，不是底层数组</h3>
+            <p>大白话：slice像一张写着“从哪开始、能看多长、还能扩多大”的卡片。把slice赋给别人，通常仍看同一块底层数组。</p>
+            <p><strong>边界与易错：</strong>边界：append容量够时复用数组，容量不够时可能换数组。若要独立数据，显式分配并copy；切小片段也可能让大数组继续存活。</p>
+          </article>
+          <article class="lab-concept"><h3>channel关闭：由发送方管理生命周期</h3>
+            <p>大白话：close表示以后不会再有新值，不是把已有缓冲值扔掉。接收方先取完剩余值，然后收到零值和ok=false。</p>
+            <p><strong>边界与易错：</strong>易错：给关闭channel发送会panic；nil channel收发会阻塞。多个发送者要协调最后一次close，不能让每个worker各自关闭。</p>
+          </article>
+          <article class="lab-concept"><h3>并发错误：循环变量与共享变量要分开谈</h3>
+            <p>大白话：goroutine不是自动给变量拍快照。显式把本轮值作为参数传入，意图最直白；共享map或计数仍需要同步。</p>
+            <p><strong>边界与易错：</strong>版本边界：Go 1.22起、采用新语言语义的循环声明变量每轮独立；循环外已声明变量再赋值仍可共享。不要把旧版闭包问题说成所有Go版本的必然结果。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>为什么有context取消仍会goroutine泄漏？</summary><p>context是取消信号，任务必须在阻塞点select监听Done或调用支持取消的API。若卡在无接收者的发送、永不返回的调用，信号不会自动杀死goroutine。</p></details>
+          <details class="lab-question"><summary>interface变量为什么不等于nil，里面却像是nil？</summary><p>接口同时携带动态类型和动态值；装入一个类型为*MyError的nil指针后，动态类型存在，接口整体不为nil。无错误时直接返回nil接口，避免typed nil误导调用方。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 有缓冲channel关闭后，其缓冲区还有2个元素，接收方会怎样？</h4>
+            <ol type="A">
+              <li>立刻丢弃元素</li>
+              <li>先读2个元素，再读到零值和false</li>
+              <li>所有接收panic</li>
+              <li>必须重新打开</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>close禁止继续发送，已缓冲的数据仍可正常接收；耗尽后接收立即返回元素零值且ok=false。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0"><h4>2. s和t共享底层数组，执行 t[0]=9 后通常会怎样？</h4>
+            <ol type="A">
+              <li>s对应元素也改变</li>
+              <li>s一定完全不变</li>
+              <li>编译失败</li>
+              <li>自动深拷贝数组</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：A。</strong>slice赋值复制描述符，不复制底层数组；两者重叠的索引区域指向相同存储。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>slice共享数组：append扩容前后的分界</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "slice s",
+    "slice t",
+    "原数组",
+    "新数组"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "建立s",
+      "detail": "教学例：s长度2、容量2，底层数组为[1,2]。",
+      "state": [
+        "len2 cap2",
+        "尚未赋值",
+        "[1,2]",
+        "无"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "t=s",
+      "detail": "两个描述符共享同一数组。",
+      "state": [
+        "len2 cap2",
+        "len2 cap2",
+        "[1,2]",
+        "无"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "修改t[0]=9",
+      "detail": "s[0]也看到9，因为还没有新数组。",
+      "state": [
+        "[9,2]",
+        "[9,2]",
+        "[9,2]",
+        "无"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "t=append(t,3)",
+      "detail": "原容量已满，需新数组；之后t修改不再影响原数组。",
+      "state": [
+        "[9,2]",
+        "[9,2,3]",
+        "[9,2]",
+        "[9,2,3]"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://go.dev/doc/faq#closures_and_goroutines" target="_blank" rel="noopener noreferrer">Go FAQ：循环变量与goroutine</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

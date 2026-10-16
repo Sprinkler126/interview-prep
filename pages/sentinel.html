@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sentinel - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">Dashboard 控制台</a></li>
           <li class="sub"><a href="#s2-4">Spring Cloud 集成</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -465,6 +468,127 @@ spring:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：限流、熔断与恢复探测</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>限流管入口量，熔断管坏依赖</h4>
+            <p><strong>大白话：</strong>限流像门口发号，控制进入资源的流量；熔断像暂停接通故障线路，避免持续等待慢依赖拖垮自己。</p>
+            <p><strong>边界与易错：</strong>QPS 低不等于并发低：单请求变慢时并发仍会积累。并发线程数控制能限制在途量，但不等同于独立线程池的物理隔离。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>熔断要看窗口与最小样本量</h4>
+            <p><strong>大白话：</strong>慢调用比例或异常比例达到条件才触发熔断，最低请求数避免因一两个样本就下结论。</p>
+            <p><strong>边界与易错：</strong>异常需要通过正确的资源入口和追踪方式计入统计；手工吞掉异常可能使熔断器看见“成功”。低流量时要明确样本不足的行为。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>半开不是全部恢复放行</h4>
+            <p><strong>大白话：</strong>Open 期间快速拒绝，等待恢复时间后进入探测阶段，只允许受控探测请求判断依赖是否恢复。</p>
+            <p><strong>边界与易错：</strong>探测失败应回到 Open；恢复太激进会形成流量锯齿。blockHandler 处理限流/熔断阻断，fallback 用于适配后的业务异常回退，二者不要混为一谈。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>进入资源并校验流控规则
+若熔断 Open：快速阻断
+若允许：调用依赖并记录耗时/异常
+统计窗口满足阈值：打开熔断
+恢复期后受控探测，再决定恢复</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>为什么只有每秒几十个请求，线程仍耗尽？</summary><p>依赖从 20ms 变成 10s，按并发≈吞吐×耗时，50 req/s 可能堆出约 500 个在途请求。应配合调用超时、并发限流和慢调用熔断，而非仅把 QPS 阈值继续调大。</p></details>
+          <details><summary>熔断恢复后为什么又马上打挂？</summary><p>若探测后立刻恢复全部流量，依赖仍可能承受不了。检查半开探测条件、慢调用阈值、上游重试放大及恢复后的容量，必要时配合灰度流量恢复；回退结果也要明确业务语义。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 吞吐稳定 20 req/s，平均请求时长 2s，稳定状态平均在途量约为？</h4>
+            <ol type="A">
+              <li>10</li>
+              <li>20</li>
+              <li>40</li>
+              <li>400</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>Little 定律 L≈λW=20×2=40；说明低 QPS 配合高耗时也能产生明显并发积压。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 熔断器处于半开状态时，较合理的行为是？</h4>
+            <ol type="A">
+              <li>无限制放开所有请求</li>
+              <li>受控放行探测请求</li>
+              <li>永久拒绝</li>
+              <li>清空所有业务数据库</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>半开用于验证恢复；探测成功/失败再决定关闭熔断或重新打开。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：限流、熔断与恢复探测</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "业务请求",
+    "资源统计",
+    "熔断器",
+    "下游依赖"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "正常调用",
+      "detail": "教学例子：慢调用比例策略已配置，并满足最低样本量要求。",
+      "state": [
+        "正常进入",
+        "窗口收集耗时",
+        "Closed",
+        "正常响应"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "慢调用比例升高",
+      "detail": "不是一次请求慢就一定熔断，而是窗口统计满足规则。",
+      "state": [
+        "部分等待",
+        "慢调用超阈值",
+        "将触发 Open",
+        "持续变慢"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "打开熔断",
+      "detail": "新请求快速失败或返回明确回退，避免继续堆线程。",
+      "state": [
+        "被快速阻断",
+        "持续维护窗口",
+        "Open",
+        "暂停新调用"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "等待后受控探测",
+      "detail": "恢复时间到后允许探测，并非所有请求都放行。",
+      "state": [
+        "一个探测请求",
+        "记录探测耗时",
+        "Half-Open",
+        "处理探测"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "探测正常，恢复",
+      "detail": "本例探测成功转 Closed；失败则重新 Open。",
+      "state": [
+        "后续按规则进入",
+        "重新观察窗口",
+        "Closed",
+        "恢复正常"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://sentinelguard.io/en-us/docs/circuit-breaking.html" target="_blank" rel="noopener noreferrer">Sentinel 官方：熔断状态与策略</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

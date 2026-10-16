@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spring - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#s2-3">Spring 中的设计模式</a></li>
           <li class="sub"><a href="#s2-4">常见面试陷阱题</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -608,28 +611,28 @@ public class OrderService {
         </div>
 
         <div class="qa">
-          <div class="q>Spring 中使用了哪些设计模式？请举例说明。</div>
+          <div class="q">Spring 中使用了哪些设计模式？请举例说明。</div>
           <div class="a">
             <strong>参考：</strong>1）工厂模式：BeanFactory 创建和管理 Bean；2）单例模式：Bean 默认 singleton，通过三级缓存管理；3）代理模式：AOP 通过 JDK 动态代理或 CGLIB 实现方法增强；4）模板方法：JdbcTemplate 封装了获取连接、执行 SQL、关闭连接的固定流程，子类只需实现 SQL 逻辑；5）观察者模式：ApplicationEvent + ApplicationListener 实现事件驱动；6）适配器模式：Spring MVC 的 HandlerAdapter 适配不同类型的 Handler（Controller 方法、HttpRequestHandler 等）；7）策略模式：Resource 接口有 ClassPathResource、FileSystemResource 等多种实现。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>@Autowired 和 @Resource 有什么区别？</div>
+          <div class="q">@Autowired 和 @Resource 有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>@Autowired 是 Spring 注解，按类型注入（byType），找到多个候选时按字段名匹配，可配合 @Qualifier 指定名称。@Resource 是 JSR-250 标准注解，先按名称（byName）再按类型（byType）注入。区别：1）来源不同：@Autowired 是 Spring 特有，@Resource 是 Java 标准；2）注入策略不同：@Autowired 先类型后名称，@Resource 先名称后类型；3）@Autowired 支持 required=false 允许 null，@Resource 不支持。推荐使用构造器注入（Spring 官方推荐），可以保证依赖不为空且便于单元测试。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring 的 BeanPostProcessor 有什么作用？有哪些常见的实现？</div>
+          <div class="q">Spring 的 BeanPostProcessor 有什么作用？有哪些常见的实现？</div>
           <div class="a">
             <strong>参考：</strong>BeanPostProcessor 是 Spring 的扩展点，在 Bean 初始化前后进行处理。postProcessBeforeInitialization 在 @PostConstruct 之前执行，postProcessAfterInitialization 在初始化之后执行（AOP 代理在此创建）。常见实现：1）AutowiredAnnotationBeanPostProcessor：处理 @Autowired 注入；2）CommonAnnotationBeanPostProcessor：处理 @Resource、@PostConstruct、@PreDestroy；3）AbstractAutoProxyCreator：创建 AOP 代理；4）ApplicationContextAwareProcessor：注入 ApplicationContext；5）ScheduledAnnotationBeanPostProcessor：处理 @Scheduled 定时任务。通过实现 BeanPostProcessor 可以在不修改业务代码的情况下增强 Bean 功能。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Spring 中 singleton Bean 注入 prototype Bean 会有什么问题？如何解决？</div>
+          <div class="q">Spring 中 singleton Bean 注入 prototype Bean 会有什么问题？如何解决？</div>
           <div class="a">
             <strong>参考：</strong>问题：singleton Bean 在容器启动时创建并注入 prototype Bean 的实例，之后每次调用 singleton Bean 的方法时，使用的都是同一个 prototype 实例，prototype 的"每次创建新实例"特性失效。解决方案：1）@Lookup 注解：在 singleton Bean 中添加 @Lookup 方法，Spring 会通过 CGLIB 重写该方法，每次调用时从容器获取新的 prototype 实例；2）注入 ObjectFactory&lt;PrototypeBean&gt;，每次调用 getObject() 获取新实例；3）注入 ApplicationContext，每次调用 getBean() 获取新实例。推荐使用 @Lookup 方式，代码最简洁。
           </div>
@@ -637,6 +640,104 @@ public class OrderService {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>代理事务：调用有没有经过代理是关键</h3>
+            <p>大白话：事务像门口的登记员，外部先经过代理才能开启和结束事务；同一个对象内部this调用，通常绕过门口，不触发新的代理拦截。</p>
+            <p><strong>边界与易错：</strong>边界：这里讨论代理模式，不把AspectJ织入等其他模式混为一谈。private/final与代理类型有关；不要简单说“标注@Transactional就必然生效”。</p>
+          </article>
+          <article class="lab-concept"><h3>事务回滚：异常到哪里、规则是什么都重要</h3>
+            <p>大白话：事务拦截器需要看到异常并按回滚规则决定提交或回滚。业务catch后正常返回，拦截器未必知道你认为失败。</p>
+            <p><strong>边界与易错：</strong>易错：默认通常对RuntimeException和Error回滚，checked异常需明确规则；内层标记rollback-only后外层即使catch也可能出现UnexpectedRollbackException。</p>
+          </article>
+          <article class="lab-concept"><h3>Bean生命周期：初始化对象与获得可用代理不是同一步</h3>
+            <p>大白话：容器先构造实例，再填依赖、执行初始化回调和后处理等；AOP代理常在后处理阶段形成，依赖注入对象可能是代理引用。</p>
+            <p><strong>边界与易错：</strong>边界：不要在构造函数或初始化阶段假定自身事务代理已生效。单例Bean不等于线程安全，prototype对象销毁责任也不能照搬单例生命周期。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>REQUIRED与REQUIRES_NEW在外层失败时有何差别？</summary><p>REQUIRED常加入已有物理事务，最终提交回滚相关联；REQUIRES_NEW在支持的事务管理器下挂起外层并开启独立事务，内层可独立提交。后者会增加连接资源压力，必须评估池容量。</p></details>
+          <details class="lab-question"><summary>构造器循环依赖为什么难以解决？</summary><p>A创建前需要B，B创建前又需要A，两边都没有完成实例化，无法像部分setter单例场景那样暴露早期引用。优先重新划分职责或引入合适的延迟依赖，不把容器技巧当设计解法。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 默认代理模式下，this.save()调用同类带@Transactional的方法，通常会怎样？</h4>
+            <ol type="A">
+              <li>一定开启新事务</li>
+              <li>绕过代理，不触发该方法的新事务拦截</li>
+              <li>自动切换AspectJ</li>
+              <li>必定编译报错</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>内部直接调用目标对象方法，没有经过代理边界；是否已有外层事务需另看调用上下文。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 按常见默认回滚规则，哪种异常通常触发Spring声明式事务回滚？</h4>
+            <ol type="A">
+              <li>所有checked异常</li>
+              <li>RuntimeException</li>
+              <li>仅IOException</li>
+              <li>只要打印错误日志</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>默认回滚通常覆盖RuntimeException和Error；checked异常可通过rollbackFor等规则调整，日志不会自动触发回滚。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>事务自调用：经过代理和绕过代理的区别</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "外部调用方",
+    "Spring代理",
+    "Service目标",
+    "事务状态"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "外部调用未标注的入口",
+      "detail": "假设outer本身无事务，内部准备调用save。",
+      "state": [
+        "调用outer",
+        "进入outer拦截链",
+        "outer执行",
+        "无事务"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "outer中执行this.save",
+      "detail": "this指向目标对象，直接进入save方法体。",
+      "state": [
+        "等待",
+        "没有新拦截",
+        "this.save执行",
+        "未因save注解开启"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "改由外部调用save",
+      "detail": "通过正确边界调用代理上的save。",
+      "state": [
+        "调用proxy.save",
+        "匹配事务规则",
+        "等待执行",
+        "准备开启"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "代理开启与结束事务",
+      "detail": "代理先begin，再调用目标；正常提交或按规则回滚。",
+      "state": [
+        "收到结果",
+        "begin→调用→提交",
+        "save执行业务",
+        "事务受管理"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.spring.io/spring-framework/reference/core/aop/proxying.html" target="_blank" rel="noopener noreferrer">Spring AOP代理机制官方文档</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grafana - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -31,6 +33,7 @@
           <li class="sub"><a href="#s2-3">Provisioning</a></li>
           <li class="sub"><a href="#s2-4">插件生态与权限管理</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -351,6 +354,127 @@ datasources:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：从曲线到可执行告警</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>Grafana 查询数据源，不自动代替数据库</h4>
+            <p><strong>大白话：</strong>面板像仪表盘，按时间区间查询 Prometheus、日志库或其他数据源，再把结果画出来。</p>
+            <p><strong>边界与易错：</strong>页面没数据先分清数据源采集失败、查询标签不匹配与时间范围问题；仅重启 Grafana 通常不能修复指标源的缺失。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>告警先判断，通知再分发</h4>
+            <p><strong>大白话：</strong>告警规则周期性查询并计算条件；持续超阈值可先进入 Pending，再达到等待时长才进入 Alerting。</p>
+            <p><strong>边界与易错：</strong>等待时长是防抖，不是查询窗口。No Data 与 Error 需要显式策略，不能一律当作“系统健康”。通知静默也不意味着规则停止计算。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>图上平均值会掩盖尾延迟</h4>
+            <p><strong>大白话：</strong>平均耗时像全班平均分，少数极慢请求可能被大量快请求冲淡；P95/P99 更适合观察尾部体验。</p>
+            <p><strong>边界与易错：</strong>不能把多个实例的 P99 再求平均作为整体 P99；应在数据源层用可聚合分布计算，图表单位与查询聚合维度也必须一致。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>定时查询数据源
+计算条件：错误率 &gt; 5%
+首次满足：进入 Pending
+持续满等待期：进入 Alerting
+通知策略 → 分组 / 路由 / 静默</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>曲线有尖峰但没收到告警，怎么回答？</summary><p>检查评估时间间隔是否采到尖峰、reduce 函数和阈值是否一致、Pending 是否满足、通知路由和静默是否命中。面板可有自己的下采样与时间窗口，肉眼尖峰不一定等于告警条件连续成立。</p></details>
+          <details><summary>如何减少半夜无效告警？</summary><p>围绕用户可感知的错误率和延迟定义规则，设最小请求量、等待窗口、合理分组与路由，给出负责人和排查链接。关键采集缺失单独报警，避免用长 Pending 掩盖真实故障。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 规则等待时长 2 分钟，条件只连续为真 30 秒就恢复，通常会怎样？</h4>
+            <ol type="A">
+              <li>必然进入 Alerting</li>
+              <li>先 Pending，未满等待期就恢复</li>
+              <li>永久停在 Error</li>
+              <li>删除数据源</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>等待期要求条件持续成立；短暂尖峰通常不足以进入 Alerting，具体恢复行为还受规则设置影响。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. Grafana 面板无数据时，哪项排查最直接？</h4>
+            <ol type="A">
+              <li>立即增加 CPU</li>
+              <li>先在数据源执行同一查询并核对时间和标签</li>
+              <li>删除所有面板</li>
+              <li>把阈值改成 0</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>先验证原始查询能否返回数据，再判断展示与权限问题，能缩小故障范围。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：从曲线到可执行告警</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "指标源",
+    "规则评估器",
+    "告警状态",
+    "通知路由"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "第 0 分钟：错误率上升",
+      "detail": "教学例子：阈值 5%，等待期 2 分钟，每分钟评估。",
+      "state": [
+        "错误率 8%",
+        "即将评估",
+        "Normal",
+        "未发送"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "条件首次成立",
+      "detail": "满足阈值后开始计时，尚未满足持续时间。",
+      "state": [
+        "错误率 8%",
+        "条件为真，计时 0 分钟",
+        "Pending",
+        "未发送"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "第 1 分钟仍异常",
+      "detail": "持续异常 1 分钟，还未达到等待期。",
+      "state": [
+        "错误率 9%",
+        "条件为真，持续 1 分钟",
+        "Pending",
+        "未发送"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "第 2 分钟进入告警",
+      "detail": "持续异常满 2 分钟，状态进入 Alerting。",
+      "state": [
+        "错误率 7%",
+        "条件为真，持续 2 分钟",
+        "Alerting",
+        "匹配团队路由"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "按通知策略处理",
+      "detail": "分组、静默和通知间隔影响投递，不改变错误率事实。",
+      "state": [
+        "错误率仍高",
+        "继续周期评估",
+        "Alerting",
+        "发送或按策略静默"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://grafana.com/docs/grafana/latest/alerting/fundamentals/alert-rule-evaluation/" target="_blank" rel="noopener noreferrer">Grafana 官方：告警评估与状态</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

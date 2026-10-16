@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>计算机组成原理 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -17,7 +19,8 @@
         <li><a href="#part1">第一部分：技术原理</a></li>
         <li class="sub"><a href="#s1-1">冯·诺依曼体系</a></li><li class="sub"><a href="#s1-2">CPU 与指令执行</a></li><li class="sub"><a href="#s1-3">存储层次与 Cache</a></li><li class="sub"><a href="#s1-4">流水线与性能</a></li>
         <li><a href="#part2">第二部分：场景化讲解</a></li><li class="sub"><a href="#s2-1">程序如何运行</a></li><li class="sub"><a href="#s2-2">Cache 性能问题</a></li><li class="sub"><a href="#s2-3">磁盘与 IO</a></li><li><a href="#part3">第三部分：模拟面试</a></li>
-      </ul></aside>
+        <li><a href="#interview-lab">面试笔试与交互演示</a></li>
+        </ul></aside>
       <main class="main-content">
         <h2 id="part1"><span class="icon">🔩</span>第一部分：技术原理</h2>
         <h3 id="s1-1">1.1 冯·诺依曼体系结构</h3>
@@ -65,6 +68,104 @@
         <div class="qa"><div class="q">CPU 的字长和 64 位系统分别意味着什么？</div><div class="a"><strong>参考：</strong>字长通常表示 CPU 一次自然处理的数据宽度及寄存器宽度。64 位 ISA 可使用 64 位通用寄存器和更大的虚拟地址空间；它不等于物理内存一定有 2<sup>64</sup> 字节，也不意味着所有指令/数据都必须是 64 位。</div></div>
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>Cache 地址拆分：先算块内偏移，再算索引</h3>
+            <p>大白话：内存地址先告诉你块内第几个字节，再告诉你去哪个组，剩下的标记用来核对是不是要找的块。组相联中组内多个路都要匹配标记。</p>
+            <p><strong>边界与易错：</strong>易错：按字节编址时，64B块的偏移为6位。Cache容量通常题目给数据容量，是否含标记位必须看题意；全相联没有组索引位。</p>
+          </article>
+          <article class="lab-concept"><h3>流水线：吞吐率提高不代表单条指令更快</h3>
+            <p>大白话：像洗衣、晾衣、收衣由不同工位并行做，多批任务能重叠。k段流水线在理想等长条件下执行 n 条指令需 k+n−1 个周期。</p>
+            <p><strong>边界与易错：</strong>边界：数据相关可能停顿或转发，分支错误要冲刷，资源冲突造成结构冒险。时钟周期由最慢段及寄存器开销约束。</p>
+          </article>
+          <article class="lab-concept"><h3>补码溢出：看符号变化，别只看最高进位</h3>
+            <p>大白话：固定 n 位整数像只能显示 n 格的计数器。两正数相加得到负数或两负数相加得到非负数，就发生有符号溢出。</p>
+            <p><strong>边界与易错：</strong>易错：无符号加法的进位标志和有符号溢出不同。8位补码范围是−128~127，−128没有可表示的正相反数。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>为什么提升CPU频率一倍，程序不一定快一倍？</summary><p>执行时间=指令数×CPI÷频率；CPI会受访存、分支和依赖影响，程序还可能受磁盘或网络限制。先看实际热点，不能仅用频率推断端到端性能。</p></details>
+          <details class="lab-question"><summary>直接映射Cache命中率差，扩容一定有用吗？</summary><p>若热点地址反复映射到同一行，冲突未命中可能占主导。增大相联度或改变布局可能更有效；还要区分首次访问、容量不足和映射冲突。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 32位字节地址、32KiB数据Cache、64B块、4路组相联，组索引有几位？</h4>
+            <ol type="A">
+              <li>6</li>
+              <li>7</li>
+              <li>8</li>
+              <li>9</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>组数=32768÷64÷4=128，所以索引7位；块内偏移6位，标记为32−7−6=19位。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2"><h4>2. 理想5级等长流水线执行10条指令，忽略停顿，需要多少周期？</h4>
+            <ol type="A">
+              <li>5</li>
+              <li>10</li>
+              <li>14</li>
+              <li>50</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>首条指令用5周期填满流水线，此后每周期完成一条，总计5+10−1=14周期。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>直接映射Cache：地址0与128的冲突</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "CPU地址",
+    "组索引",
+    "Cache行0",
+    "主存"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "设定教学Cache",
+      "detail": "4行、每行32B，先假设Cache为空。",
+      "state": [
+        "0",
+        "0",
+        "无效",
+        "块0"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "第一次读地址0",
+      "detail": "块号0映射行0，未命中后装入，标记0。",
+      "state": [
+        "0",
+        "0",
+        "标记0／块0",
+        "读入块0"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "接着读地址128",
+      "detail": "块号4仍映射行0，标记变为1，块0被替换。",
+      "state": [
+        "128",
+        "0",
+        "标记1／块4",
+        "读入块4"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "再次读地址0",
+      "detail": "行0虽有效但标记不匹配，再次冲突未命中。",
+      "state": [
+        "0",
+        "0",
+        "标记0／块0",
+        "重新读块0"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://pages.cs.wisc.edu/~remzi/OSTEP/" target="_blank" rel="noopener noreferrer">计算机体系结构开放教材</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

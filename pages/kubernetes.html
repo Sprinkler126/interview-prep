@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kubernetes - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-2">RBAC 权限控制</a></li>
           <li class="sub"><a href="#s2-3">网络模型</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -835,21 +838,21 @@ roleRef:
         </div>
 
         <div class="qa">
-          <div class="q>Kubernetes 的 PV、PVC 和 StorageClass 分别是什么？</div>
+          <div class="q">Kubernetes 的 PV、PVC 和 StorageClass 分别是什么？</div>
           <div class="a">
             <strong>参考：</strong>PV（PersistentVolume）是管理员定义的存储资源，描述存储的容量、访问模式、后端类型。PVC（PersistentVolumeClaim）是用户对存储的申请，声明需要多大容量和什么访问模式。Kubernetes 自动将匹配的 PV 绑定到 PVC。StorageClass 实现动态供应：定义存储的"类别"（如 SSD、HDD），用户创建 PVC 时指定 StorageClass，系统自动创建 PV，无需管理员手动干预。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>RBAC 是如何工作的？Role 和 ClusterRole 有什么区别？</div>
+          <div class="q">RBAC 是如何工作的？Role 和 ClusterRole 有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>RBAC（基于角色的访问控制）通过 Role/ClusterRole 定义权限（对哪些资源可以执行哪些操作），通过 RoleBinding/ClusterRoleBinding 将角色绑定到用户/组/ServiceAccount。Role 和 RoleBinding 是 Namespace 级别的，只在特定命名空间内生效。ClusterRole 和 ClusterRoleBinding 是集群级别的，对整个集群生效。典型场景：为 CI/CD 的 ServiceAccount 绑定特定命名空间的部署权限。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Kubernetes 的 Service 是如何实现的？iptables 和 IPVS 有什么区别？</div>
+          <div class="q">Kubernetes 的 Service 是如何实现的？iptables 和 IPVS 有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>kube-proxy 监听 API Server 的 Service 和 Endpoints 变化，在节点上维护网络规则。iptables 模式：为每个 Service 创建 iptables 规则，随机选择后端 Pod，Service 多时规则线性增长影响性能。IPVS 模式：使用 Linux 内核 IPVS 模块，哈希表查找性能更好，支持多种负载均衡算法（轮询、最少连接、源地址哈希），适合大规模集群。
           </div>
@@ -857,6 +860,127 @@ roleRef:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：探针、调度与滚动发布的判题边界</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>三个探针问三个问题</h4>
+            <p><strong>大白话：</strong>startup 问是否启动完成，readiness 问能否接新流量，liveness 问是否需要重启恢复。</p>
+            <p><strong>边界与易错：</strong>Readiness 失败通常让 Pod 不再作为就绪后端，而不是直接重启；startup 成功前会抑制其他两种探针。把外部数据库波动绑到 liveness 易引发重启风暴。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>requests 用于安排座位，limits 用于限制消耗</h4>
+            <p><strong>大白话：</strong>调度器按资源请求量等条件选节点；CPU limit 像限速，内存 limit 越界则可能被 OOM 终止。</p>
+            <p><strong>边界与易错：</strong>节点有实际空闲不保证请求量能放下；只有 limit 没有显式 request 时可能有默认行为，应检查最终 Pod spec，避免机械套公式。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>滚动更新要同时控制存量与增量</h4>
+            <p><strong>大白话：</strong>maxSurge 控制更新期间可多建多少 Pod，maxUnavailable 控制允许多少期望副本不可用。</p>
+            <p><strong>边界与易错：</strong>可用不只是进程 Running，还要 readiness 等条件满足；资源不足时新副本 Pending，会拖住发布。优雅终止要处理流量摘除传播和已有请求收尾。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>创建新版本 Pod
+等待 startup 成功
+等待 readiness 成功并满足发布条件
+在 maxUnavailable 预算内终止旧 Pod
+重复直到副本达到目标版本</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>应用启动慢，应把 liveness 超时设很大吗？</summary><p>优先用 startupProbe 给初始化单独预算；启动完成后保留敏捷的 liveness。readiness 应反映接单能力。这样不必在“慢启动被杀”和“运行后死锁发现太晚”之间硬做同一个参数取舍。</p></details>
+          <details><summary>4 副本，maxUnavailable=1、maxSurge=1 怎么解释？</summary><p>更新时最多允许比期望多 1 个 Pod，期望可用副本下界为 4−1=3（按这些更新参数理解）。新 Pod 要就绪，控制器才继续替换；节点故障等额外事件仍可能突破理想可用性。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. readinessProbe 失败，最符合通常语义的是？</h4>
+            <ol type="A">
+              <li>一定重启容器</li>
+              <li>该 Pod 不再被视为就绪流量后端</li>
+              <li>删除 Deployment</li>
+              <li>自动扩容数据库</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>readiness 管接流量资格；liveness 才用于判断是否需要重启，不能混用。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 期望副本 4，maxSurge=1，滚动更新允许的 Pod 数上限通常为？</h4>
+            <ol type="A">
+              <li>3</li>
+              <li>4</li>
+              <li>5</li>
+              <li>8</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>4+1=5；终止过程中的 Pod 计数和资源实际占用有生命周期细节，这里考更新参数的计划上限。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：探针、调度与滚动发布的判题边界</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "Deployment",
+    "旧 Pod A",
+    "新 Pod B",
+    "Service 后端"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "提交新镜像",
+      "detail": "教学模型只显示一次副本替换，控制器按滚动参数推进。",
+      "state": [
+        "目标版本 v2",
+        "v1 就绪",
+        "未创建",
+        "A 接流量"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B 启动中",
+      "detail": "startup 尚未成功，此时不能因为进程出现就接流量。",
+      "state": [
+        "等待 B",
+        "v1 就绪",
+        "v2 初始化",
+        "仍只有 A"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B Readiness 通过",
+      "detail": "启动完成且接单检查通过，B 成为就绪候选。",
+      "state": [
+        "观察就绪",
+        "v1 就绪",
+        "v2 Ready",
+        "加入 B"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "终止旧 A",
+      "detail": "流量摘除与终止并发传播，应用需留出已有请求收尾预算。",
+      "state": [
+        "缩减旧副本",
+        "停止接新单并处理在途请求",
+        "v2 Ready",
+        "向 B 路由"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "本次替换完成",
+      "detail": "控制器持续比较期望和实际，而不是只执行一次命令。",
+      "state": [
+        "v2 达到期望",
+        "已退出",
+        "v2 Ready",
+        "B 接流量"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/" target="_blank" rel="noopener noreferrer">Kubernetes 官方：Pod 生命周期与探针</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

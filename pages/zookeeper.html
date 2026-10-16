@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zookeeper - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">Zookeeper 集群</a></li>
           <li class="sub"><a href="#s2-4">ZK vs etcd vs Consul</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -456,6 +459,105 @@ server.4=zk4:2888:3888:observer
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>会话断开不等于会话过期</h3>
+            <p>短暂断连可能恢复原会话，临时节点仍存在；服务端判定过期后才删除。客户端若失去锁的有效性证明，应停止关键操作，不能仅凭本地还记得锁路径继续写。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>监听是通知，不是完整事件总线</h3>
+            <p>经典一次性 Watch 触发后需重新注册，断连期间不能用通知次数还原所有中间变化；新版本也有持久监听形式，使用时应明确 API。收到通知后重新读实际状态才可靠。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>顺序临时节点锁减少惊群</h3>
+            <p>每个竞争者创建节点，最小序号持锁，其余只监听前驱。检查前驱和注册监听之间仍可能前驱消失，需要用 exists 等带监听操作并在返回不存在时重试判断。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>为什么仅监听前一个节点而不是锁目录？</summary><p>释放时只唤醒后继，减少所有竞争者同时争抢的惊群；后继仍需重新读取和判断，不应把通知当成已获锁。</p></details>
+          <details class="study-followup"><summary>ZooKeeper 保证所有客户端读到相同最新值吗？</summary><p>不能简单这样说。普通读可落在 follower 并看到滞后视图；要结合会话顺序、一致性需求及同步机制解释。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 会话短暂断连但尚未过期，临时节点通常会？</h4>
+            <ol type="A">
+              <li>立即必定删除</li>
+              <li>可继续存在，等待重连或超时判定</li>
+              <li>自动变成永久节点</li>
+              <li>复制到客户端磁盘</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。删除依据会话过期或显式关闭等条件，不是每次网络抖动立即触发。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. 传统一次性 Watch 被触发后，要继续监测一般需要？</h4>
+            <ol type="A">
+              <li>重新读取状态并注册监听</li>
+              <li>假设仍永久有效</li>
+              <li>删除整个集群</li>
+              <li>把通知数当数据库版本</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。一次性监听不会持续产生所有后续事件；应与持久 Watch 的 API 区别说明。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>临时顺序节点锁按前驱交接</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端 A",
+    "客户端 B",
+    "客户端 C",
+    "锁目录"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A 入队",
+      "detail": "A 创建最小的临时顺序节点。",
+      "state": [
+        "持锁 001",
+        "未创建",
+        "未创建",
+        "001"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "B 入队",
+      "detail": "B 发现 001 比自己小，只监听 001。",
+      "state": [
+        "持锁",
+        "002 等待 001",
+        "未创建",
+        "001,002"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "C 入队",
+      "detail": "C 只监听前驱 002，不监听全部目录变化。",
+      "state": [
+        "持锁",
+        "等待",
+        "003 等待 002",
+        "001,002,003"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 释放",
+      "detail": "001 删除只唤醒 B；B 重新判断最小后获锁。",
+      "state": [
+        "释放",
+        "002 持锁",
+        "继续等 002",
+        "002,003"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html" target="_blank" rel="noopener noreferrer">ZooKeeper 程序员指南</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

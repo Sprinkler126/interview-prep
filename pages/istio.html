@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Istio - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">Envoy 原理</a></li>
           <li class="sub"><a href="#s2-4">与 Linkerd / Consul 对比</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -474,42 +477,42 @@ spec:
         </div>
 
         <div class="qa">
-          <div class="q>Istio 如何实现金丝雀发布？</div>
+          <div class="q">Istio 如何实现金丝雀发布？</div>
           <div class="a">
             <strong>参考：</strong>Istio 通过 VirtualService 和 DestinationRule 实现金丝雀。VirtualService 定义路由规则：1）基于权重：v1 90% + v2 10%，逐步调整比例；2）基于 Header：内部测试人员在请求头加 x-canary-user: true 访问 v2，其他用户访问 v1。DestinationRule 定义服务版本子集（subset）。配合 Ingress Gateway 处理外部流量。优势：无需修改部署配置，纯流量控制。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Istio 的熔断是怎么实现的？</div>
+          <div class="q">Istio 的熔断是怎么实现的？</div>
           <div class="a">
             <strong>参考：</strong>Istio 的熔断基于 Envoy 的 Outlier Detection（异常检测）。在 DestinationRule 中配置：当后端实例连续返回 5xx 错误超过阈值（consecutive5xxErrors: 5），自动将其从负载均衡池中驱逐（eject）。驱逐时间结束后（baseEjectionTime: 30s），Envoy 自动恢复探测。可配置最大驱逐比例（maxEjectionPercent: 50），避免全部实例被驱逐。还可配置连接池限制（maxConnections）。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Istio 的 mTLS 是如何工作的？PERMISSIVE 和 STRICT 模式有什么区别？</div>
+          <div class="q">Istio 的 mTLS 是如何工作的？PERMISSIVE 和 STRICT 模式有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>mTLS（双向 TLS）要求客户端和服务端都出示证书，实现双向认证和加密通信。Istiod 自动为每个服务签发 SPIFFE 格式的证书，自动轮换。PERMISSIVE 模式同时接受 mTLS 和明文流量，适合从非网格迁移到网格的过渡期。STRICT 模式只接受 mTLS 流量，生产环境推荐。Envoy Sidecar 自动处理 mTLS 握手，应用代码无需关心。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>VirtualService 和 DestinationRule 分别是什么？有什么区别？</div>
+          <div class="q">VirtualService 和 DestinationRule 分别是什么？有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>VirtualService 定义路由规则：根据条件（Header、Path、权重）将请求路由到不同版本的服务。DestinationRule 定义流量策略：连接池大小、熔断规则、负载均衡算法，以及服务版本子集（subset）。关系：VirtualService 管"路由到哪"，DestinationRule 管"到达后怎么处理"。两者配合使用：VirtualService 引用 DestinationRule 中定义的 subset。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>什么是 Envoy 的 xDS 协议？</div>
+          <div class="q">什么是 Envoy 的 xDS 协议？</div>
           <div class="a">
             <strong>参考：</strong>xDS 是 Envoy 与控制平面之间的配置发现协议。包括：LDS（Listener，监听器配置）、RDS（Route，路由规则）、CDS（Cluster，集群配置）、EDS（Endpoint，端点列表）、SDS（Secret，证书）。Istiod 通过 xDS 协议将配置实时推送给所有 Envoy Sidecar，实现配置的动态更新，无需重启服务。Envoy 支持增量 xDS，只推送变更部分。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Istio 和 Linkerd 该怎么选？</div>
+          <div class="q">Istio 和 Linkerd 该怎么选？</div>
           <div class="a">
             <strong>参考：</strong>Istio 功能最丰富（流量管理、安全、可观测），但资源占用较高、学习曲线陡峭。Linkerd 更轻量（Rust 编写的 Linkerd2-proxy），资源占用低、部署简单，但功能相对较少。选择建议：需要复杂流量管理（金丝雀、熔断、多集群）选 Istio；追求简单轻量、快速上手选 Linkerd。两者都是 CNCF 毕业项目，生产可用。
           </div>
@@ -517,6 +520,127 @@ spec:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：流量治理中的预算与身份</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>控制面发规则，数据面处理请求</h4>
+            <p><strong>大白话：</strong>Istiod 像交通规则管理处，把路由和安全配置下发；真正转发请求的是代理。Sidecar 与 ambient 是不同数据面部署方式。</p>
+            <p><strong>边界与易错：</strong>不要把旧的 Sidecar 描述当成全部 Istio；ambient 的 L4 与 L7 能力边界不同，具体功能应看部署模式与版本。控制面短暂不可用不必然让所有已有连接立刻中断。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>重试要花时间和流量预算</h4>
+            <p><strong>大白话：</strong>代理发现可重试失败后再发一次，像重拨电话；每一次尝试都消耗下游容量与总时间。</p>
+            <p><strong>边界与易错：</strong>只对允许重复的操作重试，设置总超时与单次尝试预算；应用和代理同时重试会乘法放大，超时后远端业务仍可能完成。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>mTLS 识别工作负载，授权决定能做什么</h4>
+            <p><strong>大白话：</strong>双向证书校验帮助双方确认工作负载身份并加密传输；AuthorizationPolicy 再决定该身份可访问哪些路径或方法。</p>
+            <p><strong>边界与易错：</strong>加密通道不自动等于拥有业务权限；还需用户身份和业务授权。追踪上下文也通常仍需应用跨调用传播。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>应用发起请求并传播 trace 上下文
+代理按路由选择目标
+按总预算发起一次尝试
+若错误可重试且预算充足：再尝试
+返回结果或明确超时</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>控制面挂了，数据面会立即全部停吗？</summary><p>已有代理通常可以继续使用已下发配置处理流量，但新配置、证书更新、新工作负载接入等会受到影响。回答要区分已建立的数据面能力与持续控制面依赖，并说明持续故障时间的影响。</p></details>
+          <details><summary>有代理了为什么链路还断？</summary><p>代理能观察网络调用，但不知道应用收到请求后发出的某个请求是否属于同一条业务链。检查应用是否透传 trace 上下文、异步线程是否丢失上下文，以及采样和上报配置。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. mTLS 已开启，是否意味着所有服务可互相访问所有接口？</h4>
+            <ol type="A">
+              <li>是，证书代替全部授权</li>
+              <li>否，仍需授权策略与业务权限</li>
+              <li>是，只要 HTTP 200</li>
+              <li>否，必须关闭加密</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>身份认证和加密解决“是谁、是否被窃听”，授权解决“允许做什么”。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 应用与代理各最多尝试 3 次，末端一次业务调用最坏尝试数可能是？</h4>
+            <ol type="A">
+              <li>3</li>
+              <li>6</li>
+              <li>9</li>
+              <li>始终为 1</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>两层独立尝试可能相乘为 3×3=9；需明确重试职责与总预算。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：流量治理中的预算与身份</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "应用 A",
+    "出站代理",
+    "服务 B",
+    "Istiod"
+  ],
+  "frames": [
+    {
+      "active": 3,
+      "title": "下发路由与超时",
+      "detail": "示例按 Sidecar 模式讲解；规则由控制面分发到代理。",
+      "state": [
+        "准备调用",
+        "收到总预算 600ms",
+        "等待",
+        "下发规则"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "发起幂等 GET",
+      "detail": "应用透传链路上下文，本例允许安全重试。",
+      "state": [
+        "GET /items",
+        "接收出站请求",
+        "等待",
+        "规则已下发"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "首次尝试失败",
+      "detail": "代理按策略识别一次可重试的连接失败。",
+      "state": [
+        "等待结果",
+        "耗时 100ms，剩余预算 500ms",
+        "连接未成功",
+        "无需逐请求参与"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "预算内再尝试",
+      "detail": "重试受总截止时间约束，不能每次都重新获得完整预算。",
+      "state": [
+        "仍等待",
+        "第二次尝试，继续倒计时",
+        "处理 GET",
+        "无需逐请求参与"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "成功返回",
+      "detail": "只要业务在剩余预算内完成就返回；写请求另需幂等设计。",
+      "state": [
+        "收到结果",
+        "转发响应",
+        "返回 200",
+        "后续更新规则"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://istio.io/latest/docs/concepts/traffic-management/" target="_blank" rel="noopener noreferrer">Istio 官方：流量管理</a> · <a href="https://istio.io/latest/docs/ops/best-practices/observability/" target="_blank" rel="noopener noreferrer">Istio 官方：可观测性边界</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

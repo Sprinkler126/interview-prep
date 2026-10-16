@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Netty - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">心跳机制</a></li>
           <li class="sub"><a href="#s2-4">Netty vs Mina vs NIO</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -517,14 +520,14 @@ public class HeartbeatHandler extends ChannelInboundHandlerAdapter {
         </div>
 
         <div class="qa">
-          <div class="q>什么是 Netty 的零拷贝？有哪些实现方式？</div>
+          <div class="q">什么是 Netty 的零拷贝？有哪些实现方式？</div>
           <div class="a">
             <strong>参考：</strong>Netty 的零拷贝是指减少数据在内存中的拷贝次数，提高 IO 效率。实现方式：1）FileRegion：底层使用 Linux 的 sendfile() 系统调用，数据直接从文件缓冲区传输到 Socket 缓冲区，不经过用户空间；2）CompositeByteBuf：逻辑上组合多个 ByteBuf，不拷贝底层数据；3）slice()：将 ByteBuf 切分成多个逻辑视图，共享底层内存；4）wrap()：包装已有 byte[]，不复制数据；5）堆外内存（DirectBuffer）：减少堆内到堆外的数据拷贝。传统 IO 需要 4 次拷贝（磁盘→内核→用户空间→Socket→网卡）和 4 次上下文切换，零拷贝只需 2 次拷贝和 2 次上下文切换。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Netty 中 Pipeline 的工作原理是什么？Inbound 和 Outbound Handler 有什么区别？</div>
+          <div class="q">Netty 中 Pipeline 的工作原理是什么？Inbound 和 Outbound Handler 有什么区别？</div>
           <div class="a">
             <strong>参考：</strong>Pipeline 是一个双向链表，每个节点是一个 ChannelHandlerContext，包装了 ChannelHandler。数据在 Pipeline 中按方向流动：入站数据从 Head → Tail 方向经过 Inbound Handler（如解码器、业务 Handler），出站数据从 Tail → Head 方向经过 Outbound Handler（如编码器）。Inbound Handler 处理接收到的数据（channelRead），Outbound Handler 处理要发送的数据（write）。HeadContext 是实际进行 Socket 读写的 Handler，TailContext 处理未被消费的事件。一个 Handler 可以同时是 Inbound 和 Outbound（实现两个接口）。Pipeline 支持动态添加和删除 Handler。
           </div>
@@ -538,28 +541,28 @@ public class HeartbeatHandler extends ChannelInboundHandlerAdapter {
         </div>
 
         <div class="qa">
-          <div class="q>Netty 的 ByteBuf 和 Java NIO 的 ByteBuffer 有什么区别？为什么 Netty 要重新设计？</div>
+          <div class="q">Netty 的 ByteBuf 和 Java NIO 的 ByteBuffer 有什么区别？为什么 Netty 要重新设计？</div>
           <div class="a">
             <strong>参考：</strong>区别：1）读写指针：ByteBuffer 用 position 和 limit，切换读写模式需要 flip()，容易出错；ByteBuf 有独立的 readerIndex 和 writerIndex，无需切换；2）扩容：ByteBuffer 固定大小，写满需要手动扩容；ByteBuf 支持自动扩容；3）池化：ByteBuffer 无池化机制；ByteBuf 支持对象池化复用；4）引用计数：ByteBuf 有引用计数机制，计数归零自动释放；5）API：ByteBuf 提供丰富的 readXxx/writeXxx 方法和零拷贝操作（slice、composite）。Netty 重新设计的原因是 ByteBuffer 的 API 太底层且难用，容易出错（flip/compact），且不支持池化和零拷贝等高级特性。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Netty 中如何实现心跳检测和断线重连？</div>
+          <div class="q">Netty 中如何实现心跳检测和断线重连？</div>
           <div class="a">
             <strong>参考：</strong>心跳检测：使用 IdleStateHandler 监测读/写/全部空闲。配置 readerIdleTime（读空闲超时）、writerIdleTime（写空闲超时），当超时触发时会调用 userEventTriggered() 方法。在自定义 Handler 中处理 IdleStateEvent：读空闲超过阈值 → 关闭连接；写空闲 → 发送心跳包。断线重连：在客户端的 ChannelHandler 的 channelInactive() 方法中触发重连逻辑，使用定时任务延迟执行重连（避免频繁重连），重连成功后重新初始化 Channel Pipeline。注意使用指数退避策略（如 1s、2s、4s、8s...），避免服务端压力过大。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Netty 中有哪些常见的性能优化手段？</div>
+          <div class="q">Netty 中有哪些常见的性能优化手段？</div>
           <div class="a">
             <strong>参考：</strong>1）使用池化的 DirectBuffer：减少 GC 和内存拷贝（默认已开启）；2）合理设置线程数：Boss 线程 1 个即可，Worker 线程默认 CPU*2；3）减少对象分配：使用 ByteBuf 池化、对象池化、ThreadLocal 缓存；4）避免在 EventLoop 中执行阻塞操作：使用 DefaultEventExecutorGroup 处理耗时业务；5）TCP 参数优化：SO_BACKLOG、SO_SNDBUF、SO_RCVBUF、TCP_NODELAY；6）使用 CompositeByteBuf 和 slice 实现零拷贝；7）减少系统调用：批量写（gather write）；8）使用 Protobuf 等高效序列化替代 JSON。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Netty 的 EventLoop 一个线程绑定一个 Channel 的设计有什么好处？</div>
+          <div class="q">Netty 的 EventLoop 一个线程绑定一个 Channel 的设计有什么好处？</div>
           <div class="a">
             <strong>参考：</strong>好处：1）线程安全：一个 Channel 的所有 IO 操作都在同一个 EventLoop 线程中执行，无需加锁，避免了多线程竞争；2）减少线程切换：同一个连接的读写和业务处理在同一线程完成；3）简化编程模型：开发者无需关心 Channel 上的并发问题。实现原理：Channel 注册到 EventLoop 时建立绑定关系，后续该 Channel 的所有事件（读/写/连接/断开）都由绑定的 EventLoop 线程处理。如果在非 EventLoop 线程中调用 Channel 的方法（如 write），Netty 会将操作封装成任务提交到对应的 EventLoop 任务队列中。
           </div>
@@ -567,6 +570,104 @@ public class HeartbeatHandler extends ChannelInboundHandlerAdapter {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>EventLoop：一个慢任务会拖住多条连接</h3>
+            <p>大白话：一个EventLoop像一个办事窗口，轮流处理它管理的连接事件。在handler里做阻塞数据库或长CPU计算，会让同窗口其他连接一起等。</p>
+            <p><strong>边界与易错：</strong>边界：耗时任务可交给受控线程池，但要处理结果回写、顺序、队列容量和取消；不能把问题变成无界异步任务堆积。</p>
+          </article>
+          <article class="lab-concept"><h3>ByteBuf引用计数：谁最后用，谁承担释放责任</h3>
+            <p>大白话：引用计数像借用登记，retain增加使用权，release归还；归零后内存可回收。普通JVM对象还可达，不代表底层buffer还能使用。</p>
+            <p><strong>边界与易错：</strong>易错：slice/duplicate通常共享底层内存且不自动增加计数，跨异步边界需明确retain或使用retained变体；避免重复release和释放后访问。</p>
+          </article>
+          <article class="lab-concept"><h3>写缓冲背压：write成功排队不等于对端已处理</h3>
+            <p>大白话：应用写入快于网络发送，出站缓冲会越积越多。高低水位可提示可写状态，业务应暂停生产或限流，而非继续无限write。</p>
+            <p><strong>边界与易错：</strong>边界：isWritable是信号不是强制限流器。写Future成功通常说明该写操作完成到相应传输层边界，不能当成对端业务确认。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>TCP消息只有半个头到达，解码器该怎么办？</summary><p>保留未消费字节并等待更多数据，先检查可读长度再读取；长度字段还要校验最大帧长，避免恶意大长度导致内存消耗。不能把readableBytes直接当完整消息长度。</p></details>
+          <details class="lab-question"><summary>SimpleChannelInboundHandler与手动释放要注意什么？</summary><p>其自动释放行为与配置相关，默认处理完会释放匹配消息；若还要异步使用或向外传递，需要正确保留引用。混用手动release容易双重释放，应按handler所有权约定检查。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 在共享EventLoop的handler中直接执行5秒阻塞查询，主要风险是什么？</h4>
+            <ol type="A">
+              <li>只影响当前数据库连接</li>
+              <li>阻塞该EventLoop负责的其他事件</li>
+              <li>自动启用新线程隔离</li>
+              <li>ByteBuf自动扩容解决</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>EventLoop串行处理分配给它的事件；阻塞任务会拖延多条连接的读写、心跳与定时任务。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 普通ByteBuf.slice()与原buffer一般是什么关系？</h4>
+            <ol type="A">
+              <li>完全独立拷贝</li>
+              <li>共享底层存储</li>
+              <li>自动持久化磁盘</li>
+              <li>必须有相同读索引</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>slice通常共享内容但有独立索引，且不自动增加引用计数；需要按跨生命周期使用情况保留引用。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>ByteBuf跨异步任务：retain与release配对</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "入站handler",
+    "引用计数",
+    "异步任务",
+    "底层内存"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "收到buffer",
+      "detail": "教学例初始refCnt=1，handler拥有当前使用权。",
+      "state": [
+        "持有buf",
+        "1",
+        "未提交",
+        "可用"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "交给异步任务前retain",
+      "detail": "增加一份使用权，避免handler返回后内存过早释放。",
+      "state": [
+        "准备结束",
+        "2",
+        "已接收buf",
+        "可用"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "handler释放自身使用权",
+      "detail": "自动或手动释放依照handler约定执行一次。",
+      "state": [
+        "处理结束",
+        "1",
+        "仍在读取",
+        "可用"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "异步任务finally释放",
+      "detail": "最后使用者归还，引用归零，之后不能再读写。",
+      "state": [
+        "无使用权",
+        "0",
+        "完成并release",
+        "可回收"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://netty.io/wiki/reference-counted-objects.html" target="_blank" rel="noopener noreferrer">Netty 引用计数官方说明</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

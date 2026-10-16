@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JVM - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">OOM 排查流程</a></li>
           <li class="sub"><a href="#s2-4">GC 日志分析</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -858,6 +861,104 @@ java -server \
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>GC可达性：找不到才可回收，不是“用得少”就回收</h3>
+            <p>大白话：从GC Roots出发沿引用能走到的对象仍活着；两个对象互相引用，如果外部再也到不了，也可以被回收。</p>
+            <p><strong>边界与易错：</strong>边界：静态集合、线程上下文、监听器可能把无用对象一直挂在根上。弱引用不等于立刻回收；堆外内存也不应只靠堆使用率判断。</p>
+          </article>
+          <article class="lab-concept"><h3>栈、堆与元空间：OOM不是只有堆不够</h3>
+            <p>大白话：调用栈记录每次方法调用，堆承载对象，类元数据在具体实现中有自己的管理区域。不同区域出问题，排查入口不同。</p>
+            <p><strong>边界与易错：</strong>易错：HotSpot的Metaspace是实现概念；JVM规范的方法区是逻辑区域。栈过深常见StackOverflowError，堆满、元空间或本地线程资源不足可能表现为不同OOM。</p>
+          </article>
+          <article class="lab-concept"><h3>停顿与吞吐：不能只盯一次Full GC</h3>
+            <p>大白话：GC像清场，暂停时间长会影响尾延迟，清得太频繁会消耗CPU。吞吐优先与低延迟目标需要不同取舍。</p>
+            <p><strong>边界与易错：</strong>边界：先记录分配速率、存活量、暂停分位数、GC原因和容器限制，再调堆与收集器；不要把增大堆当成修复泄漏，也不要跨JDK照抄收集器默认值。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>内存持续增长，怎样区分泄漏与正常缓存？</summary><p>观察稳定负载下GC后存活量是否持续抬高；若持续增长，比较堆快照中的增长类、支配树与到GC Roots的引用路径。正常缓存也要有容量和过期边界。</p></details>
+          <details class="lab-question"><summary>逃逸分析后对象是否一定在栈上分配？</summary><p>不能如此承诺。JIT可能消除分配或进行标量替换，具体优化受运行时、代码形态和编译决策影响；Java语言并不保证某对象按该方式分配。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. A与B互相引用，但没有任何GC Roots能到达它们。基于可达性分析可得什么？</h4>
+            <ol type="A">
+              <li>一定永久存活</li>
+              <li>可以判定为不可达</li>
+              <li>必须手动free</li>
+              <li>引用次数必定为0</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>环内部引用不会使对象从根可达，因此可被识别为垃圾；实际回收时机由收集器决定。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. GC后堆占用持续上涨，最有价值的下一步通常是什么？</h4>
+            <ol type="A">
+              <li>直接禁用GC</li>
+              <li>分析存活对象和根引用链</li>
+              <li>只增加线程</li>
+              <li>删除所有日志</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>需先找出对象为何仍可达、是否有无界缓存或容器滞留。盲目加堆可能只延后故障。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>可达性分析：互相引用也能回收</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "GC Roots",
+    "对象A",
+    "对象B",
+    "回收集合"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "建立引用",
+      "detail": "Roots→A，A与B互相引用，两个对象均存活。",
+      "state": [
+        "引用A",
+        "引用B",
+        "引用A",
+        "空"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "断开外部引用",
+      "detail": "Roots不再指向A，环内部引用仍存在。",
+      "state": [
+        "无A引用",
+        "引用B",
+        "引用A",
+        "待分析"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "从根遍历",
+      "detail": "遍历无法到达A和B，环不构成根。",
+      "state": [
+        "遍历完成",
+        "不可达",
+        "不可达",
+        "A、B候选"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "执行回收阶段",
+      "detail": "假设不存在特殊引用处理等影响，两对象可释放。",
+      "state": [
+        "不变",
+        "已回收",
+        "已回收",
+        "释放环对象"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html" target="_blank" rel="noopener noreferrer">JVM规范：运行时数据区</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

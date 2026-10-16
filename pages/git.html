@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Git 与 GitHub - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -30,6 +32,7 @@
           <li class="sub"><a href="#conflict">冲突与恢复</a></li>
           <li class="sub"><a href="#release">发布追溯</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </aside>
 
@@ -193,6 +196,115 @@ git revert &lt;commit-id&gt;</code></pre>
   </div>
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>提交是快照，分支是可移动的引用</h3>
+            <p>大白话：commit记录一份项目快照和父提交，branch像贴在某次提交上的标签。新增提交时当前分支标签前移，其他分支不会自动跟着走。</p>
+            <p><strong>边界与易错：</strong>易错：HEAD通常指向当前分支，但检出某次提交可能进入detached HEAD。此时继续提交并非立刻丢失，但应及时创建分支保留可达引用。</p>
+          </article>
+          <article class="lab-concept"><h3>revert 与 reset：撤销内容和移动历史不同</h3>
+            <p>大白话：revert写一张反向更改单来抵消旧提交，保留已有历史；reset把当前分支指回另一个提交，并按模式决定是否改变暂存区及工作区。</p>
+            <p><strong>边界与易错：</strong>边界：共享分支通常优先revert。reset --hard可能丢弃本地修改；撤销merge需指定主线父提交并理解对以后合并的影响。</p>
+          </article>
+          <article class="lab-concept"><h3>rebase：把自己的改动重新接到新起点</h3>
+            <p>大白话：把一串提交逐个重新应用到另一个基点，得到看起来线性的历史。内容可能相近，但父提交变了，提交ID也会变。</p>
+            <p><strong>边界与易错：</strong>易错：rebase不是把远端代码直接覆盖本地。已共享提交被重写会增加协作成本；冲突解决后要继续rebase，放弃时用abort回到操作前。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>冲突标记删掉了，能直接提交吗？</summary><p>还要核对语义：两边可能分别改了校验和调用方，单看文本合并通过也可能破坏业务。检查冲突文件、运行相关验证，再stage并完成merge或rebase。</p></details>
+          <details class="lab-question"><summary>误删分支后如何恢复提交？</summary><p>先停止无关清理，通过reflog寻找该分支之前指向的提交，核对日志与文件，再从确认的提交创建新分支。reflog是本地记录，有过期和回收边界，不是永久备份。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="0"><h4>1. 已推送的普通提交需要撤销且保留协作历史，通常选择什么？</h4>
+            <ol type="A">
+              <li>git revert</li>
+              <li>删除.git</li>
+              <li>git reset --hard并强推</li>
+              <li>清空暂存区</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：A。</strong>revert新增反向提交，保留原提交与后续历史；其他选项可能损坏仓库或重写共享历史。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. git add 后又继续编辑同一文件，直接 git commit 通常提交哪部分？</h4>
+            <ol type="A">
+              <li>工作区最新全部内容</li>
+              <li>add时暂存的版本</li>
+              <li>自动合并两个版本</li>
+              <li>不允许提交</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>commit默认记录暂存区快照；后续工作区修改尚未stage，通常不会进入该提交，除非使用其他明确选项。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>三个区域：提交的是暂存快照</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "工作区",
+    "暂存区",
+    "本地提交",
+    "远端"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "编辑版本v2",
+      "detail": "起点本地与远端均为v1，工作区修改为v2。",
+      "state": [
+        "v2",
+        "v1",
+        "v1",
+        "v1"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "执行git add",
+      "detail": "把当时的v2快照放入暂存区。",
+      "state": [
+        "v2",
+        "v2",
+        "v1",
+        "v1"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "继续编辑成v3",
+      "detail": "未再次add，所以暂存区仍是v2。",
+      "state": [
+        "v3",
+        "v2",
+        "v1",
+        "v1"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "执行普通git commit",
+      "detail": "新提交记录v2，工作区v3仍有未暂存差异。",
+      "state": [
+        "v3",
+        "v2",
+        "v2",
+        "v1"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "推送新提交",
+      "detail": "远端获得v2提交；本地尚未提交的v3不会被push。",
+      "state": [
+        "v3",
+        "v2",
+        "v2",
+        "v2"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://git-scm.com/docs/git-revert" target="_blank" rel="noopener noreferrer">Git revert 官方文档</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

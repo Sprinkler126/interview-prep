@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spark - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#p2-6">Spark on K8s</a></li>
           <li class="sub"><a href="#p2-7">常见问题排查</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -638,6 +641,105 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>Shuffle 是重新分堆</h3>
+            <p>按 key 聚合要把同键的数据拉到一起，像把散落各车厢的包裹送往同一站。它引入网络、排序和落盘；多加 executor 不一定能消掉单个热 key。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>缓存与 checkpoint 目的不同</h3>
+            <p>cache/persist 复用结果以少算几遍，丢分区时仍可沿血缘重算。可靠 checkpoint 将结果写入可靠存储并截断血缘，代价更大；不能只调用 cache 就断言已执行或已可靠落盘。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>流式微批也要定义输出语义</h3>
+            <p>Structured Streaming 用检查点保存进度与状态，端到端效果取决于源、Sink 与处理模式。foreachBatch 可能重跑同一批，应使用 batchId 或业务键去重；RDD checkpoint 与流 checkpoint 不能简单等同。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>reduceByKey 为什么常比 groupByKey 后求和省？</summary><p>可以先在 map 端局部合并，减少跨网络的数据；前提是聚合函数满足可正确组合的语义。</p></details>
+          <details class="study-followup"><summary>一个 Stage 只有一个任务很慢，先扩容吗？</summary><p>先看分区大小、热 key、GC、spill 与慢节点。若是单 key 倾斜，扩容其他 executor 仍无法拆开该键的必要处理。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 下列哪个操作通常形成 Shuffle 边界？</h4>
+            <ol type="A">
+              <li>map</li>
+              <li>filter</li>
+              <li>按键 groupByKey</li>
+              <li>只做字段重命名</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C</strong>。按键重新分组通常需要跨分区交换数据；map/filter 通常是窄依赖。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. foreachBatch 向外部库写入时，同一 batchId 重跑，正确措施是？</h4>
+            <ol type="A">
+              <li>直接再次累加</li>
+              <li>按批次或业务键幂等写入</li>
+              <li>删除 checkpoint 避免重试</li>
+              <li>禁用所有数据库唯一键</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。故障可导致批次再次执行，输出端应识别重复。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>词频统计的本地合并与 Shuffle</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "分区 A",
+    "分区 B",
+    "Shuffle",
+    "Reduce"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "原始输入",
+      "detail": "两个分区各有多个相同词。",
+      "state": [
+        "a,a,b",
+        "a,b,b",
+        "未开始",
+        "空"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "本地合并",
+      "detail": "可结合的求和先在每个分区压缩记录数。",
+      "state": [
+        "a:2,b:1",
+        "a:1,b:2",
+        "待传输",
+        "空"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "按键交换",
+      "detail": "把两个 a 的局部计数送同一目标，b 同理。",
+      "state": [
+        "已发送",
+        "已发送",
+        "a→[2,1]; b→[1,2]",
+        "等待"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "最终聚合",
+      "detail": "相加得到全局结果，避免把每个原始词都跨网发送。",
+      "state": [
+        "完成",
+        "完成",
+        "交换完成",
+        "a:3,b:3"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://spark.apache.org/docs/latest/streaming/apis-on-dataframes-and-datasets.html" target="_blank" rel="noopener noreferrer">Spark Structured Streaming 指南</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>
@@ -662,7 +764,7 @@
     </div>
   </div>
   <script>
-  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u},{passive:true});u()})();
+  (function(){const l=document.querySelectorAll('.sidebar a'),s=[];l.forEach(a=>{const id=a.getAttribute('href')?.replace('#','');if(id){const e=document.getElementById(id);if(e)s.push({e,l:a})}});if(!s.length)return;function u(){let c=s[0];for(const x of s)if(x.e.getBoundingClientRect().top<=120)c=x;l.forEach(a=>a.classList.remove('active'));if(c)l.forEach(a=>{if(a===c.l)a.classList.add('active')})}window.addEventListener('scroll',u,{passive:true});u()})();
   </script>
 </body>
 </html>

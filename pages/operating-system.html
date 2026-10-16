@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>操作系统 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -41,6 +43,7 @@
           <li class="sub"><a href="#s2-3">用户态与内核态</a></li>
           <li class="sub"><a href="#s2-4">文件系统</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -634,6 +637,104 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>缺页不一定读磁盘：先判断页在哪里</h3>
+            <p>大白话：虚拟地址像门牌，页表把它映射到物理页框。缺页可能是首次按需分配、写时复制或页被换出，只有部分情况需要慢速存储访问。</p>
+            <p><strong>边界与易错：</strong>易错：TLB未命中不等于缺页，前者通常只需要重新查页表。缺页也不一定是非法访问；不合法或无权限的地址才可能导致保护异常。</p>
+          </article>
+          <article class="lab-concept"><h3>银行家算法：安全状态不是“资源现在都够”</h3>
+            <p>大白话：尝试找一种排队顺序，让每个进程都能借到剩余需求、完成后归还资源。如果找得到完整顺序就是安全状态。</p>
+            <p><strong>边界与易错：</strong>边界：Need=Max−Allocation，试分配后再做安全检查。不安全不等于已经死锁，只表示不能保证存在完成顺序；需知道最大需求，适用条件有局限。</p>
+          </article>
+          <article class="lab-concept"><h3>epoll边沿触发：通知来了要把当前可读数据吃完</h3>
+            <p>大白话：水平触发像灯一直亮到处理完；边沿触发更像状态变化时敲一下铃。ET处理时通常配合非阻塞IO，循环读到EAGAIN再等待。</p>
+            <p><strong>边界与易错：</strong>易错：一次事件只read一次可能留下未读数据却等不到新边沿。epoll报告就绪，不保证业务消息完整，也不是异步完成磁盘IO的统一机制。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>进程与线程切换谁更轻，能一概回答吗？</summary><p>同进程线程一般共享地址空间，切换可能减少页表相关成本，但仍需保存上下文与调度。实际开销受架构、缓存、工作集及内核实现影响，不给固定倍数。</p></details>
+          <details class="lab-question"><summary>互斥锁能否解决一切并发问题？</summary><p>锁必须覆盖共享不变量且所有访问方遵守同一协议；多锁反向获取会死锁，持锁等待IO可能严重排队。还要考虑饥饿、优先级反转与取消后的资源清理。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. TLB未命中但页表项有效，最准确的判断是？</h4>
+            <ol type="A">
+              <li>必定缺页读盘</li>
+              <li>可查页表得到物理页框</li>
+              <li>地址一定非法</li>
+              <li>必须杀死进程</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>TLB是页表映射的缓存，缓存未命中不意味着页不存在于内存。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 采用非阻塞socket与epoll ET模式，收到可读事件后通常应该？</h4>
+            <ol type="A">
+              <li>只读一个字节</li>
+              <li>循环读取直到EAGAIN等边界</li>
+              <li>立即关闭连接</li>
+              <li>切换成无限阻塞read</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>ET依赖就绪状态变化，需消耗当前可读数据；同时处理EOF与实际错误，避免漏处理和阻塞事件循环。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>LRU页面置换：3个页框访问1、2、3、1、4</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "页框集合",
+    "最近访问序",
+    "当前访问",
+    "缺页次数"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "装入1、2、3",
+      "detail": "从空页框开始，前三次访问各缺页一次；顺序左旧右新。",
+      "state": [
+        "1,2,3",
+        "1→2→3",
+        "3",
+        "3"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "再次访问1",
+      "detail": "命中，无需换页，把1移到最近使用端。",
+      "state": [
+        "1,2,3",
+        "2→3→1",
+        "1",
+        "3"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "访问4且页框已满",
+      "detail": "当前最久未用的是2，而不是最早装入的1。",
+      "state": [
+        "1,2,3",
+        "2→3→1",
+        "4",
+        "待置换"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "淘汰2并装入4",
+      "detail": "LRU依据最近使用时间，不等同于FIFO装入顺序。",
+      "state": [
+        "1,4,3",
+        "3→1→4",
+        "4",
+        "4"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener noreferrer">Linux epoll 手册</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

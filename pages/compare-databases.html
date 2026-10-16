@@ -150,6 +150,8 @@
       .summary-table td, .summary-table th { padding: 0.4rem; }
     }
   </style>
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -162,6 +164,7 @@
 
   <div class="container">
     <h1>🗄️ 数据库技术对比</h1>
+    <p><a href="#interview-lab" style="color:var(--accent)">面试与笔试实战 · 互动练习和动画 →</a></p>
     <p class="subtitle">MySQL · Redis · MongoDB · Elasticsearch · PostgreSQL · TiDB · HBase — 七种存储，各有战场</p>
 
     <!-- TOC -->
@@ -923,6 +926,106 @@
         <strong>参考答案</strong>：典型的分层存储——<strong>MySQL</strong> 做业务主库（订单、用户、商品），<strong>Redis</strong> 做缓存和会话层，<strong>Elasticsearch</strong> 做搜索和日志分析，<strong>MongoDB</strong> 做非结构化内容存储（用户画像、评论、日志）。数据同步：MySQL → Binlog → Canal → ES/MongoDB。各司其职，不要用一个数据库解决所有问题。
       </div>
     </div>
+
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>先描述查询，再选存储</h3>
+            <p>订单扣款重约束和事务，全文搜索重倒排索引，缓存重低延迟。不要只列“哪个更快”；把读写比例、返回字段、范围扫描、唯一性、容忍延迟写出来才能比较。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>多存储不能多份都当真相</h3>
+            <p>主库加搜索索引或缓存时，应选清晰的权威来源，通过变更日志构建派生视图。同步延迟、重复事件、乱序和重建都要设计，不能应用同时写两处就宣布一致。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>扩容比较也要算恢复账</h3>
+            <p>除了吞吐还要测故障切换、备份恢复时间、恢复后校验以及热点。分布式事务增加网络与运维成本，单机关系库在容量足够时往往更容易保持约束。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>商品搜索价格与结算价格不同，以谁为准？</summary><p>结算应重新读取权威业务数据并校验价格/库存，搜索视图允许一定延迟；界面需要合理提示与业务规则。</p></details>
+          <details class="study-followup"><summary>怎么公平比较数据库性能？</summary><p>固定数据规模、硬件、持久化与副本策略、查询语义和延迟分位，包含预热、故障和恢复；不能拿内存缓存与强持久写直接比 QPS。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 订单库与搜索库异步同步，结算扣款应优先依据？</h4>
+            <ol type="A">
+              <li>搜索列表缓存价</li>
+              <li>权威订单/商品库及业务校验</li>
+              <li>任意较低值</li>
+              <li>最近打开的页面</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。派生检索视图可滞后，关键业务约束要在权威事务边界校验。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 性能对比中必须对齐的关键条件是？</h4>
+            <ol type="A">
+              <li>产品图标</li>
+              <li>确认语义、持久化与副本配置</li>
+              <li>官网配色</li>
+              <li>数据库名字长度</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。语义越弱通常成本越低，配置不对等的 QPS 不能证明同等可靠性下更快。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>主库与搜索派生视图的延迟窗口</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "业务主库",
+    "变更日志",
+    "同步程序",
+    "搜索索引"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "订单商品价格更新",
+      "detail": "权威价格先在本地事务中变为 120。",
+      "state": [
+        "价格 120",
+        "事件待发布",
+        "未读取",
+        "旧价格 100"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "日志记录变更",
+      "detail": "可靠变更捕获产生带版本的事件。",
+      "state": [
+        "版本 2",
+        "price=120,v2",
+        "准备处理",
+        "旧价格 100"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "同步事件",
+      "detail": "以业务主键和版本去重，防止旧事件覆盖新值。",
+      "state": [
+        "版本 2",
+        "可重复投递",
+        "应用 v2",
+        "更新中"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "视图追平",
+      "detail": "搜索最终显示 120，窗口内结算仍应向主库校验。",
+      "state": [
+        "价格 120",
+        "已消费",
+        "已追平",
+        "价格 120"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://www.mongodb.com/docs/manual/core/read-isolation-consistency-recency/" target="_blank" rel="noopener noreferrer">MongoDB 一致性维度示例</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
 
     <div style="text-align:center; color:var(--text-dim); margin-top:3rem; padding-bottom:2rem; font-size:0.85rem;">
       <a href="../index.html" style="color:var(--accent); text-decoration:none;">← 返回知识库目录</a>

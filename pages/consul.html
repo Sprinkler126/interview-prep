@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consul - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">与 Nacos/Eureka 对比</a></li>
           <li class="sub"><a href="#s2-4">Consul Connect</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -438,6 +441,127 @@ PUT /v1/connect/intentions
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：注册发现的多数派与故障边界</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>Gossip 与 Raft 各管一摊</h4>
+            <p><strong>大白话：</strong>Gossip 像互相报平安，传播成员是否存活；Raft 像少数服从多数的账本，让服务目录与 KV 的写入形成一致顺序。</p>
+            <p><strong>边界与易错：</strong>成员被怀疑失联不等于目录写入已提交；只有 Server 参与 Raft，增加 Client 不会增加多数派票数。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>多数派是写入门槛</h4>
+            <p><strong>大白话：</strong>5 个投票 Server 的多数派是 3，最多容忍 2 个不可用；4 个 Server 也只能容忍 1 个，不比 3 个多。</p>
+            <p><strong>边界与易错：</strong>跨故障域分布节点；失去多数派后不能靠“还有一台活着”继续提交新写入。恢复时不要草率重建集群造成旧数据丢失。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>健康、发现与业务可用分三层</h4>
+            <p><strong>大白话：</strong>健康检查先改变目录状态，消费者再通过查询或缓存更新地址，最后新请求才绕开坏实例。</p>
+            <p><strong>边界与易错：</strong>DNS 缓存和消费者地址缓存会延长故障窗口；检查通过也不代表所有业务依赖正常，检查应体现服务能否接单。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>注册请求 → Leader 追加日志
+复制到投票 Server
+若确认数 &lt; 多数派：等待或失败
+否则提交并应用到目录
+向客户端返回成功</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>为什么 5 个 Server 故障 3 个不能继续注册？</summary><p>提交必须获得 3 票，剩 2 台不能证明自己掌握最新已提交日志。禁止少数派写入是在避免分区后出现两个相互冲突的目录。旧缓存可能还能调用服务，但这不代表目录能更新。</p></details>
+          <details><summary>注册中心正常但调用失败，从哪里排？</summary><p>先确认查询是否只取健康实例，再查 DNS/客户端缓存、实例公布的 IP 与端口、网络策略和服务本身。注册目录只是通讯录，不替代业务请求的超时、重试与熔断。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 5 个投票 Server 的 Consul 集群，提交新写入至少需要几票？</h4>
+            <ol type="A">
+              <li>1</li>
+              <li>2</li>
+              <li>3</li>
+              <li>5</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>多数派为 floor(5/2)+1=3；并非所有节点都确认才能提交，也不是任意一台存活即可。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 下列哪一项主要负责 Consul Server 间目录写入的一致性？</h4>
+            <ol type="A">
+              <li>Gossip 成员探测</li>
+              <li>Raft 日志复制</li>
+              <li>客户端 DNS 缓存</li>
+              <li>业务 HTTP 重试</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>Gossip 传播成员状态；Raft 负责一致日志，二者解决的问题不同。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：注册发现的多数派与故障边界</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端",
+    "Leader",
+    "Follower A",
+    "Follower B"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发起注册",
+      "detail": "示例采用 3 个投票 Server，多数派为 2。",
+      "state": [
+        "提交服务 A 地址",
+        "等待写入",
+        "旧目录",
+        "旧目录"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "Leader 记录日志",
+      "detail": "Leader 先记录待提交项，单节点记录不等于已经成功。",
+      "state": [
+        "等待结果",
+        "日志 #42 待提交",
+        "旧目录",
+        "旧目录"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "复制到一个 Follower",
+      "detail": "Leader 与 A 共 2 票，满足多数派条件。",
+      "state": [
+        "等待结果",
+        "已持久化 #42",
+        "已持久化 #42",
+        "网络延迟"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "提交并应用",
+      "detail": "在提交应用完成后，注册请求才能得到成功结果。",
+      "state": [
+        "注册成功",
+        "目录含服务 A",
+        "跟随提交进度",
+        "稍后追赶"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "落后副本追赶",
+      "detail": "B 恢复通信后补日志；不必等所有副本才确认本次写入。",
+      "state": [
+        "可查询服务",
+        "目录含服务 A",
+        "目录含服务 A",
+        "补齐 #42"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://developer.hashicorp.com/consul/docs/concept/consensus" target="_blank" rel="noopener noreferrer">Consul 官方：共识与多数派</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

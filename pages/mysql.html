@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MySQL - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -38,6 +40,7 @@
           <li class="sub"><a href="#s2-3">分库分表</a></li>
           <li class="sub"><a href="#s2-4">主从复制与高可用</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -1010,6 +1013,105 @@ min_examined_row_limit = 100              # 扫描超过 100 行才记录</code>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>快照读为什么能读到旧值</h3>
+            <p>像看一张定格照片：InnoDB 用 Read View 判定版本可见性，再沿 undo 找旧版本。RR 通常复用第一次一致性读的快照，RC 每次一致性读建新快照；自己写入的变化可见，不能把所有 SELECT 都当快照读。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>覆盖索引与回表</h3>
+            <p>二级索引叶子带主键；查的字段都在索引里就少一次找整行。索引 (a,b) 并不保证 WHERE b=2 总能高效定位；检查实际扫描行数和执行计划，不能只看到 key 有值就说优化成功。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>条件扣减比先查再写稳</h3>
+            <p>把库存条件和扣减放进同一条 UPDATE，并检查影响行数。两次普通 SELECT 都看到库存 1，不意味着两人都能买；幂等订单号仍需唯一约束，防止重试重复扣减。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>RR 事务先查余额 100，另一个事务改为 80 并提交，再普通 SELECT 是多少？</summary><p>没有自身更新且使用同一一致性快照时仍为 100；FOR UPDATE 属于锁定读，不能套用旧快照结论。</p></details>
+          <details class="study-followup"><summary>库存不超卖为什么还需要订单唯一键？</summary><p>条件 UPDATE 保护库存非负；订单唯一键约束同一业务请求只执行一次，两者解决不同问题。重试应在同一事务中先完成幂等判断。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 索引 (a,b,c)，查询只返回 a,b 且 WHERE a=7，最直接收益是什么？</h4>
+            <ol type="A">
+              <li>保证无需任何 I/O</li>
+              <li>可能使用覆盖索引减少回表</li>
+              <li>保证结果按 c 全局排序</li>
+              <li>自动消除锁等待</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。覆盖取决于所需字段是否都在索引中；仍可能读索引页，锁和排序也有独立条件。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 库存初值 1，两事务执行 UPDATE goods SET stock=stock-1 WHERE id=1 AND stock&gt;0，均正常提交，成功扣减次数是？</h4>
+            <ol type="A">
+              <li>0</li>
+              <li>1</li>
+              <li>2</li>
+              <li>由客户端 SELECT 次数决定</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。同一行的写操作由锁串行化，后执行者重新判断 stock&gt;0，不再匹配。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>RR 快照读与当前版本分离</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "事务 A",
+    "事务 B",
+    "当前行",
+    "undo 旧版本"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "建立快照",
+      "detail": "A 第一次普通 SELECT 建立一致性视图。",
+      "state": [
+        "读到 100",
+        "未开始",
+        "100",
+        "无"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "并发更新",
+      "detail": "B 修改并提交，A 的快照不刷新。",
+      "state": [
+        "快照固定",
+        "提交 80",
+        "80",
+        "100"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "再次快照读",
+      "detail": "沿版本链找到对 A 可见的 100。",
+      "state": [
+        "仍读 100",
+        "已提交",
+        "80",
+        "100"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "锁定读",
+      "detail": "A 执行 FOR UPDATE，读取并锁住当前可用版本；示例中没有其他写锁。",
+      "state": [
+        "锁定读 80",
+        "已结束",
+        "80，被 A 锁定",
+        "100"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html" target="_blank" rel="noopener noreferrer">MySQL 一致性读</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

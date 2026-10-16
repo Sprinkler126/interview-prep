@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>共识算法 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#s2-3">各算法对比</a></li>
           <li class="sub"><a href="#s2-4">实际应用场景</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -614,6 +617,105 @@ Follower 校验:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>多数派交叉是保护已决定值</h3>
+            <p>5 个节点的任意两个 3 节点集合必相交。但交叉只是基础，还需持久化投票与日志规则，避免交点忘记承诺或选出缺失已提交历史的领导者。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>选举比较日志新旧不是只比长度</h3>
+            <p>Raft 先比较最后日志任期，再比较索引。更长但最后任期更旧的候选人并不一定有资格；选举限制与提交规则共同保护历史。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>旧任期日志不能只数副本直接提交</h3>
+            <p>Raft 领导者只靠副本数推进当前任期日志的提交；当前任期条目提交后，可间接提交前面的条目。这是协议安全规则，不代表旧任期条目永远不能提交。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>五节点集群分成 3 和 2，两边都能选出有效新主吗？</summary><p>同一配置下只有能取得多数的三节点一侧可完成选举；少数派旧主可能暂未察觉失联，但不能提交新写。</p></details>
+          <details class="study-followup"><summary>共识保证了日志一致，业务还需幂等吗？</summary><p>需要。客户端超时重试可能把相同业务命令作为新日志再提一次；状态机应按请求 ID 去重，并保证确定性执行。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 5 节点标准多数派至少需要多少票？</h4>
+            <ol type="A">
+              <li>2</li>
+              <li>3</li>
+              <li>4</li>
+              <li>5</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。多数严格超过半数，floor(5/2)+1=3，可容忍两个节点崩溃。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. 候选人 A 最后日志(term=4,index=8)，B 为(term=3,index=20)，按 Raft 新旧比较谁更新？</h4>
+            <ol type="A">
+              <li>A</li>
+              <li>B</li>
+              <li>完全相同</li>
+              <li>只看节点编号</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。先比较最后任期，任期相同时才比较最后索引；不能只比日志长度。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>三节点 Raft 当前任期日志提交</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "Leader",
+    "Follower A",
+    "Follower B",
+    "状态机"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "追加命令",
+      "detail": "任期 5 的领导者先追加 index=9。",
+      "state": [
+        "9/t5 未提交",
+        "到 8",
+        "到 8",
+        "应用到 8"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "复制到 A",
+      "detail": "Leader 和 A 构成三节点中的多数。",
+      "state": [
+        "9/t5",
+        "9/t5",
+        "到 8",
+        "尚未应用 9"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "推进提交位置",
+      "detail": "当前任期条目满足多数复制，commitIndex 推到 9。",
+      "state": [
+        "commit=9",
+        "收到提交进度前",
+        "到 8",
+        "可应用 9"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "应用并追赶",
+      "detail": "状态机应用命令，B 随后追赶；无需等所有副本才提交。",
+      "state": [
+        "已提交",
+        "应用 9",
+        "追赶 9",
+        "应用到 9"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://raft.github.io/raft.pdf" target="_blank" rel="noopener noreferrer">Raft 原始论文</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

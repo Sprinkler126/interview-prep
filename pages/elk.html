@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ELK Stack - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">架构演进</a></li>
           <li class="sub"><a href="#s2-4">性能优化与安全</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -391,28 +394,28 @@ PUT _ilm/policy/app-logs-policy
         </div>
 
         <div class="qa">
-          <div class="q>Elasticsearch 的 ILM 是什么？有什么作用？</div>
+          <div class="q">Elasticsearch 的 ILM 是什么？有什么作用？</div>
           <div class="a">
             <strong>参考：</strong>ILM（Index Lifecycle Management）是 ES 的索引生命周期管理功能。它将索引分为四个阶段：Hot（写入+查询，SSD 存储）、Warm（只读+查询，HDD 存储）、Cold（低频查询，压缩存储）、Delete（过期删除）。通过 Rollover 策略自动创建新索引（按大小或时间），旧索引自动降级或删除。好处：避免单个索引过大、自动管理存储成本、保留合理的数据周期。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>ELK 的架构是如何演进的？什么是 EFK？</div>
+          <div class="q">ELK 的架构是如何演进的？什么是 EFK？</div>
           <div class="a">
             <strong>参考：</strong>最初是 ELK（Elasticsearch + Logstash + Kibana），Logstash 直接采集日志。后来 Filebeat 替代 Logstash 做采集（更轻量），形成 Filebeat + Logstash + ES + Kibana。EFK 是 Kubernetes 生态常用架构，用 Fluentd 替代 Logstash（Fluentd 是 CNCF 项目，与 K8s 集成更好）。生产级架构：Filebeat + Kafka + Logstash + ES + Kibana，加入 Kafka 做缓冲队列。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Elasticsearch 的分片和副本是什么？如何设置？</div>
+          <div class="q">Elasticsearch 的分片和副本是什么？如何设置？</div>
           <div class="a">
             <strong>参考：</strong>分片（Shard）是 ES 的基本存储单元，数据被分散到多个分片上实现水平扩展。副本（Replica）是分片的复制，提供高可用和查询性能。设置建议：单个分片 10-50GB，日志场景按日期创建索引，每个索引 1-3 个主分片。副本数通常为 1（写入密集时可临时设为 0）。分片数在创建索引后不可修改（需要 Reindex），副本数可以动态调整。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>如何保证 ELK 日志系统的安全性？</div>
+          <div class="q">如何保证 ELK 日志系统的安全性？</div>
           <div class="a">
             <strong>参考：</strong>1）X-Pack Security：ES 内置安全插件，支持用户名密码认证和 RBAC 权限控制；2）TLS/SSL：节点间通信和客户端连接加密；3）API Key：程序化访问使用 API Key；4）网络隔离：ES 集群不应暴露到公网，使用防火墙限制访问；5）日志脱敏：不打印密码、Token 等敏感信息；6）审计日志：记录所有访问操作。
           </div>
@@ -420,6 +423,127 @@ PUT _ilm/policy/app-logs-policy
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：日志可靠投递与检索代价</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>采集游标不等于端到端不丢</h4>
+            <p><strong>大白话：</strong>采集器像读书做书签，记录读到哪个位置；Logstash 处理并交给 Elasticsearch 后才完成后续一段。</p>
+            <p><strong>边界与易错：</strong>进程崩溃、磁盘故障、日志轮转和确认时机影响丢失/重放边界。持久队列增强恢复能力，但不能把所有输入输出组合都变成 exactly-once。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>至少一次要准备处理重复</h4>
+            <p><strong>大白话：</strong>传输断开后发送方不知道对端是否收到了，安全做法常是再发一次，所以日志可能重复。</p>
+            <p><strong>边界与易错：</strong>业务事件有稳定 event_id 时，可考虑使用确定性文档 ID 做去重；同一 ID 覆盖会改变历史语义，不能随便用 trace_id 当所有日志的唯一键。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>索引字段是检索预算</h4>
+            <p><strong>大白话：</strong>text 像把句子拆成词建立索引，适合全文；keyword 保留完整值，适合状态码、服务名和精确聚合。</p>
+            <p><strong>边界与易错：</strong>动态字段爆炸会拖累 mapping 与集群管理。不要把每个用户 ID 变成字段名；日志保留期、分片数量与磁盘水位要一起规划。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>读取日志(event_id, payload)
+入缓冲队列 → 转换字段
+尝试批量写入搜索引擎
+失败：按策略重试并观察积压
+重复容忍或按 event_id 去重</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>Elasticsearch 压力大，为什么采集端也开始积压？</summary><p>下游变慢导致输出阻塞，队列逐步填满，背压向采集端传播。先查看写入拒绝、批量延迟、分片与磁盘水位，再估算队列可缓冲时长；盲目扩采集器可能继续加重写入压力。</p></details>
+          <details><summary>订单日志偶尔重复，如何区分正常重投和代码重复？</summary><p>结合 event_id、采集源路径/偏移、业务流水及首次时间分析。相同源事件被多次传输属于重投；不同 event_id 对应同一扣款则需要查业务幂等。日志重复不能直接证明业务重复执行。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 对 service_name 按完整值统计数量，优先使用哪类字段？</h4>
+            <ol type="A">
+              <li>text 分词字段</li>
+              <li>keyword 字段</li>
+              <li>二进制字段</li>
+              <li>每个服务创建新字段</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>keyword 适合精确匹配和聚合；text 用于分词全文检索。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. 已接收的事件在确认回包丢失后重发，最直接可能出现什么？</h4>
+            <ol type="A">
+              <li>重复日志</li>
+              <li>自动保证绝不重复</li>
+              <li>全部历史索引被删除</li>
+              <li>分片自动归零</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A。</strong>发送端无法辨认对端是否已写入，重发可能导致重复。端到端去重需额外设计。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：日志可靠投递与检索代价</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "采集器",
+    "Logstash 队列",
+    "Elasticsearch",
+    "检索用户"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "采集事件 E17",
+      "detail": "采集器读取一行结构化日志，带稳定事件编号。",
+      "state": [
+        "E17 待发送",
+        "空",
+        "尚无 E17",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "进入持久队列",
+      "detail": "本例启用 PQ，用磁盘缓冲下游短暂波动。",
+      "state": [
+        "等待确认",
+        "E17 待输出",
+        "写入中",
+        "暂未检索到"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "首次写入成功",
+      "detail": "文档落库，但连接在确认返回前断开。",
+      "state": [
+        "连接断开",
+        "未确认完成",
+        "已有 E17",
+        "可搜索到一份"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "恢复后重放",
+      "detail": "不确定是否写入成功时重试，至少一次语义允许重复。",
+      "state": [
+        "恢复传输",
+        "重发 E17",
+        "收到重复事件",
+        "可能看到重复"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "用稳定文档 ID 处理重投",
+      "detail": "仅在业务语义允许时以 E17 作确定性 ID，避免同一事件多份文档。",
+      "state": [
+        "完成确认",
+        "移出已确认事件",
+        "E17 保持一份",
+        "结果可解释"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://www.elastic.co/docs/reference/logstash/persistent-queues" target="_blank" rel="noopener noreferrer">Elastic 官方：Logstash 持久队列与限制</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

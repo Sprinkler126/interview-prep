@@ -6,6 +6,8 @@
 <title>国家电网计算机类专业课复习 - 面试知识复习库</title>
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/sgcc.css">
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -97,6 +99,68 @@
 </p>
 </article>
 </div>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>专业课学习闭环</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "原理",
+    "手算",
+    "交互验证",
+    "错题复盘"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "先解释机制",
+      "detail": "选择一门专业课，说清概念及前提；从数据结构开始。",
+      "state": [
+        "确认前提",
+        "尚未计算",
+        "尚未核对",
+        "未开始"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "独立列过程",
+      "detail": "遮住答案，列变量、单位、循环和中间结果，不只背最终数字。",
+      "state": [
+        "已理解",
+        "记录推导",
+        "准备核对",
+        "未开始"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "验证变化",
+      "detail": "使用本章步骤回放或原算法页的自定义数组，核对每一步。",
+      "state": [
+        "检查边界",
+        "对照中间值",
+        "暂停、回退观察",
+        "收集差异"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "复盘迁移",
+      "detail": "做自编练习并看推导，改参数后再独立计算；题目不冒充官方真题。",
+      "state": [
+        "说清为何成立",
+        "换参数复算",
+        "验证边界",
+        "回到错误对应单元"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="method">第二部分：场景化讲解 · 从会背到会做</h2>
 <div class="flow">
 <div class="flow-box flow-blue">先说清概念</div>

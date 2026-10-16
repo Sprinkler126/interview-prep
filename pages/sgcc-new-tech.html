@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -117,6 +119,68 @@
 <div class="exam-trap">
 <strong>易错点：</strong>批处理与流处理不是“慢”和“快”的同义词；原始异常不能为了好看直接删掉。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "传感器",
+    "网关",
+    "消息服务",
+    "分析服务"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "事件产生",
+      "detail": "设备在10:00产生事件E，记录设备身份、事件ID和时间。",
+      "state": [
+        "E，事件时间10:00",
+        "尚未接收",
+        "无消息",
+        "等待数据"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "边缘预处理",
+      "detail": "网关验证格式并保留异常标签；异常值可能代表真实故障。",
+      "state": [
+        "原始记录保留",
+        "校验并上送E",
+        "收到E",
+        "等待消费"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "可能重复投递",
+      "detail": "假设消息用至少一次投递，确认丢失可能导致E重投。",
+      "state": [
+        "已采样",
+        "已发送",
+        "E，可能重投E",
+        "按事件ID去重"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "按事件时间聚合",
+      "detail": "平台10:05收到，但事件仍属10:00业务窗口；迟到规则需明确。",
+      "state": [
+        "时间10:00",
+        "网络有延迟",
+        "处理时间10:05",
+        "按10:00窗口处理"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>告警模型评价</h3>

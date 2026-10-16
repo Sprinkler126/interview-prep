@@ -1,0 +1,48 @@
+/* Shared chapter exercises and state animations; no build step required. */
+.interview-lab { margin:2rem 0; scroll-margin-top:90px; overflow-wrap:anywhere; }
+.interview-lab a { color:var(--accent); }
+.interview-lab .lab-concept,.interview-lab .lab-quiz,.interview-lab .study-question { background:var(--surface); border:1px solid var(--border); padding:1rem 1.2rem; border-radius:9px; margin:.9rem 0; }
+.interview-lab .lab-concept h3 { margin-top:0; }
+.interview-lab .lab-concept p + p { margin-top:.6rem; }
+.interview-lab .study-question h4 { margin-top:0; }
+.interview-lab details { border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; margin:.75rem 0; background:var(--surface); }
+.interview-lab summary { cursor:pointer; font-weight:600; color:var(--accent); }
+.interview-lab details[open] summary { margin-bottom:.7rem; }
+.interview-lab pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.study-animation { margin:1.3rem 0; padding:1.2rem; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+.study-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; margin:1rem 0; }
+.study-controls button,.study-controls select { font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:.35rem .65rem; }
+.study-controls button { cursor:pointer; }
+.study-controls button:disabled { opacity:.4; cursor:default; }
+.study-controls button:focus-visible,.study-controls select:focus-visible,.study-controls input:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.study-controls input[type=range] { flex:1; min-width:120px; accent-color:var(--accent); }
+.study-stage { display:grid; grid-template-columns:repeat(var(--study-nodes,4),minmax(0,1fr)); gap:1rem; margin:1rem 0; }
+.study-node { position:relative; min-width:0; padding:.9rem .6rem; border:1px solid var(--border); border-radius:9px; text-align:center; background:var(--bg); transition:background .3s,border-color .3s,transform .3s; overflow-wrap:anywhere; }
+.study-node strong { display:block; color:var(--accent); margin-bottom:.4rem; }
+.study-node span { font-size:.88rem; }
+.study-node:not(:last-child)::after { content:'→'; position:absolute; right:-.9rem; top:40%; color:var(--accent4); }
+.study-node.is-active { border-color:var(--accent3); background:rgba(52,211,153,.13); transform:translateY(-3px); animation:study-pulse .65s ease-out; }
+.study-node.is-active strong { color:var(--accent3); }
+.study-caption { min-height:5em; border-left:3px solid var(--accent); padding:.6rem 1rem; background:var(--bg); }
+.study-caption strong { display:block; color:var(--accent4); margin-bottom:.3rem; }
+.study-caption p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.study-hint { color:var(--text-dim); font-size:.85rem; }
+.study-failure { color:#fca5a5; }
+.study-options { min-width:0; border:0; padding:0; margin:.6rem 0; }
+.study-options legend { color:var(--text-dim); font-size:.9rem; }
+.study-option { display:flex; align-items:baseline; gap:.6rem; padding:.45rem .6rem; border:1px solid transparent; border-radius:6px; cursor:pointer; }
+.study-option:has(input:checked) { border-color:var(--accent); background:rgba(56,189,248,.08); }
+.study-feedback { min-height:1.7em; color:var(--accent3); }
+.interview-lab [hidden] { display:none; }
+.study-animation [hidden] { display:none; }
+@keyframes study-pulse { from { box-shadow:0 0 0 6px rgba(52,211,153,.2); } to { box-shadow:0 0 0 0 transparent; } }
+/* Constrain long tables/code in existing chapters, too. */
+.main-content,.compare-box { min-width:0; }
+.main-content { overflow-wrap:anywhere; }
+.arch-box { min-width:0; overflow-wrap:anywhere; }
+table { display:block; max-width:100%; overflow-x:auto; }
+:not(pre) > code { overflow-wrap:anywhere; white-space:normal; }
+.flow-box { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+@media(max-width:1024px) { .main-content { width:100%; } }
+@media(max-width:600px) { .study-stage { grid-template-columns:1fr; gap:.8rem; } .study-node { text-align:left; } .study-node:not(:last-child)::after { content:'↓'; top:auto; bottom:-.9rem; right:50%; } .study-animation { padding:.85rem; } }
+@media(prefers-reduced-motion:reduce) { .study-node,.study-node.is-active { animation:none; transition:none; transform:none; } }

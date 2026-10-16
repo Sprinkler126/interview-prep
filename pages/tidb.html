@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TiDB - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -35,6 +37,7 @@
           <li class="sub"><a href="#s2-3">与 MySQL 兼容性</a></li>
           <li class="sub"><a href="#s2-4">适用场景</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -450,6 +453,105 @@ EXPLAIN ANALYZE ...  -- 含实际执行统计</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>SQL 层扩容不解决所有写热点</h3>
+            <p>TiDB 层像无状态接待员，TiKV Region 才承载数据和 Raft 复制。加 SQL 节点可分摊计算与连接，但单热点行、单 Region leader 或存储 I/O 仍可能是瓶颈。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>快照隔离不是完整 MySQL RR 复刻</h3>
+            <p>TiDB 的 RR 语义基于快照隔离，不能照搬 InnoDB 间隙锁规则。跨行写偏差仍需约束设计；事务模式与隔离设置应按所用版本文档确认。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>分布式执行要付网络账单</h3>
+            <p>一个 SQL 即使语句很短，也可能跨很多 Region 取数并聚合。EXPLAIN ANALYZE 应关注扫描量、数据倾斜与 RPC；批量写入还要控制事务大小和冲突。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>已经有 Raft 为什么还需要分布式事务？</summary><p>Raft 保证一个复制组内部日志一致；跨多个 Region 的原子提交是另一层问题，不能把副本一致等同跨分片事务。</p></details>
+          <details class="study-followup"><summary>TiFlash 适合替代所有点查吗？</summary><p>列存擅长扫描少量列并聚合，点查与频繁小写通常仍适合行存；还需考虑同步进度、代价估计和具体查询计划。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 对单一库存行的高争用，优先无限增加 TiDB 节点是否必然线性提速？</h4>
+            <ol type="A">
+              <li>是，SQL 节点越多锁越少</li>
+              <li>否，热点写仍需协调</li>
+              <li>是，Raft 自动拆分一行</li>
+              <li>只要增加连接数即可</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。同一逻辑行的串行约束不会因无状态 SQL 层扩容消失。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. Raft 在 TiKV 中主要解决？</h4>
+            <ol type="A">
+              <li>单 Region 副本日志一致性</li>
+              <li>自动提供跨所有 Region 的 SQL 原子性</li>
+              <li>消除全部网络延迟</li>
+              <li>替代 SQL 优化器</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。复制组内一致性和跨组事务分别处理不同边界。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>跨 Region 事务的准备与提交</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "事务协调",
+    "Region A",
+    "Region B",
+    "事务记录"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发起转账",
+      "detail": "扣款与入账分别位于两个 Region；演示经典两阶段思路。",
+      "state": [
+        "开始",
+        "账户 100",
+        "账户 0",
+        "未决定"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "准备 A",
+      "detail": "保存扣款意图与锁，尚未对外作为已提交结果。",
+      "state": [
+        "准备中",
+        "预写 -10",
+        "账户 0",
+        "未决定"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "准备 B",
+      "detail": "入账也准备成功，才具备整体提交条件。",
+      "state": [
+        "两分支就绪",
+        "预写 -10",
+        "预写 +10",
+        "未决定"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "记录提交决定",
+      "detail": "持久化提交决定后，各分支按该决定完成，恢复可继续查询。",
+      "state": [
+        "提交",
+        "账户 90",
+        "账户 10",
+        "COMMIT"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://docs.pingcap.com/tidb/stable/transaction-isolation-levels/" target="_blank" rel="noopener noreferrer">TiDB 隔离级别</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

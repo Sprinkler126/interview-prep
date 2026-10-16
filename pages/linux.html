@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Linux - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">性能分析</a></li>
           <li class="sub"><a href="#s2-4">定时任务</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -469,6 +472,104 @@ crrontab -r          # 删除所有定时任务
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>文件描述符：路径被删，不等于文件立刻释放</h3>
+            <p>大白话：文件名是目录里的入口，打开文件后进程握着文件描述符。删除最后一个名字时，仍打开的文件可继续占用磁盘，直到引用释放。</p>
+            <p><strong>边界与易错：</strong>易错：df满而du统计不大，可能有deleted但仍打开的日志；先查持有进程与日志轮转策略，别把删除目录当作一定释放空间。</p>
+          </article>
+          <article class="lab-concept"><h3>权限位：目录的x是“能穿过”，不是运行目录</h3>
+            <p>大白话：普通文件r/w/x是读写执行；目录r允许列名字，x允许按路径访问里面的项，w涉及创建删除入口且通常还需x。</p>
+            <p><strong>边界与易错：</strong>边界：能否删文件主要受父目录权限、粘滞位等控制，不由文件自身w位单独决定。chmod 777不是通用修复，还要考虑ACL、挂载和安全策略。</p>
+          </article>
+          <article class="lab-concept"><h3>管道与重定向：先后顺序会改变输出去向</h3>
+            <p>大白话：标准输出是1，标准错误是2。2&gt;&amp;1表示把错误输出指向此刻标准输出的位置，后续再改1不会追溯修改2。</p>
+            <p><strong>边界与易错：</strong>易错：cmd &gt;out 2&gt;&amp;1把两者写文件；cmd 2&gt;&amp;1 &gt;out则可能只有标准输出入文件。排错时应保留退出码，不能只凭日志有没有内容判断成功。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>机器load很高，但CPU利用率不高，说明什么？</summary><p>load还可能包含不可中断睡眠任务，先看进程状态与磁盘IO延迟、队列、内存回收和网络文件系统。不能看到load高就立即加CPU。</p></details>
+          <details class="lab-question"><summary>服务端口监听正常却连接失败，怎样排？</summary><p>核对监听地址是回环、IPv4还是IPv6，再核对目标地址、容器端口映射、防火墙与路由；用ss及两端抓包定位SYN是否到达及响应是否返回。监听成功仅证明本地bind状态。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 文件已unlink但仍由进程打开，磁盘数据通常何时才能释放？</h4>
+            <ol type="A">
+              <li>删除名字后必定立即</li>
+              <li>相关打开引用都释放后</li>
+              <li>只有重装系统</li>
+              <li>修改文件权限后</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>删除目录项不等于关闭已打开对象，最后链接和打开引用都消失后，其占用才可回收。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2"><h4>2. 命令 cmd &gt;out 2&gt;&amp;1 的一般效果是什么？</h4>
+            <ol type="A">
+              <li>仅错误入文件</li>
+              <li>仅标准输出入文件</li>
+              <li>标准输出和错误都指向out</li>
+              <li>两者都丢弃</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>先把1指向out，再让2复制1当前的目标，因此两种输出都进入out。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>日志删了，空间为什么还没回来</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "目录项",
+    "进程fd",
+    "inode",
+    "磁盘空间"
+  ],
+  "frames": [
+    {
+      "active": 1,
+      "title": "服务打开日志",
+      "detail": "路径app.log指向inode，进程fd引用已打开文件。",
+      "state": [
+        "app.log存在",
+        "fd=7打开",
+        "链接1／被打开",
+        "占用1GB"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "删除路径",
+      "detail": "unlink移除名字，但进程仍持有fd。",
+      "state": [
+        "app.log消失",
+        "fd=7仍打开",
+        "链接0／被打开",
+        "仍占1GB"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "服务继续写",
+      "detail": "通过原fd仍可写入这个匿名文件对象。",
+      "state": [
+        "无路径",
+        "继续写入",
+        "仍被引用",
+        "可能继续增加"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "服务关闭原fd",
+      "detail": "假设没有其他链接或打开引用，数据块可回收。",
+      "state": [
+        "无路径",
+        "fd关闭",
+        "引用释放",
+        "空间回收"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://man7.org/linux/man-pages/man2/unlink.2.html" target="_blank" rel="noopener noreferrer">Linux unlink 官方手册</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

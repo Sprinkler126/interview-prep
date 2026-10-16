@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -211,6 +213,68 @@ return 所有 Finish 都为 true  // 存在安全序列</code>
 <div class="exam-trap">
 <strong>易错点：</strong>“登录成功”不代表有全部权限；管理员权限也不代表可以绕过审计。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "进程P1",
+    "调度器",
+    "CPU",
+    "进程P2"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "时刻0：P1运行",
+      "detail": "P1到达0，服务5；P2尚未到达。采用SRTF，忽略切换开销。",
+      "state": [
+        "剩余5",
+        "选P1",
+        "P1：0–1",
+        "尚未到达"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "时刻1：P2到达",
+      "detail": "P1剩4，P2服务2；抢占式最短剩余时间选择P2。",
+      "state": [
+        "剩余4，就绪",
+        "比较4与2",
+        "切换P2",
+        "剩余2"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "时刻3：P2完成",
+      "detail": "P2从1运行到3，周转时间3-1=2。P1仍剩4。",
+      "state": [
+        "剩余4，就绪",
+        "重新选择",
+        "P2结束",
+        "完成，周转2"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "时刻7：P1完成",
+      "detail": "P1从3运行到7，周转7，平均周转(7+2)/2=4.5。",
+      "state": [
+        "完成，周转7",
+        "无就绪进程",
+        "空闲",
+        "等待0，P1等待2"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>FCFS 与 SRTF 对照</h3>

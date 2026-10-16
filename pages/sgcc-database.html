@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -222,6 +224,79 @@ ORDER BY dept_id;
 <div class="exam-trap">
 <strong>易错点：</strong>ER 图中的联系属性如成绩属于选课事实，不能随意塞进学生或课程实体。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "T1",
+    "锁管理器",
+    "账户A",
+    "T2"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "申请排他锁",
+      "detail": "T1准备修改账户A余额，先申请X锁。",
+      "state": [
+        "请求X(A)",
+        "收到请求",
+        "余额100",
+        "未开始"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "授予锁",
+      "detail": "目前没有冲突锁，T1获得排他锁。",
+      "state": [
+        "持有X(A)",
+        "所有者T1",
+        "余额100",
+        "准备读A"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "冲突访问等待",
+      "detail": "本场景采用锁式读写，T2请求S(A)与T1的X(A)冲突。",
+      "state": [
+        "写入80未提交",
+        "T2排队",
+        "未提交余额80",
+        "等待S(A)"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "事务提交",
+      "detail": "按严格两段锁场景，T1提交后释放X锁；此处不演示MVCC读。",
+      "state": [
+        "提交并释放",
+        "可授予S(A)",
+        "已提交余额80",
+        "等待解除"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "读取已提交值",
+      "detail": "锁管理器授予T2共享锁后，T2读到80，避免读取未提交修改。",
+      "state": [
+        "已结束",
+        "S锁所有者T2",
+        "余额80",
+        "读取80"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>闭包、范式与分解</h3>

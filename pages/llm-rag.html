@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>大模型与 RAG - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -31,6 +33,7 @@
           <li class="sub"><a href="#s2-2">效果评估与可观测</a></li>
           <li class="sub"><a href="#s2-3">安全与成本</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </aside>
       <main class="main-content">
@@ -144,6 +147,104 @@
         <div class="qa"><div class="q">为什么 RAG 会回答错？如何系统定位？</div><div class="a"><strong>参考</strong>：可能是知识不存在、解析丢失、Chunk 边界不完整、Embedding 不匹配、召回被权限过滤、重排错序、上下文超长截断或模型忽略证据。按“数据 → 权限 → 召回 → 重排 → 上下文 → 生成”分层打点，使用带标准证据的评测集逐层定位。</div></div>
         <div class="qa"><div class="q">如何防止 RAG 中的 Prompt Injection？</div><div class="a"><strong>参考</strong>：把检索内容视为不可信数据，系统指令与证据严格分隔；只允许模型基于证据回答，不允许文档改变工具权限或系统规则；工具调用做白名单和参数校验；对输入、文档、输出做安全检测，并记录审计。不能只靠一句“忽略恶意指令”解决。</div></div>
         <div class="qa"><div class="q">大模型应用如何控制延迟和成本？</div><div class="a"><strong>参考</strong>：离线做增量 Embedding，在线做查询缓存和结果缓存；先 metadata 过滤，再混合召回，限制 rerank TopK；按问题复杂度路由小模型/大模型，控制上下文 Token，使用流式返回；设置超时、重试、熔断和降级。指标要看 P95、首 Token、Token 用量和单次成本。</div></div>
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>评估拆两层：检索没找对，生成再强也难补救</h3>
+            <p>大白话：先问“标准证据有没有进入候选”，再问“答案有没有忠实使用证据”。把召回与生成混成一个总分，很难知道该修哪里。</p>
+            <p><strong>边界与易错：</strong>边界：Recall@k要先定义相关证据集合；重排只能调整已召回候选，无法找回候选之外的文档。抽样集需覆盖无答案、冲突版本和越权请求。</p>
+          </article>
+          <article class="lab-concept"><h3>向量相似度：数值高不是业务事实成立</h3>
+            <p>大白话：向量更像语义位置图，相似意味着表达接近，不等于两个文档结论一致。型号、编号、金额等精确字符串常需要关键词检索补充。</p>
+            <p><strong>边界与易错：</strong>易错：余弦相似度不是正确率或概率；不同Embedding模型的分数阈值不能照搬。更新模型需要评估索引重建和查询向量兼容性。</p>
+          </article>
+          <article class="lab-concept"><h3>知识权限与版本：检索前就要控制证据范围</h3>
+            <p>大白话：先限定租户、用户权限、文件版本和生效日期，再让模型看证据；不能把所有资料塞给模型后仅要求它“不要泄露”。</p>
+            <p><strong>边界与易错：</strong>边界：索引、重排、缓存及引用回链都需保持权限一致。缓存键不能只看问题字符串，权限变更和文档更新还需要失效策略。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>如何回答“RAG可以彻底消除幻觉吗”？</summary><p>不能保证。检索漏召回、内容过期、上下文冲突以及模型误用证据都会出错；通过证据引用、无答案拒答、分阶段评估与人工复核降低风险，并报告可验证的指标。</p></details>
+          <details class="lab-question"><summary>chunk越大越好吗？</summary><p>大块上下文完整但噪声、成本和截断风险上升，小块定位精准却可能切断定义或表格。按语义边界切分，保留标题、来源和版本，可先检索小块再扩展相邻上下文。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 重排阶段能直接解决哪种问题？</h4>
+            <ol type="A">
+              <li>相关文档完全没进候选</li>
+              <li>候选中相关证据排得靠后</li>
+              <li>文档没有权限元数据</li>
+              <li>源文档事实错误</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>重排只在已召回候选中重新评分排序，不能凭空增加未召回证据，也不能自动修复权限或源数据真实性。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 某查询标准证据共4段，Top5命中其中3段，按证据段定义的Recall@5是多少？</h4>
+            <ol type="A">
+              <li>3/5</li>
+              <li>3/4</li>
+              <li>4/5</li>
+              <li>5/4</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>召回率=命中的相关证据数÷全部相关证据数=3/4。3/5是这一定义下的Precision@5。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>RAG诊断：候选存在但重排丢掉了证据</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "问题",
+    "召回候选",
+    "重排Top2",
+    "最终回答"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "带标准证据评测",
+      "detail": "教学问题正确证据是文档C，不是仅看回答是否流畅。",
+      "state": [
+        "当前政策？",
+        "未检索",
+        "未重排",
+        "未生成"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "召回阶段命中C",
+      "detail": "候选为A、B、C，说明本例召回阶段有正确证据。",
+      "state": [
+        "不变",
+        "A,B,C",
+        "未重排",
+        "未生成"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "重排错误排除C",
+      "detail": "若只保留A、B，生成模型已看不到正确文档。",
+      "state": [
+        "不变",
+        "含C",
+        "A,B／漏C",
+        "缺少依据"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "定位并修正重排",
+      "detail": "修正后Top2为C、A；回答仍需检查是否忠实引用。",
+      "state": [
+        "不变",
+        "含C",
+        "C,A",
+        "引用C并核对"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://arxiv.org/abs/2005.11401" target="_blank" rel="noopener noreferrer">原始RAG研究论文</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <div style="text-align:center;color:var(--text-dim);margin-top:3rem;padding-bottom:2rem;font-size:0.85rem"><a href="../index.html" style="color:var(--accent);text-decoration:none">← 返回知识库目录</a><br><br>大模型与 RAG · 面试知识复习库 · Last updated 2026-09-07</div>
       </main>
     </div>

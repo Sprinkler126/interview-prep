@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dubbo - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-2">Dubbo 3.x 新特性</a></li>
           <li class="sub"><a href="#s2-3">与 gRPC / Spring Cloud 对比</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -516,6 +519,127 @@ public interface GreeterService {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：RPC 超时与重试的真实语义</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>超时不等于对端没执行</h4>
+            <p><strong>大白话：</strong>Consumer 等待结果超时，只说明在期限内没收到结果；Provider 可能已扣款，回包恰好丢了。</p>
+            <p><strong>边界与易错：</strong>对写操作直接重试会重复执行；业务幂等应依靠请求号与数据库唯一约束等机制，不能只相信 RPC 返回码。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>容错策略必须匹配业务</h4>
+            <p><strong>大白话：</strong>Failover 像换一家再问，适合允许重复尝试的读取；Failfast 像失败立即告诉调用者，减少写请求的盲目重复。</p>
+            <p><strong>边界与易错：</strong>配置 retries 时应按所用 Dubbo 版本确认含义与生效范围；常见 Failover 的 retries 表示额外重试次数，总尝试数为 1+retries。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>负载均衡只解决选谁</h4>
+            <p><strong>大白话：</strong>LeastActive 偏向未完成调用较少的实例；权重用于表达容量差异，连接复用减少建连成本。</p>
+            <p><strong>边界与易错：</strong>少活跃不一定 CPU 最空闲；慢实例可能持续积压。要合并看耗时、错误率、线程池和连接池，避免只调权重。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>调用(requestId)
+若数据库已有成功流水：返回原结果
+否则在事务内写唯一流水并扣款
+提交事务后返回
+超时重试：沿用 requestId</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>扣款 RPC 超时，可以切另一个实例再扣吗？</summary><p>先用业务流水号查询或重试同一幂等操作。唯一键与余额变更需处在同一事务边界；重复请求返回原结果。换实例并不能规避数据库中的重复副作用。</p></details>
+          <details><summary>如何避免多层重试放大流量？</summary><p>让一层明确拥有重试职责，限定总截止时间、可重试错误和最大次数，必要时指数退避加抖动。若网关、服务和 SDK 各尝试 3 次，单请求最坏可触发 27 次末端调用。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 某 Failover 设置 retries=2，按“额外重试次数”语义，最多尝试几次？</h4>
+            <ol type="A">
+              <li>1</li>
+              <li>2</li>
+              <li>3</li>
+              <li>无限次</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>首次调用 1 次，再额外重试 2 次，总共 3 次；实际仍可能受总超时等条件限制。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. Consumer 超时后，哪项判断可靠？</h4>
+            <ol type="A">
+              <li>Provider 一定没执行</li>
+              <li>Provider 一定回滚</li>
+              <li>Provider 的业务结果可能成功也可能失败</li>
+              <li>换节点就能保证不重复</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>超时是调用端观察，不是远端事务结果。需要幂等键、结果查询或补偿处理不确定性。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：RPC 超时与重试的真实语义</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "Consumer",
+    "Provider A",
+    "Provider B",
+    "业务数据库"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发送扣款请求",
+      "detail": "请求携带幂等号 pay-81，重试也必须保持该编号。",
+      "state": [
+        "pay-81 发往 A",
+        "接收中",
+        "空闲",
+        "尚无流水"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 提交扣款",
+      "detail": "事务中插入唯一流水并更新余额。",
+      "state": [
+        "等待回包",
+        "扣款已提交",
+        "空闲",
+        "pay-81 已成功"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "回包延迟导致超时",
+      "detail": "调用方不知道成功与否，不能据此认定没有扣款。",
+      "state": [
+        "超时，结果未知",
+        "回包丢失",
+        "空闲",
+        "pay-81 已成功"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "以同一编号向 B 重试",
+      "detail": "B 先识别已有流水，不再执行扣款。",
+      "state": [
+        "重试 pay-81",
+        "已完成",
+        "读取原业务结果",
+        "唯一流水命中"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "返回原结果",
+      "detail": "幂等保护了副作用；RPC 重试本身没有提供该保证。",
+      "state": [
+        "获得成功结果",
+        "未再扣款",
+        "返回已成功",
+        "仍只有一笔扣款"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://dubbo.apache.org/en/overview/mannual/java-sdk/tasks/framework/fault-tolerent-strategy/" target="_blank" rel="noopener noreferrer">Apache Dubbo 官方：集群容错</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

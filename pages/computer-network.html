@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>计算机网络 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -40,6 +42,7 @@
           <li class="sub"><a href="#s2-3">WebSocket</a></li>
           <li class="sub"><a href="#s2-4">Cookie/Session/Token</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -472,6 +475,104 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>子网划分：先看掩码，再判断是否同一网络</h3>
+            <p>大白话：IP 像门牌号，掩码规定前多少位是街道。主机把目的地址与掩码按位与；同网段通常直接 ARP 找对方，不同网段则找下一跳网关的 MAC。</p>
+            <p><strong>边界与易错：</strong>易错：跨路由转发时通常逐跳更换链路层地址；IP 目的地址并不会因此变成网关地址。传统 IPv4 普通子网可用主机数为 2^h−2，/31 点对点等情况另有规则。</p>
+          </article>
+          <article class="lab-concept"><h3>TCP 序号：确认的是字节，不是第几个包</h3>
+            <p>大白话：收件人说“下次从第1005个字节给我”，意思是1005之前的连续字节已收到。发送方按序号识别丢失和重复，不需要假定一次 write 对应一次 read。</p>
+            <p><strong>边界与易错：</strong>边界：SYN 和 FIN 各占一个序号；纯 ACK 不占。累计确认只覆盖连续前缀，乱序数据是否缓存和 SACK 反馈要结合协商及实现。</p>
+          </article>
+          <article class="lab-concept"><h3>流量控制与拥塞控制：两个不同的瓶颈</h3>
+            <p>大白话：接收窗口 rwnd 表示对方仓库还装得下多少，拥塞窗口 cwnd 表示网络路上适合放多少。可发送的在途量受两者共同约束。</p>
+            <p><strong>边界与易错：</strong>易错：接收端窗口为零不等于网络拥塞；重传超时也不证明服务器业务执行失败，因此支付等请求还要做应用层幂等。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>输入域名后一直打不开，怎样分层排查？</summary><p>先查 DNS 解析与地址，再查路由、端口和 TCP 建连；随后检查 TLS 证书、HTTP 状态码与服务端耗时。能 ping 通仅说明部分网络可达，不能证明目标 TCP 端口或 HTTPS 正常。</p></details>
+          <details class="lab-question"><summary>HTTP/2 多路复用后为什么仍可能一起停顿？</summary><p>多条 HTTP 流共享 TCP 字节流，TCP 丢失的字节未补齐时，后续字节不能按序交给上层。HTTP/3 在 QUIC 流层面隔离这种按序等待，但仍共享拥塞等连接级约束。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 传统 IPv4 /27 子网不考虑特殊保留地址时，可分配给主机的地址通常有多少个？</h4>
+            <ol type="A">
+              <li>16</li>
+              <li>30</li>
+              <li>32</li>
+              <li>62</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>主机位是32−27=5，共32个地址；普通子网扣除网络地址与广播地址，得到30个。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2"><h4>2. TCP 段 SEQ=1000，携带5字节数据，不含 SYN/FIN。接收端按序收到后 ACK 应为多少？</h4>
+            <ol type="A">
+              <li>1000</li>
+              <li>1001</li>
+              <li>1005</li>
+              <li>1006</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>确认号表示期望收到的下一个字节序号，1000到1004共5字节已收到，所以下一个是1005。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>TCP 累计确认：乱序段不会推进连续前缀</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "发送端",
+    "网络",
+    "接收缓存",
+    "ACK"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发送两个数据段",
+      "detail": "段A为1000~1004，段B为1005~1009。",
+      "state": [
+        "A、B发出",
+        "A延迟",
+        "期望1000",
+        "1000"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B先到达",
+      "detail": "示意接收端缓存乱序B，但缺口还在1000。",
+      "state": [
+        "等待确认",
+        "B到达",
+        "B已缓存",
+        "1000"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "A随后到达",
+      "detail": "连续范围变为1000~1009，缓存可以整体推进。",
+      "state": [
+        "等待确认",
+        "A到达",
+        "连续10字节",
+        "1010"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "收到累计ACK",
+      "detail": "发送方得知1010之前连续字节均被确认。",
+      "state": [
+        "释放已确认数据",
+        "ACK返回",
+        "交付应用",
+        "1010"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://www.rfc-editor.org/rfc/rfc9293.html" target="_blank" rel="noopener noreferrer">TCP 标准 RFC 9293</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

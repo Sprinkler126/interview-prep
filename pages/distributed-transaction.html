@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>分布式事务 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">各方案对比</a></li>
           <li class="sub"><a href="#s2-4">Seata 框架详解</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -472,6 +475,105 @@ COMMIT;
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>2PC 的两阶段是先保证能做再决定做</h3>
+            <p>prepare 后参与者记录待决状态并保留必要资源；协调者持久化统一决定后通知。参与者失联超时不能随意回滚，因为别处可能已收到提交决定。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>Outbox 把双写缩到本地事务</h3>
+            <p>订单与待发事件同库一起提交，后台持续发送。发送成功回执可能丢失，所以中继可以重复发送，下游仍要以业务键幂等；清理消息必须可恢复可审计。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>补偿不是时间倒流</h3>
+            <p>Saga 的补偿是新的业务操作，例如退款；用户已经看到订单状态或外部通知后无法假装从未发生。补偿可能失败，需要重试、对账与人工接管。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>订单提交后直接调用 MQ，失败就 catch 忽略行吗？</summary><p>会丢事件。用本地消息表/CDC/事务消息等可恢复机制；把发送失败记入持久状态再重试，而不是仅打印日志。</p></details>
+          <details class="study-followup"><summary>TCC 的 Cancel 先到，Try 后到怎么办？</summary><p>记录取消状态形成防悬挂屏障，拒绝迟到 Try；Cancel 要支持空回滚，Confirm/Cancel 要幂等。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. Outbox 中继已发送消息，但“已发送”状态更新前崩溃，恢复可能发生？</h4>
+            <ol type="A">
+              <li>重复发送</li>
+              <li>订单必然自动回滚</li>
+              <li>消息必定永久消失</li>
+              <li>数据库被清空</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。中继仍看见未发送记录会重发，下游去重不可省略。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 2PC 参与者已 prepare，协调者暂时失联时应？</h4>
+            <ol type="A">
+              <li>直接依据超时独立回滚</li>
+              <li>遵守待决协议并恢复查询决定</li>
+              <li>当作从未执行</li>
+              <li>把库存直接增加两次</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。未知全局决定时擅自回滚可能与其他已提交分支冲突。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>Outbox 从本地原子提交到可靠重发</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "订单事务",
+    "Outbox",
+    "中继",
+    "消费者"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "同一本地事务",
+      "detail": "订单和事件记录原子提交。",
+      "state": [
+        "订单成功",
+        "e1 未发送",
+        "等待",
+        "未处理"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "发送 e1",
+      "detail": "中继读取未发送事件并发送。",
+      "state": [
+        "保持提交",
+        "仍未标发送",
+        "已发 MQ",
+        "收到 e1"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "标记前宕机",
+      "detail": "消息已到达，但中继的本地标记未完成。",
+      "state": [
+        "订单存在",
+        "仍未标发送",
+        "宕机",
+        "已处理 e1"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "恢复重发与去重",
+      "detail": "中继重发正常，下游识别 e1，副作用保持一次。",
+      "state": [
+        "订单存在",
+        "最终标已发",
+        "重发 e1",
+        "幂等跳过"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://rocketmq.apache.org/docs/featureBehavior/04transactionmessage/" target="_blank" rel="noopener noreferrer">RocketMQ 事务消息边界参考</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

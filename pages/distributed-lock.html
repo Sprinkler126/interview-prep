@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>分布式锁 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">RedLock 争议</a></li>
           <li class="sub"><a href="#s2-4">分布式锁最佳实践</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -437,6 +440,105 @@ SET lock:order:123:pay NX EX 30</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>租约过期不会暂停旧线程</h3>
+            <p>锁只是服务端的一条带期限记录。持锁者暂停后租约过期，别人拿到新锁；旧线程醒来仍能继续执行，资源端必须能拒绝过期持有者才可保障关键副作用。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>唯一 token 与 fencing 不同</h3>
+            <p>随机 token 用于证明“这把锁是我的”，避免误删别人的锁；递增 fencing token 用于比较持有者新旧，资源端拒绝旧序号。仅有随机 token 不能判定谁更新。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>续租与解锁都检查所有权</h3>
+            <p>检查 token 与删除必须原子执行；GET 后再 DEL 有检查与使用的竞态。看门狗只能降低正常长任务过期概率，不能消除网络隔离与长暂停的所有风险。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>Redis 锁 TTL 设置成两倍平均耗时就安全吗？</summary><p>不安全。长尾、暂停与网络会超过平均值；用有界任务、续租、所有权检查以及资源端 fencing/版本条件共同处理。</p></details>
+          <details class="study-followup"><summary>数据库为什么还要唯一约束？</summary><p>分布式锁通常是协调手段，唯一约束是权威数据底线；锁丢失或误用时仍能阻止重复业务记录。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. 随机 token 最直接防止什么问题？</h4>
+            <ol type="A">
+              <li>旧持有者删除新持有者的锁</li>
+              <li>任意旧线程写入外部资源</li>
+              <li>所有网络分区</li>
+              <li>磁盘损坏</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。比较后删除保护锁记录所有权；资源写安全需额外协议。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 资源端已接受 fencing=12，再收到 fencing=11 应？</h4>
+            <ol type="A">
+              <li>无条件接受</li>
+              <li>拒绝旧令牌写入</li>
+              <li>先把版本改回 11</li>
+              <li>删除所有数据</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。资源端记录最大序号，拒绝过期持有者，才能抵御暂停后恢复的旧请求。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>旧持锁者恢复与 fencing 拦截</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端 A",
+    "锁服务",
+    "客户端 B",
+    "资源服务器"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A 获得租约",
+      "detail": "A 的持锁代次为 11。",
+      "state": [
+        "token=11",
+        "A，TTL 有效",
+        "等待",
+        "最大序号 0"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 长暂停",
+      "detail": "锁租约到期，但 A 的线程并未被销毁。",
+      "state": [
+        "暂停",
+        "租约过期",
+        "可竞争",
+        "最大序号 0"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B 获新代次并写入",
+      "detail": "资源接受 12 并记住最大序号。",
+      "state": [
+        "仍暂停",
+        "B token=12",
+        "写入成功",
+        "最大序号 12"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "A 恢复旧写",
+      "detail": "资源识别 11\u003c12，拒绝过期写；随机 token 单独无法完成比较。",
+      "state": [
+        "旧写被拒",
+        "B 持有",
+        "已生效",
+        "拒绝 token=11"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/" target="_blank" rel="noopener noreferrer">Redis 锁的安全边界</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

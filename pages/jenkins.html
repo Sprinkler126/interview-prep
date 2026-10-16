@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jenkins / GitLab CI - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">GitOps</a></li>
           <li class="sub"><a href="#s2-4">工具对比</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -544,6 +547,127 @@ metadata:
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：流水线的制品、安全与发布一致性</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>一次构建，多环境晋级</h4>
+            <p><strong>大白话：</strong>把代码提交号做成可追踪制品，测试环境验证这份制品，再把同一份发布到生产。</p>
+            <p><strong>边界与易错：</strong>每个环境重新构建可能拿到不同依赖或基础镜像，测试通过的未必是上线那份。应记录 commit、构建号、制品摘要与环境配置。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>流水线失败不代表外部动作撤销</h4>
+            <p><strong>大白话：</strong>Jenkins 记录步骤执行状态，但调用部署、发消息或数据库迁移会产生外部副作用。</p>
+            <p><strong>边界与易错：</strong>重跑阶段前要判断是否重复部署、重复迁移；post/finally 适合清理资源，不是跨系统事务回滚。不可逆迁移应采用兼容的分阶段方案。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>凭据与并发是上线边界</h4>
+            <p><strong>大白话：</strong>凭据像临时借用的钥匙，尽量缩小可读范围；同一环境的并发发布像两个人同时换锁，需互斥。</p>
+            <p><strong>边界与易错：</strong>日志脱敏不是绝对安全边界，不向不可信 PR 暴露生产凭据；制品已发布也要用环境锁/版本校验避免旧构建覆盖新版本。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>checkout(固定 commit)
+构建 → 单测 → 安全检查
+publish(不可变 artifact_digest)
+取得生产环境发布锁
+部署同一 digest → 验证 → 释放锁</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>构建绿色但上线故障，怎么快速定位？</summary><p>先比对实际运行的制品 digest、配置版本与发布记录，确认测试和生产是否一致；再查健康检查和运行依赖。回滚应指向已验证的旧制品，同时确认新数据库变更是否向后兼容。</p></details>
+          <details><summary>流水线断在“部署中”，点重跑安全吗？</summary><p>不能仅从 Jenkins 状态判断外部部署结果。先查询目标环境的版本和 rollout 状态；部署动作应按版本幂等，防止重跑重复执行破坏性脚本。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 确保测试制品与生产制品一致，较合理的做法是？</h4>
+            <ol type="A">
+              <li>生产重新拉最新分支编译</li>
+              <li>每个环境动态解析 latest</li>
+              <li>构建一次并按摘要晋级</li>
+              <li>跳过测试缩短差异窗口</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>同一不可变制品晋级可保证被验证的二进制一致，环境差异通过受控配置表达。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 两个流水线同时部署同一生产环境，最直接需要什么？</h4>
+            <ol type="A">
+              <li>提高日志级别</li>
+              <li>环境级互斥并校验发布版本</li>
+              <li>同时删除工作区</li>
+              <li>取消所有制品版本号</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>互斥避免交错部署；版本校验还可阻止排队的旧任务覆盖新版本。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：流水线的制品、安全与发布一致性</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "代码仓库",
+    "构建 Agent",
+    "制品仓库",
+    "生产环境"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "锁定提交",
+      "detail": "本次流水线绑定 commit a81，而非随时变化的分支头。",
+      "state": [
+        "commit a81",
+        "待构建",
+        "尚无制品",
+        "旧版本"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "构建并测试",
+      "detail": "在 Agent 编译并完成测试，失败则不晋级。",
+      "state": [
+        "commit a81",
+        "测试通过",
+        "准备上传",
+        "旧版本"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "发布不可变制品",
+      "detail": "记录制品摘要 sha256:X，后续环境引用同一摘要。",
+      "state": [
+        "commit a81",
+        "构建结束",
+        "制品 X",
+        "旧版本"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "取得环境发布锁",
+      "detail": "防止多个流水线同时修改一个环境。",
+      "state": [
+        "可继续提交新代码",
+        "本构建不再重编译",
+        "制品 X",
+        "锁定环境，部署 X"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "验证后结束",
+      "detail": "检查健康与关键指标，失败时按兼容性条件回滚已知制品。",
+      "state": [
+        "关联发布记录",
+        "记录构建结果",
+        "保留 X 与历史制品",
+        "X 健康，释放锁"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://www.jenkins.io/doc/book/pipeline/jenkinsfile/" target="_blank" rel="noopener noreferrer">Jenkins 官方：Jenkinsfile 与凭据</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

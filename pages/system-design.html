@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>系统设计 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -31,6 +33,7 @@
           <li class="sub"><a href="#s2-3">Feed 流系统设计</a></li>
           <li class="sub"><a href="#s2-4">分布式文件存储设计</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -515,6 +518,127 @@ public String encode(long id) {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：从容量估算到业务一致性</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>先估在途量，再谈机器数</h4>
+            <p><strong>大白话：</strong>平均并发约等于吞吐乘平均耗时。2000 req/s、平均 50ms，稳定状态平均在途约 100，而不是 2000。</p>
+            <p><strong>边界与易错：</strong>这不是线程池大小公式：异步模型、峰值、尾延迟和下游连接池要另算；也不能用 P99 冒充平均值严格代入 Little 定律。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>幂等必须原子保护副作用</h4>
+            <p><strong>大白话：</strong>同一请求重发只产生一次业务变化，像同一张取款凭证只能兑现一次。可用业务唯一键结合事务保存执行结果。</p>
+            <p><strong>边界与易错：</strong>先查再写而不加唯一约束会并发穿透；分布式锁租约到期也不能单独保证不重复。扣款与幂等记录要考虑同一事务或可靠状态机。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>Outbox 把双写改成可重放流程</h4>
+            <p><strong>大白话：</strong>业务表与待发送事件表在同一本地事务提交，再由后台投递消息，避免“订单成功但发消息失败”无法补发。</p>
+            <p><strong>边界与易错：</strong>投递后宕机仍可能导致重复消息，所以消费者继续需要幂等；Outbox 改善原子持久化，不会自动提供全链路 exactly-once。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>本地事务：插入订单 + 插入 Outbox 事件
+后台读取未发送事件
+发送消息，成功后标记
+崩溃恢复允许重复投递
+消费者以 event_id 原子去重并执行副作用</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>支付成功，通知库存失败，怎么设计？</summary><p>先明确强一致还是允许异步最终一致。订单与 Outbox 事件在同事务持久化，投递器可重试；库存按事件号幂等处理，并提供超时告警、对账和补偿。不能仅在 catch 中写日志就当作已解决一致性。</p></details>
+          <details><summary>秒杀是先扣 Redis 还是先扣数据库？</summary><p>先明确库存不可超卖、吞吐和失败恢复约束。缓存预扣可削峰，但需处理消息落地、超时归还与重放；数据库条件更新可保护最终库存。选择取决于一致性边界，重点是原子扣减、幂等订单和对账恢复。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 平均吞吐 2000 req/s，平均耗时 0.05s，稳定系统平均在途请求约多少？</h4>
+            <ol type="A">
+              <li>40</li>
+              <li>100</li>
+              <li>2000</li>
+              <li>40000</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>L≈λW=2000×0.05=100；仅是稳定状态的平均在途量，容量仍需峰值与余量。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. Outbox 模式正确的关键是？</h4>
+            <ol type="A">
+              <li>先发消息再随意写订单</li>
+              <li>订单与待发事件同一本地事务提交</li>
+              <li>只依赖内存事件列表</li>
+              <li>所有消费者不再需要幂等</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>同事务保证业务成功时事件具备可恢复的持久记录；后续投递仍可能重复，消费幂等不可省。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：从容量估算到业务一致性</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "订单事务",
+    "Outbox 表",
+    "投递器",
+    "库存消费者"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "开始创建订单",
+      "detail": "同一本地数据库事务包含订单与事件。",
+      "state": [
+        "事务进行中",
+        "尚无已提交事件",
+        "等待",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "原子提交订单和事件",
+      "detail": "事务提交后，两份持久记录同时存在。",
+      "state": [
+        "订单 O18 已提交",
+        "事件 E18 待发",
+        "即将扫描",
+        "等待"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "发送事件",
+      "detail": "消息发送后，投递器可能在标记完成前宕机。",
+      "state": [
+        "订单 O18 已提交",
+        "E18 尚未标记完成",
+        "已发送后宕机",
+        "收到 E18"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "重启后再次投递",
+      "detail": "事件仍待发，所以安全恢复会导致重复。",
+      "state": [
+        "订单 O18 已提交",
+        "E18 可重放",
+        "重发 E18",
+        "再次收到 E18"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "按事件号幂等消费",
+      "detail": "库存事务用唯一事件号记录处理结果，重复不再扣库存。",
+      "state": [
+        "订单 O18 已提交",
+        "最终标记已发",
+        "确认完成",
+        "E18 只产生一次扣减"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html" target="_blank" rel="noopener noreferrer">AWS 官方：Transactional Outbox 与重复投递</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

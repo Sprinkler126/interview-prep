@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Java 基础 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -35,6 +37,7 @@
           <li class="sub"><a href="#s2-3">反射实战</a></li>
           <li class="sub"><a href="#s2-4">Java 8~21 新特性</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -1081,6 +1084,104 @@ String json = """
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>equals与hashCode：先找桶，再比较是否同一把钥匙</h3>
+            <p>大白话：hashCode帮你找候选桶，equals确认是不是同一个逻辑键。相等对象必须有相同哈希，但相同哈希的对象未必相等。</p>
+            <p><strong>边界与易错：</strong>易错：把可变字段参与哈希后，入Map再修改该字段，可能无法按新哈希找到原映射。HashMap不保证迭代顺序，也不提供并发写入安全。</p>
+          </article>
+          <article class="lab-concept"><h3>泛型PECS：生产者供你读，消费者收你写</h3>
+            <p>大白话：List&lt;? extends Number&gt;保证拿出来是Number，却不知道具体是Integer还是Double，不能安全塞入任意Number；List&lt;? super Integer&gt;适合放Integer。</p>
+            <p><strong>边界与易错：</strong>边界：extends通配符一般只能安全写null；super读取通常只能按Object处理。泛型不变性使List&lt;Integer&gt;不是List&lt;Number&gt;的子类型。</p>
+          </article>
+          <article class="lab-concept"><h3>异常与资源：关闭动作也可能失败</h3>
+            <p>大白话：try-with-resources把关闭动作纳入结构化流程；多个资源通常按声明的逆序关闭。业务异常和关闭异常同时发生时，需要查看suppressed异常才能还原全貌。</p>
+            <p><strong>边界与易错：</strong>易错：finally中return可能遮住原返回值或异常；不能为了“保证成功”吞异常。checked异常与RuntimeException区别在编译期处理要求，不等同于故障是否严重。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>HashMap的get返回null，能断言键不存在吗？</summary><p>不能。HashMap允许null值，因此既可能没有该键，也可能该键映射到null；用containsKey区分，并结合并发语义判断两次操作之间是否有变化。</p></details>
+          <details class="lab-question"><summary>浅拷贝后改子对象，原对象为什么跟着变？</summary><p>浅拷贝只复制外层字段，引用字段仍指向同一子对象。深拷贝需要说明复制边界、循环引用和不可变对象复用，不能把clone或集合构造器一概当深拷贝。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="0"><h4>1. 若a.equals(b)为true，符合Java约定的结果应是什么？</h4>
+            <ol type="A">
+              <li>两者hashCode必须相同</li>
+              <li>两者必须同一引用</li>
+              <li>两者类型必须完全一致</li>
+              <li>hashCode必须不同</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：A。</strong>equals相等要求hashCode相同，便于哈希容器正确找桶；反向推论不成立，相同哈希可以发生碰撞。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="3"><h4>2. List&lt;? extends Number&gt; x 中，一般可安全加入哪个值？</h4>
+            <ol type="A">
+              <li>Integer.valueOf(1)</li>
+              <li>Double.valueOf(1)</li>
+              <li>任意Number</li>
+              <li>null</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：D。</strong>实际列表可能是List&lt;Integer&gt;或List&lt;Double&gt;，无法安全写入某个具体Number类型；null与引用类型兼容。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>可变HashMap键：为什么“放进去却找不到”</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "键对象",
+    "哈希定位",
+    "桶A",
+    "桶B"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "建立键",
+      "detail": "假设hash由id计算，id=1对应桶A。",
+      "state": [
+        "id=1",
+        "hash(1)→A",
+        "空",
+        "空"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "put键和值",
+      "detail": "映射存入桶A，节点保存当时的哈希信息。",
+      "state": [
+        "id=1",
+        "A",
+        "键→订单",
+        "空"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "外部修改id",
+      "detail": "对象地址未变，但现在hashCode依据id=2计算。",
+      "state": [
+        "id=2",
+        "hash(2)→B",
+        "旧节点仍在A",
+        "空"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "按新哈希get",
+      "detail": "去桶B找不到；示例假设两次哈希映射到不同桶。",
+      "state": [
+        "id=2",
+        "查B",
+        "旧节点滞留",
+        "未命中"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html" target="_blank" rel="noopener noreferrer">Java 21 HashMap API</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

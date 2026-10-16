@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flink - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#p2-5">CDC</a></li>
           <li class="sub"><a href="#p2-6">性能调优</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -466,6 +469,105 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>Watermark 是进度声明</h3>
+            <p>它表达系统预计某个事件时间之前的数据大体已到齐，不是给每条事件改时间。多输入算子一般受最慢活跃输入约束，空闲分区不处理会拖住窗口。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>Exactly-once 指状态恢复边界</h3>
+            <p>Checkpoint 把源位置和算子状态关联恢复，失败后事件可能重放但状态结果应保持一致。外部输出也需要事务或幂等 Sink，不能由 Checkpoint 自动保证任意 HTTP 调用只发生一次。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>状态倾斜比总流量更隐蔽</h3>
+            <p>keyBy 把同键交给同一逻辑分区，热 key 会让一个任务忙而其他空闲。局部预聚合或加盐能拆负载，但必须能正确合并，不能改变非结合运算语义。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>事件时间很新，为什么窗口还不触发？</summary><p>检查所有上游分区的 watermark、空闲检测、算子背压和窗口触发条件；处理时间推进不等于事件时间 watermark 推进。</p></details>
+          <details class="study-followup"><summary>Checkpoint 越频繁越安全吗？</summary><p>更频繁可缩小恢复重放范围，也增加快照、存储和对齐开销；应根据 RPO、状态大小与持续时间调整，而非无上限加频率。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 两个活跃输入 watermark 分别是 20 和 12，普通多输入算子进度通常受谁限制？</h4>
+            <ol type="A">
+              <li>20</li>
+              <li>12</li>
+              <li>32</li>
+              <li>随机选择</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。为避免漏掉慢输入的早期事件，通常取活跃输入最小值；空闲输入策略需另行配置。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. Checkpoint 可直接保证任意外部支付 HTTP 调用只执行一次吗？</h4>
+            <ol type="A">
+              <li>可以</li>
+              <li>不可以，需要外部事务或幂等协作</li>
+              <li>只要线程数为 1 即可</li>
+              <li>只看窗口大小</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。内部状态一致性不自动覆盖外部副作用。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>慢输入如何拖住事件时间窗口</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "输入 A",
+    "输入 B",
+    "合并算子",
+    "窗口 [0,10)"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A 进度领先",
+      "detail": "演示窗口无额外 allowed lateness，触发由 watermark 到达边界控制。",
+      "state": [
+        "WM=12",
+        "WM=6",
+        "WM=6",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "B 仍较慢",
+      "detail": "A 更快并不能单独推动合并进度。",
+      "state": [
+        "WM=20",
+        "WM=8",
+        "WM=8",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "B 追到边界",
+      "detail": "两个活跃输入都声明时间 10 前基本到齐。",
+      "state": [
+        "WM=20",
+        "WM=10",
+        "WM=10",
+        "可触发"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "输出窗口",
+      "detail": "算子关闭首轮窗口计算；迟到事件按配置单独处理。",
+      "state": [
+        "继续",
+        "继续",
+        "进度已推进",
+        "输出聚合"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/" target="_blank" rel="noopener noreferrer">Flink 时间与 Watermark</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Elasticsearch - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -37,6 +39,7 @@
           <li class="sub"><a href="#s2-3">集群架构</a></li>
           <li class="sub"><a href="#s2-4">ELK Stack</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -563,6 +566,105 @@ k1 = 1.2 (默认), b = 0.75 (默认)</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>refresh 和 flush 管不同问题</h3>
+            <p>refresh 让新段可搜索，flush 关联 Lucene commit 和 translog 周期。写入成功不代表搜索立即可见；强行每次 refresh 会增加小段和合并负担。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>text 与 keyword 取决于查询语义</h3>
+            <p>text 像拆词后建目录，适合全文检索；keyword 把整个字符串当一个值，适合精确过滤、排序和聚合。不是给 text 发 term 就自动得到分词查询。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>深分页会放大分片工作</h3>
+            <p>from+size 要在各分片保留大量候选，页码越深越贵。稳定遍历常用 PIT 与 search_after；排序字段要有确定的打破平局项，并处理 PIT 生命周期。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>刚写成功，GET 能看到但 search 找不到，数据丢了吗？</summary><p>未必。按 ID 读取和搜索可见性路径不同，先看 refresh；不能把近实时延迟直接判为丢数据。</p></details>
+          <details class="study-followup"><summary>日志统计为何不应总在 message 上直接 terms 聚合？</summary><p>message 常是全文 text，精确维度宜用 keyword 字段。先确认 mapping、基数和内存成本，不能为所有文本随意开启高成本字段加载。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. 让新写入文档进入可搜索视图的关键操作是？</h4>
+            <ol type="A">
+              <li>refresh</li>
+              <li>修改副本名字</li>
+              <li>仅增加 mapping 注释</li>
+              <li>删除 translog</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。refresh 打开搜索可见的新段；不应与持久化提交或副本数量混同。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 按完整订单号精确检索和聚合应优先建模为？</h4>
+            <ol type="A">
+              <li>只有 text</li>
+              <li>keyword</li>
+              <li>随机分词器</li>
+              <li>忽略字段</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。订单号是精确标识，不应被拆词；字段类型决定查询与聚合方式。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>文档从写入成功到搜索可见</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端",
+    "索引缓冲",
+    "translog",
+    "搜索视图"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "提交文档",
+      "detail": "示例展示近实时可见性，持久化细节依配置。",
+      "state": [
+        "发送 doc1",
+        "接收文档",
+        "记录操作",
+        "无 doc1"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "写入确认",
+      "detail": "符合确认条件后返回，搜索视图尚未刷新。",
+      "state": [
+        "收到成功",
+        "doc1 待刷新",
+        "已记录",
+        "无 doc1"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "执行 refresh",
+      "detail": "缓冲形成可供搜索的新段并打开搜索器。",
+      "state": [
+        "可发起搜索",
+        "新段生成",
+        "不等于清空日志",
+        "准备新视图"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "搜索可见",
+      "detail": "查询现在可以命中新文档；这不是 flush 的同义词。",
+      "state": [
+        "命中 doc1",
+        "继续接收新写",
+        "保持恢复信息",
+        "含 doc1"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search" target="_blank" rel="noopener noreferrer">Elastic 近实时搜索</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

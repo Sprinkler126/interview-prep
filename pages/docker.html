@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Docker - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#s2-3">安全最佳实践</a></li>
           <li class="sub"><a href="#s2-4">容器编排：Swarm vs K8s</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -720,6 +723,127 @@ FROM python:3.11-slim</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：容器退出、数据与资源隔离</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>进程退出就是容器退出</h4>
+            <p><strong>大白话：</strong>把容器看成带隔离环境的一组进程：主进程退出，容器便结束；镜像更像启动这组进程的只读材料包。</p>
+            <p><strong>边界与易错：</strong>后台启动服务后让主进程退出，容器不会因此常驻。exec 形式 ENTRYPOINT 有利于让应用直接接收停止信号；应用仍需正确处理 SIGTERM。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>可写层不是数据备份</h4>
+            <p><strong>大白话：</strong>镜像层只读，容器把新增修改放进自己的可写层；删除并重建容器不会自动带走旧可写层。</p>
+            <p><strong>边界与易错：</strong>卷可以独立于容器保留，tmpfs 是临时内存挂载；删除容器、删除卷、宿主机故障是三种不同风险，持久化仍需备份。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>隔离与限额不是同一件事</h4>
+            <p><strong>大白话：</strong>Namespace 像分房间，让进程看到不同的网络、进程号和挂载；cgroups 像水电表，限制与统计资源。</p>
+            <p><strong>边界与易错：</strong>同内核容器不是完整虚拟机安全边界；内存超限可能触发 OOM，CPU 限额通常表现为节流，不能都解释成应用崩溃。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>创建容器(image)
+挂载命名卷到 /data
+应用写业务数据到 /data
+删除容器，但保留卷
+新容器挂载同一卷并验证数据</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>容器重建后数据库没了，怎么解释并修复？</summary><p>先确认数据库目录是否只在可写层，并停止继续覆盖现场。恢复依赖原容器层或备份；之后为数据目录配置命名卷/合适持久存储并验证恢复流程。仅重新拉镜像无法恢复业务数据。</p></details>
+          <details><summary>docker stop 很慢，如何定位？</summary><p>检查主进程是谁、是否通过 shell 包装而没有转发信号，以及应用是否存在长事务或没有关闭线程池。停止宽限期要覆盖正常清理；只调短超时可能让系统强制终止并丢失未完成工作。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 删除容器后，哪种位置的数据可独立于该容器继续保留（未另行删除存储）？</h4>
+            <ol type="A">
+              <li>容器可写层</li>
+              <li>命名 volume</li>
+              <li>进程堆内存</li>
+              <li>tmpfs</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>命名卷生命周期独立于容器；可写层随容器移除，内存和 tmpfs 不提供该持久性。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. Namespace 与 cgroups 的职责对应正确的是？</h4>
+            <ol type="A">
+              <li>都负责镜像签名</li>
+              <li>前者限制 CPU，后者实现 DNS</li>
+              <li>前者提供视图隔离，后者控制资源</li>
+              <li>前者存储日志，后者构建镜像</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>隔离让进程“看见什么”不同，资源控制决定“可以使用多少”。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：容器退出、数据与资源隔离</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "只读镜像",
+    "容器 A",
+    "数据卷",
+    "容器 B"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "用镜像创建 A",
+      "detail": "镜像携带程序和初始文件，不携带后续业务写入。",
+      "state": [
+        "版本 v1",
+        "启动中",
+        "空卷",
+        "未创建"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "分别写两处",
+      "detail": "A 在可写层写临时日志，在挂载卷写订单。",
+      "state": [
+        "版本 v1",
+        "临时日志 + 挂载 /data",
+        "订单 #7",
+        "未创建"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "删除 A",
+      "detail": "可写层随 A 移除；本例没有执行删除卷操作。",
+      "state": [
+        "版本 v1",
+        "已移除，临时日志丢失",
+        "订单 #7 仍保留",
+        "未创建"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "创建 B 并挂同一卷",
+      "detail": "新可写层为空，但 /data 来自原来的卷。",
+      "state": [
+        "版本 v1",
+        "已移除",
+        "订单 #7 仍保留",
+        "读取到订单 #7"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "识别持久性边界",
+      "detail": "卷保留不等于跨主机容灾；备份与恢复另行设计。",
+      "state": [
+        "可重复拉取",
+        "生命周期结束",
+        "需要备份",
+        "继续使用 /data"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://docs.docker.com/engine/storage/" target="_blank" rel="noopener noreferrer">Docker 官方：存储生命周期</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

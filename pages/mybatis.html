@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MyBatis - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">MyBatis-Plus</a></li>
           <li class="sub"><a href="#s2-4">常见问题与优化</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -508,14 +511,14 @@ userMapper.update(null, updateWrapper);</code></pre>
         </div>
 
         <div class="qa">
-          <div class="q>MyBatis 的一级缓存和二级缓存有什么区别？各自的工作原理是什么？</div>
+          <div class="q">MyBatis 的一级缓存和二级缓存有什么区别？各自的工作原理是什么？</div>
           <div class="a">
             <strong>参考：</strong>一级缓存是 SqlSession 级别的，默认开启。同一个 SqlSession 中执行相同查询会直接返回缓存结果，执行写操作后清空。实现是 HashMap。二级缓存是 Mapper（namespace）级别的，默认关闭，需要在 XML 中加 &lt;cache/&gt; 开启。SqlSession 关闭或提交后，数据才写入二级缓存。二级缓存使用装饰器模式，底层也是 HashMap，外层包装了 LruCache、SerializedCache、SynchronizedCache 等。注意：二级缓存在多表关联查询时可能导致脏读（A 表修改不会清空 B 表的缓存），分布式环境下默认是本地缓存，建议使用 Redis 替代。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>#{} 和 ${} 有什么区别？为什么推荐使用 #{}？</div>
+          <div class="q">#{} 和 ${} 有什么区别？为什么推荐使用 #{}？</div>
           <div class="a">
             <strong>参考：</strong>#{} 使用 PreparedStatement 的参数占位符（?），参数会被预编译和转义，可以防止 SQL 注入。${} 是字符串直接拼接，不做任何转义，有 SQL 注入风险。推荐使用 #{} 因为：1）安全，防止 SQL 注入；2）性能好，PreparedStatement 可以复用执行计划；3）自动类型转换。${} 的使用场景：动态表名、动态列名、ORDER BY 子句（因为这些无法用占位符）。使用 ${} 时必须在代码层做白名单校验。
           </div>
@@ -529,21 +532,21 @@ userMapper.update(null, updateWrapper);</code></pre>
         </div>
 
         <div class="qa">
-          <div class="q>MyBatis 的延迟加载原理是什么？在什么场景下使用？</div>
+          <div class="q">MyBatis 的延迟加载原理是什么？在什么场景下使用？</div>
           <div class="a">
             <strong>参考：</strong>延迟加载通过 CGLIB 动态代理实现。查询主对象时，MyBatis 为关联属性创建代理对象。当访问关联属性时，代理对象拦截 getter 方法，发送额外的 SQL 查询填充数据。配置：lazyLoadingEnabled=true 开启，aggressiveLazyLoading=false 设置按需加载。使用场景：1）关联数据不是每次都需要（如订单详情可能不需要查看用户信息）；2）避免 N+1 查询的权衡方案。注意事项：延迟加载在 SqlSession 关闭后无法工作（因为需要发送 SQL），所以要么在 SqlSession 生命周期内访问关联属性，要么使用嵌套结果映射替代。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>MyBatis-Plus 相比 MyBatis 有哪些增强？LambdaQueryWrapper 的好处是什么？</div>
+          <div class="q">MyBatis-Plus 相比 MyBatis 有哪些增强？LambdaQueryWrapper 的好处是什么？</div>
           <div class="a">
             <strong>参考：</strong>MyBatis-Plus 增强：1）通用 CRUD：BaseMapper 和 IService 提供单表增删改查，无需写 XML；2）条件构造器：QueryWrapper/LambdaQueryWrapper 链式构建查询条件；3）分页插件：物理分页，自动拼接 LIMIT；4）代码生成器：一键生成 Entity/Mapper/Service/Controller；5）逻辑删除：@TableLogic 注解实现软删除；6）自动填充：@TableField(fill=FieldFill.INSERT) 自动填充创建时间等；7）乐观锁：@Version 注解。LambdaQueryWrapper 好处：1）使用方法引用（User::getName），编译期检查字段名，避免拼写错误；2）重构友好，字段改名时编译报错；3）代码可读性更好。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>MyBatis 中 ResultMap 的 association 和 collection 有什么区别？如何避免 N+1 查询？</div>
+          <div class="q">MyBatis 中 ResultMap 的 association 和 collection 有什么区别？如何避免 N+1 查询？</div>
           <div class="a">
             <strong>参考：</strong>association 用于一对一关联映射（如订单关联用户），collection 用于一对多关联映射（如用户关联多个订单）。两种实现方式：1）嵌套结果映射（推荐）：使用 JOIN 查询一次获取所有数据，在 ResultMap 中用 association/collection 定义映射关系；2）嵌套查询：association/collection 的 select 属性指向另一个查询方法，有 N+1 问题。避免 N+1 的方式：优先使用嵌套结果映射（JOIN）；如果关联数据不需要每次加载，使用延迟加载（fetchType="lazy"）；或者先查主表 ID 列表，再用 IN 批量查关联表。
           </div>
@@ -551,6 +554,104 @@ userMapper.update(null, updateWrapper);</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>参数占位与文本拼接：值和语法必须分开</h3>
+            <p>大白话：#{id}把id作为参数交给PreparedStatement，${column}直接把字符串拼到SQL文本。参数值不会被当成一段新的SQL结构执行。</p>
+            <p><strong>边界与易错：</strong>边界：列名、表名、排序方向不能靠普通参数占位随意替代，必须映射到服务端白名单。#{ }也不代表整条SQL绝对安全，其他拼接位置仍需检查。</p>
+          </article>
+          <article class="lab-concept"><h3>一级缓存：相同查询为什么还可能再次打库</h3>
+            <p>大白话：默认本地缓存常以SqlSession为边界，缓存键还包括语句、参数等信息。修改、清理或会话边界变化都会影响是否命中。</p>
+            <p><strong>边界与易错：</strong>易错：不能把同一个Mapper代理理解成同一个SqlSession。Spring整合中的会话生命周期受事务与集成配置影响；statement级localCacheScope会改变复用范围。</p>
+          </article>
+          <article class="lab-concept"><h3>N+1查询：对象关联越自然，数据库往返可能越多</h3>
+            <p>大白话：先查N个订单，再逐个查订单明细，会多出N次访问。延迟加载只是把访问延后，访问全部关联时仍可能出现N+1。</p>
+            <p><strong>边界与易错：</strong>边界：可用批量IN或适当join，但join分页要防一对多展开导致主表分页失真。先确认SQL次数、返回行数和执行计划，再决定方案。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>MyBatis二级缓存能否自动感知其他服务改表？</summary><p>通常不能。它按配置的namespace等边界管理，不会天然获知所有外部写入；跨namespace或其他应用修改会带来一致性风险。业务必须明确失效策略，不能把缓存当数据库真相。</p></details>
+          <details class="lab-question"><summary>动态IN列表为空时为什么需要单独处理？</summary><p>空集合可能生成非法SQL或意外缺少过滤条件。按业务约定返回空结果、拒绝请求或显式生成永假条件；不要静默退化成全表查询，尤其是更新和删除。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 用户输入作为查询id值，应该优先采用哪种MyBatis写法？</h4>
+            <ol type="A">
+              <li>${id}</li>
+              <li>#{id}</li>
+              <li>字符串直接拼接</li>
+              <li>拼接后删除单引号</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>#{id}生成参数绑定，让输入作为数据值处理；文本拼接会改变SQL结构并可能产生注入。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="3"><h4>2. 先查20个订单，再为每个订单单独查询明细，典型查询总次数是多少？</h4>
+            <ol type="A">
+              <li>1</li>
+              <li>2</li>
+              <li>20</li>
+              <li>21</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：D。</strong>初始列表1次加20次关联查询，总共21次，是常见N+1问题。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>N+1如何变为批量两次查询</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "订单列表",
+    "订单ID集合",
+    "明细查询",
+    "组装结果"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "查询订单列表",
+      "detail": "教学例返回订单1、2、3。",
+      "state": [
+        "一次SQL返回3单",
+        "1,2,3",
+        "未查",
+        "未组装"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "逐单查询方案",
+      "detail": "每个订单单独查明细，共再发3次SQL，总计4次。",
+      "state": [
+        "3单",
+        "逐个取ID",
+        "3次往返",
+        "可组装但往返多"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "改为收集ID批量查",
+      "detail": "收集[1,2,3]，对空集合按业务明确处理。",
+      "state": [
+        "3单",
+        "[1,2,3]",
+        "准备IN参数",
+        "待分组"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "一次明细SQL后按ID分组",
+      "detail": "总查询2次，注意大批量参数限制及结果量。",
+      "state": [
+        "第1次SQL",
+        "关联键",
+        "第2次SQL",
+        "按orderId组装"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://mybatis.org/mybatis-3/sqlmap-xml.html" target="_blank" rel="noopener noreferrer">MyBatis Mapper XML 官方说明</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

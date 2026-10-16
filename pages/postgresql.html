@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PostgreSQL - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -36,6 +38,7 @@
           <li class="sub"><a href="#s2-3">PL/pgSQL 存储过程</a></li>
           <li class="sub"><a href="#s2-4">与 MySQL 对比</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -532,6 +535,105 @@ CREATE TABLE logs_default PARTITION OF logs DEFAULT;
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>写偏差不是脏读</h3>
+            <p>两个值班医生各看到另一个在岗，各自把自己设为离岗；它们改的是不同行，快照隔离仍可能让两人都离岗。需要可串行化、共同守卫行或显式业务锁保护跨行约束。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>VACUUM 为什么重要</h3>
+            <p>更新留下旧元组，像旧账单要等所有还需查看的人离开后才能清。长事务会阻止回收；普通 VACUUM 主要回收空间供表内复用，不能等同于把文件立即缩小。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>窗口与聚合别混</h3>
+            <p>GROUP BY 把多行压成一行，窗口函数保留明细再计算排名或累计值。ROW_NUMBER 并列也分开编号；排序字段不唯一时应加稳定的主键作为次序。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>Repeatable Read 没有幻读，为什么还不是 Serializable？</summary><p>稳定快照避免再次查询突然多行，但不能消除跨事务读写依赖环，值班医生就是反例。</p></details>
+          <details class="study-followup"><summary>遇到 serialization failure 只重发最后一条 SQL 行吗？</summary><p>应回滚并重试整个事务，重新读取约束依据；只重发末句会沿用失效决策，外部副作用还要幂等。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. PG 的 Read Uncommitted 实际行为与谁一致？</h4>
+            <ol type="A">
+              <li>Read Committed</li>
+              <li>Repeatable Read</li>
+              <li>Serializable</li>
+              <li>允许任意脏读</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。PG 将该级别映射为 Read Committed，不能照抄 SQL 标准最低允许现象。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 要保留每笔订单并显示用户订单名次，应优先使用？</h4>
+            <ol type="A">
+              <li>DELETE</li>
+              <li>GROUP BY 后不保留明细</li>
+              <li>ROW_NUMBER 窗口函数</li>
+              <li>VACUUM</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C</strong>。窗口函数对明细附加计算结果；聚合通常折叠行，VACUUM 是存储维护。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>快照隔离中的值班医生写偏差</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "事务 A",
+    "事务 B",
+    "医生甲",
+    "医生乙"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A 观察",
+      "detail": "快照中两人都在岗。",
+      "state": [
+        "看乙在岗",
+        "未读取",
+        "在岗",
+        "在岗"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "B 观察",
+      "detail": "B 的快照也看到两人都在岗。",
+      "state": [
+        "准备离岗",
+        "看甲在岗",
+        "在岗",
+        "在岗"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "A 提交",
+      "detail": "A 只改甲行，没有和乙行写写冲突。",
+      "state": [
+        "已提交",
+        "准备离岗",
+        "离岗",
+        "在岗"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "B 提交",
+      "detail": "快照隔离允许该历史；跨行约束被破坏。",
+      "state": [
+        "已提交",
+        "已提交",
+        "离岗",
+        "离岗"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://www.postgresql.org/docs/current/transaction-iso.html" target="_blank" rel="noopener noreferrer">PG 事务隔离</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

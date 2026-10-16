@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prometheus - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#s2-2">Exporter 机制</a></li>
           <li class="sub"><a href="#s2-3">与 Grafana 集成</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -493,7 +496,7 @@ myapp_requests_total{method="POST",status="200"} 567</code></pre>
         </div>
 
         <div class="qa">
-          <div class="q>rate() 和 irate() 有什么区别？该用哪个？</div>
+          <div class="q">rate() 和 irate() 有什么区别？该用哪个？</div>
           <div class="a">
             <strong>参考：</strong>rate() 计算时间窗口内每秒平均增长率，结果平滑，适合告警规则和趋势图。irate() 基于最近两个数据点计算瞬时增长率，灵敏度高，适合观察短期波动。告警和趋势分析用 rate()，仪表盘实时展示用 irate()。一般推荐 rate()，因为 irate() 容易被毛刺干扰。
           </div>
@@ -507,21 +510,21 @@ myapp_requests_total{method="POST",status="200"} 567</code></pre>
         </div>
 
         <div class="qa">
-          <div class="q>Prometheus 的本地存储有什么局限？如何解决？</div>
+          <div class="q">Prometheus 的本地存储有什么局限？如何解决？</div>
           <div class="a">
             <strong>参考：</strong>Prometheus 内置 TSDB 是单机存储，默认保留 15 天，不支持水平扩展和长期保留。解决方案：1）Thanos：提供全局查询、长期存储（对象存储如 S3）、降采样；2）VictoriaMetrics：高性能时序数据库，兼容 PromQL，资源占用更低；3）Remote Write：将数据写入远程存储，Prometheus 只负责采集。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>Alertmanager 的分组、抑制、静默分别是什么？</div>
+          <div class="q">Alertmanager 的分组、抑制、静默分别是什么？</div>
           <div class="a">
             <strong>参考：</strong>分组（Grouping）将相关告警合并为一条通知，避免告警风暴（如同一服务多个实例同时宕机只发一条）。抑制（Inhibition）当高优先级告警触发时，自动抑制相关的低优先级告警（如网络故障时抑制下游服务告警）。静默（Silence）在维护窗口等场景下临时屏蔽特定告警，到期自动恢复。
           </div>
         </div>
 
         <div class="qa">
-          <div class="q>什么是 Exporter？如何自定义 Exporter？</div>
+          <div class="q">什么是 Exporter？如何自定义 Exporter？</div>
           <div class="a">
             <strong>参考：</strong>Exporter 是将第三方系统指标转换为 Prometheus 格式的组件。它暴露一个 /metrics HTTP 端点，返回 Prometheus 文本格式的指标。自定义步骤：1）使用 Prometheus 客户端库（如 prometheus/client_golang）；2）实现 Collector 接口的 Collect() 方法；3）注册指标（Counter/Gauge/Histogram）；4）暴露 HTTP 端点。也可以使用 textfile Collector 从文件读取指标。
           </div>
@@ -529,6 +532,127 @@ myapp_requests_total{method="POST",status="200"} 567</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：计数器、分位数与高基数</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>Counter 看增量，Gauge 看当前值</h4>
+            <p><strong>大白话：</strong>累计请求数像里程表，重启时可能归零；CPU 温度或队列长度像温度计，可升可降。</p>
+            <p><strong>边界与易错：</strong>计算请求速率应先对每条 counter 用 rate 再汇总，以识别各实例重置；不要直接把累计值当每秒请求数，也不要对任意 Gauge 机械套 rate。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>直方图可合并分布，分位数不能随意平均</h4>
+            <p><strong>大白话：</strong>经典 Histogram 用累积桶记录“低于某阈值有多少请求”，先合并兼容桶再估算整体分位数。</p>
+            <p><strong>边界与易错：</strong>经典桶查询保留 le：histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))。原生直方图查询形式不同；客户端 Summary 的分位数通常不可跨实例直接聚合。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>标签组合数量就是时序预算</h4>
+            <p><strong>大白话：</strong>每组标签值组合会产生独立时间序列，像给每种组合开一本账。10 个服务×5 个状态码只有 50 组；再加用户 ID 可能暴涨。</p>
+            <p><strong>边界与易错：</strong>请求 ID、订单 ID 适合日志或追踪，不适合作常规指标标签。注意桶、实例和容器标签也会继续乘大基数。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>每个实例暴露累计 Counter
+周期抓取各标签序列
+每条序列执行 rate(counter[5m])
+按服务维度 sum
+直方图先合并兼容桶，再估分位数</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>服务重启后速率算成负数，怎么办？</summary><p>检查是否手工用当前值减前值，并确认指标类型是否为 Counter。PromQL rate 能处理采样区间内可见的计数器重置；先对各实例求 rate，再汇总，避免把某实例重置藏进总和。</p></details>
+          <details><summary>两个实例 P99 分别 100ms 和 2s，总体 P99 是 1.05s 吗？</summary><p>不是。分位数依赖每个实例的请求量和完整分布，不能取两个值的平均。用一致桶边界的直方图汇总计数，再计算整体分位数；桶太粗时结果也只是估计。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 每个请求把 request_id 放入指标标签，主要问题是？</h4>
+            <ol type="A">
+              <li>无法显示小数</li>
+              <li>时序基数随请求增长，消耗大量资源</li>
+              <li>Counter 自动变 Gauge</li>
+              <li>必须关闭抓取</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>几乎每次请求新建一组标签，时间序列数量爆炸；关联单次请求应使用日志、Trace 或 exemplar 等机制。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 多实例 Counter 计算总体速率，应优先使用哪种顺序？</h4>
+            <ol type="A">
+              <li>先 sum 再 rate</li>
+              <li>先各自 rate 再 sum</li>
+              <li>直接 sum 累计值作 QPS</li>
+              <li>先平均 P99</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B。</strong>先 rate 能按实例识别重置，再求和形成总速率；先加总可能隐藏重置。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：计数器、分位数与高基数</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "实例 A Counter",
+    "实例 B Counter",
+    "PromQL rate",
+    "汇总 QPS"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "记录初始累计值",
+      "detail": "为便于手算，例子用两次端点值；实际 rate 还会结合区间采样和外推。",
+      "state": [
+        "t0 = 100",
+        "t0 = 200",
+        "等待后续采样",
+        "未知"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "10 秒后抓取",
+      "detail": "本次无重启，A 新增 20 次，B 新增 30 次。",
+      "state": [
+        "t10 = 120",
+        "t10 = 230",
+        "增量 A=20，B=30",
+        "等待计算"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "分别求速率",
+      "detail": "A=20/10=2 次/秒，B=30/10=3 次/秒。",
+      "state": [
+        "2 req/s",
+        "3 req/s",
+        "识别每条序列变化",
+        "待汇总"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "相加得到总体速率",
+      "detail": "先 rate 后 sum，总体为 5 req/s。",
+      "state": [
+        "2 req/s",
+        "3 req/s",
+        "sum(rate(...))",
+        "5 req/s"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "如果 A 重启归零",
+      "detail": "应在各自序列上识别重置，不能把全局累计总和直接相减。",
+      "state": [
+        "后续重置为 0",
+        "保持累计增长",
+        "逐序列处理 reset",
+        "继续汇总有效速率"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://prometheus.io/docs/practices/histograms/" target="_blank" rel="noopener noreferrer">Prometheus 官方：直方图与 Summary</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pulsar - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#p2-6">与 RocketMQ 对比</a></li>
           <li class="sub"><a href="#p2-7">运维与部署</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -509,6 +512,105 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>订阅名就是独立进度账本</h3>
+            <p>两个不同订阅可各消费一份完整事件，同一 Shared 订阅内的消费者分摊工作。Shared 分摊不承诺按键顺序，Key_Shared 才围绕键做分配，还需遵守相应生产批次约束。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>Broker 与 Bookie 分工</h3>
+            <p>Broker 负责接入、分发与协调，BookKeeper 保存账本。接入层与存储层可分别扩容，但持久化、复制与恢复仍有 I/O 和网络代价，“存算分离”等于免费扩容是误解。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>确认位置与留存政策分开</h3>
+            <p>未确认消息影响积压，已确认消息是否保留由 retention 等策略决定。重置游标需要相应数据仍在，不能把消费进度回退等同于已删除数据能重生。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>两个消费者订阅名不同，是否竞争同一份消息？</summary><p>它们拥有独立订阅进度，通常各得到一份；是否分摊取决于同一订阅内部的订阅类型。</p></details>
+          <details class="study-followup"><summary>Key_Shared 是否意味着跨所有 key 全局有序？</summary><p>不是，语义围绕同一个键；不同键可以并行，重投与批处理设置也要按官方约束设计。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. 要在同一订阅中扩展消费者且保持同键路由，应首先考虑？</h4>
+            <ol type="A">
+              <li>Key_Shared</li>
+              <li>每条随机新建订阅</li>
+              <li>Shared 并宣称全局有序</li>
+              <li>关闭 ACK</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。Key_Shared 以 key 为分配单元；它不提供跨键总顺序。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 消息已被所有订阅确认，是否还能回放主要还取决于？</h4>
+            <ol type="A">
+              <li>主题名字长度</li>
+              <li>留存策略与数据是否仍存在</li>
+              <li>消费者线程名称</li>
+              <li>浏览器缓存</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。游标决定进度，存储策略决定数据是否还在，两者不能混同。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>两个订阅的独立消费进度</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "Topic",
+    "订阅 A",
+    "订阅 B",
+    "BookKeeper"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "持久化事件",
+      "detail": "e1、e2 写入同一主题底层日志。",
+      "state": [
+        "e1,e2",
+        "游标在 e1 前",
+        "游标在 e1 前",
+        "保存 e1,e2"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 处理 e1",
+      "detail": "A 的确认不会替 B 确认。",
+      "state": [
+        "e1,e2",
+        "已确认 e1",
+        "仍未消费",
+        "保留所需消息"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 处理 e2",
+      "detail": "A 可以追上最新位置，B 仍积压。",
+      "state": [
+        "e1,e2",
+        "已确认 e2",
+        "e1,e2 待处理",
+        "保留 B 所需"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B 开始读取",
+      "detail": "独立订阅仍可从 e1 处理，最终删除还取决于策略。",
+      "state": [
+        "无新事件",
+        "已追平",
+        "读取 e1",
+        "进度独立"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://pulsar.apache.org/docs/next/concepts-messaging/" target="_blank" rel="noopener noreferrer">Pulsar 消息与订阅</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

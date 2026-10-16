@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -226,6 +228,68 @@
 <div class="exam-trap">
 <strong>易错点：</strong>无线有确认并不表示广播帧和所有帧类型都采用相同确认规则。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "发送方",
+    "网络",
+    "接收方",
+    "累计ACK"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发送字节100到599",
+      "detail": "连接已经建立，seq=100，载荷500B，无SYN/FIN。",
+      "state": [
+        "seq100，len500",
+        "传输中",
+        "下一个期望100",
+        "100"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "完整按序接收",
+      "detail": "接收方拿到100..599，下一字节应为600。",
+      "state": [
+        "等待确认",
+        "数据到达",
+        "下一个期望600",
+        "准备600"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "发送ACK=600",
+      "detail": "ACK指下一个期望字节，而不是最后收到字节。",
+      "state": [
+        "等待确认",
+        "ACK返回",
+        "已收100..599",
+        "600"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "推进发送窗口",
+      "detail": "发送方获知600之前的数据已累计确认，可按窗口继续发送。",
+      "state": [
+        "已确认至599",
+        "往返完成",
+        "等待600",
+        "600"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>子网手算：192.168.10.130/26</h3>

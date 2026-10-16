@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RocketMQ - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -34,6 +36,7 @@
           <li class="sub"><a href="#p2-6">与 Kafka 对比</a></li>
           <li class="sub"><a href="#p2-7">运维调优</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -572,6 +575,105 @@
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>事务消息解决生产侧双写</h3>
+            <p>半消息先存但暂不投给消费者，本地事务决定提交或回滚；未知状态由 Broker 回查生产者。它不自动把消费者数据库纳入同一个原子事务。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>回查依据必须可恢复</h3>
+            <p>不能只靠进程内 boolean 判断本地事务；宕机后变量消失。应按业务键查询持久化事务结果，区分成功、失败与尚不能判断，避免错误提交。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>顺序消息有业务分组边界</h3>
+            <p>同一订单事件需要一致的分组路由和按序消费。全局顺序会牺牲并行度；失败事件若直接跳过，后续状态即使按队列先后处理也可能违反业务依赖。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>半消息成功后生产者断电，怎么决定是否投递？</summary><p>Broker 回查；生产者从持久化业务记录判断本地事务，返回 commit/rollback/unknown，而非一律提交。</p></details>
+          <details class="study-followup"><summary>事务消息已经 commit，消费者失败还会回滚生产者事务吗？</summary><p>不会自动回滚。消费者按重试与补偿策略处理，自身副作用应幂等并最终对账。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 事务消息的半消息阶段通常具有什么特征？</h4>
+            <ol type="A">
+              <li>已对所有消费者可见</li>
+              <li>已存储但尚未作为正常消息投递</li>
+              <li>必须已经扣款成功</li>
+              <li>等于消费者 ACK</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。先保存待决消息，再通过本地事务结果决定可见性。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>2. 回查发现本地事务已提交，合理响应是？</h4>
+            <ol type="A">
+              <li>COMMIT</li>
+              <li>无条件 ROLLBACK</li>
+              <li>删除所有消息</li>
+              <li>重新执行一遍扣款再决定</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。根据已持久化结果完成消息决策；重复执行扣款会引入业务副作用。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>事务半消息在提交回执丢失后的回查</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "生产者",
+    "Broker",
+    "本地数据库",
+    "消费者"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发送半消息",
+      "detail": "Broker 保存事件，消费者暂不可见。",
+      "state": [
+        "发送成功",
+        "HALF",
+        "未提交",
+        "不可见"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "本地事务提交",
+      "detail": "订单和本地状态一起持久化。",
+      "state": [
+        "执行事务",
+        "HALF",
+        "订单已提交",
+        "不可见"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "二次确认丢失",
+      "detail": "生产者网络故障，Broker 仍只知道 HALF。",
+      "state": [
+        "失联",
+        "待决",
+        "订单已提交",
+        "不可见"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "回查并提交",
+      "detail": "恢复后查询本地结果，Broker 据此将消息变为可投递。",
+      "state": [
+        "答复 COMMIT",
+        "可投递",
+        "提交事实未变",
+        "收到事件"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://rocketmq.apache.org/docs/featureBehavior/04transactionmessage/" target="_blank" rel="noopener noreferrer">RocketMQ 事务消息</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

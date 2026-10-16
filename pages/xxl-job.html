@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>XXL-Job - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav">
@@ -32,6 +34,7 @@
           <li class="sub"><a href="#s2-3">与 Elastic-Job / Quartz 对比</a></li>
           <li class="sub"><a href="#s2-4">跨语言支持</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -433,6 +436,127 @@ echo "备份完成"</code></pre>
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：重复调度、分片与业务幂等</h2>
+          <p>先用大白话讲机制，再说明故障边界；以下为自编练习，点击答案可展开解析。</p>
+          <h3>机制与易错边界</h3>
+          <article class="card lab-concept">
+            <h4>调度成功不等于业务成功</h4>
+            <p><strong>大白话：</strong>调度中心像派工台，把任务派给执行器；执行器真正处理数据，再回报结果。</p>
+            <p><strong>边界与易错：</strong>调度请求成功、处理器执行完成、业务结果正确是三层状态。回调丢失可能让平台状态与业务事实短时不同，需按业务流水验证。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>失败重试可能重做已完成业务</h4>
+            <p><strong>大白话：</strong>任务执行后回调失败，平台无法确认结果时可能再次触发；网络重试与人工补跑都能产生重复。</p>
+            <p><strong>边界与易错：</strong>幂等键应来自业务周期和业务对象，如账期+账户，不能只依赖每次都变化的调度日志 ID。扣款与去重记录需要原子提交。</p>
+          </article>
+          <article class="card lab-concept">
+            <h4>分片只是分工，不是自动容灾事务</h4>
+            <p><strong>大白话：</strong>分片广播把不同分片参数发给执行器；任务可用 id % shardTotal == shardIndex 切分处理。</p>
+            <p><strong>边界与易错：</strong>扩缩容会改变分片总数与归属，执行器故障也不自动保证每条业务只处理一次。用业务状态、幂等键与补偿扫描承接变化。</p>
+          </article>
+          <h3>机制伪代码 / 答题推演</h3>
+          <pre><code>对每个属于本分片的业务对象
+  key = 账期 + 对象ID
+  本地事务：若已有成功记录则跳过
+  否则写唯一流水并执行业务变化
+回报结果；失败补跑仍沿用业务 key</code></pre>
+          <h3>面试追问</h3>
+          <details><summary>每天结算任务重试会不会重复发钱？</summary><p>如果代码只按“本次调度 ID”防重，人工补跑可能产生新 ID，仍会重复。应以账期+收款主体等业务唯一键约束，在事务中写结算流水与余额变更，并让重跑返回原结果。</p></details>
+          <details><summary>分片从 2 个变成 3 个，有什么风险？</summary><p>取模归属发生变化，在途旧分片和新分片可能处理同一业务对象，或造成检查点不连续。需明确切换窗口，按业务状态扫描并保证幂等；分片参数只表达工作分配，不是全局一致进度。</p></details>
+          <h3>笔试单选（自编）</h3>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>1. 采用 id % 3 == shardIndex，id=8 应由哪个分片处理（编号从 0 开始）？</h4>
+            <ol type="A">
+              <li>0</li>
+              <li>1</li>
+              <li>2</li>
+              <li>3</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>8 mod 3=2；分片编号范围为 0、1、2。扩缩容后分配会变化。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2">
+            <h4>2. 防止每日结算因重试重复入账，最合适的唯一键是？</h4>
+            <ol type="A">
+              <li>当前线程 ID</li>
+              <li>每次随机 UUID</li>
+              <li>账期+业务账户</li>
+              <li>每次变化的调度日志 ID</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：C。</strong>稳定业务键跨重试、补跑保持不变，才能识别同一笔业务。随机号和执行日志号通常每次不同。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>逐步动画：重复调度、分片与业务幂等</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "调度中心",
+    "执行器 A",
+    "业务数据库",
+    "执行器 B"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "触发账期结算",
+      "detail": "任务业务键为 2026-10-15:账户7，与本次执行日志号区分。",
+      "state": [
+        "派发执行 #91",
+        "接收任务",
+        "尚未结算",
+        "空闲"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 执行并提交",
+      "detail": "同事务写业务唯一流水和余额变化。",
+      "state": [
+        "等待回调",
+        "执行完成",
+        "业务键已成功入账",
+        "空闲"
+      ]
+    },
+    {
+      "active": 0,
+      "title": "回调丢失，结果不确定",
+      "detail": "平台的失败或超时不等于业务事务没有提交。",
+      "state": [
+        "未收到结果",
+        "回调网络异常",
+        "已经成功入账",
+        "空闲"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "补跑交给 B",
+      "detail": "执行日志号可不同，但业务键保持一致。",
+      "state": [
+        "派发补跑 #92",
+        "不再执行",
+        "原业务流水仍在",
+        "查询同一业务键"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "识别重复并返回",
+      "detail": "唯一约束与事务防止再入账，任务可以安全确认。",
+      "state": [
+        "记录完成",
+        "已完成",
+        "余额只增加一次",
+        "返回已结算结果"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-reference"><strong>官方参考：</strong><a href="https://github.com/xuxueli/xxl-job/blob/master/doc/XXL-JOB%E5%AE%98%E6%96%B9%E6%96%87%E6%A1%A3.md" target="_blank" rel="noopener noreferrer">XXL-JOB 官方文档</a>。版本相关能力请对照实际部署版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

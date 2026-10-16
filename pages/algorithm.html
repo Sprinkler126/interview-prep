@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../css/algorithm.css">
   <script src="../js/algorithm.js" defer></script>
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -43,6 +45,7 @@
           <li class="sub"><a href="#s2-3">回溯法</a></li>
           <li class="sub"><a href="#s2-4">双指针/滑动窗口/二分</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -680,6 +683,104 @@ int binarySearch(int[] arr, int target) {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>二分答案：不是看到有序数组才用二分</h3>
+            <p>大白话：把“最小能多大”改成“给定这么大够不够”。若容量 C 能在 D 天装完货，容量更大也一定能装完，就能二分最小可行容量。</p>
+            <p><strong>边界与易错：</strong>边界：先证明判定单调；下界是最大单件重量，上界是总重量。循环用闭区间或半开区间必须统一，求中点避免整数溢出。</p>
+          </article>
+          <article class="lab-concept"><h3>动态规划：状态必须把未来需要的信息带齐</h3>
+            <p>大白话：把重复的小问题的答案记下来。0/1 背包的 dp[j] 表示容量不超过 j 时的最大价值；每件物品只能用一次，所以容量从大到小扫。</p>
+            <p><strong>边界与易错：</strong>易错：从小到大扫会让本轮刚更新的值再次参与转移，变成同一物品可多次选。若要求恰好装满，除 dp[0] 外的初值应表示不可达。</p>
+          </article>
+          <article class="lab-concept"><h3>图最短路：边权条件比算法名字更重要</h3>
+            <p>大白话：BFS 按经过的边数一层层扩展，适合等权图；Dijkstra 每次确定当前最近点，依赖边权非负；负权边需换算法并考虑负环。</p>
+            <p><strong>边界与易错：</strong>边界：邻接表 BFS 为 O(V+E)；堆优化 Dijkstra 常写 O((V+E)log V)。不可达距离是无穷，松弛前要避免无穷加权溢出。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>如何口述一道算法题，让面试官相信代码不会卡边界？</summary><p>先给输入规模与目标，再给不变量和复杂度；最后举空输入、单元素、重复值及极值。例如二分下界保持“答案在 [l,r) 中”，每轮必须严格缩小区间。</p></details>
+          <details class="lab-question"><summary>快排平均很快，为什么面试还要说最坏情况？</summary><p>不恰当枢轴可能每轮只排除一个元素，时间退化到 O(n²)，递归栈也可到 O(n)。随机枢轴降低特定输入风险，但不改变理论最坏界；三路划分处理大量重复值更直接。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 0/1 背包用一维数组时，为防止一件物品重复使用，应如何遍历容量？</h4>
+            <ol type="A">
+              <li>从小到大</li>
+              <li>从大到小</li>
+              <li>只遍历偶数容量</li>
+              <li>顺序任意</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>降序使 dp[j-w] 仍来自上一件物品的结果；升序可能读到本轮更新值，等价于允许重复选择。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1"><h4>2. 无权图中求源点到各点的最少边数，首选哪种方法？</h4>
+            <ol type="A">
+              <li>DFS首次访问深度</li>
+              <li>BFS分层遍历</li>
+              <li>按顶点编号排序</li>
+              <li>普通二叉搜索</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>BFS先处理距离为 k 的层，再处理 k+1 的层；第一次发现顶点就得到最少边数。DFS先走到的路径未必最短。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>0/1 背包：容量倒序为什么只选一次</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "容量0",
+    "容量1",
+    "容量2",
+    "容量3"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "初始状态",
+      "detail": "容量不超过 j 的最大价值均为0；只有一件重量2、价值3的物品。",
+      "state": [
+        "0",
+        "0",
+        "0",
+        "0"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "先处理容量3",
+      "detail": "dp[3]=max(0,dp[1]+3)=3，dp[1]还没被本轮改变。",
+      "state": [
+        "0",
+        "0",
+        "0",
+        "3"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "再处理容量2",
+      "detail": "dp[2]=max(0,dp[0]+3)=3，同一件物品只贡献一次。",
+      "state": [
+        "0",
+        "0",
+        "3",
+        "3"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "容量1放不下",
+      "detail": "本轮到此结束。若有第二件物品，才开启下一轮。",
+      "state": [
+        "0",
+        "0",
+        "3",
+        "3"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://algs4.cs.princeton.edu/home/" target="_blank" rel="noopener noreferrer">算法可视化与教材</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

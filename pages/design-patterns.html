@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>设计模式 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
 
@@ -37,6 +39,7 @@
           <li class="sub"><a href="#s2-3">设计模式在框架中的应用</a></li>
           <li class="sub"><a href="#s2-4">UML 类图</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
 
@@ -493,6 +496,104 @@ public class CsvExportService extends AbstractExportService {
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>策略与状态：类图相似，变化原因不同</h3>
+            <p>大白话：策略像用户选择快递公司，同一件事换一套算法；状态像订单从待付款变为已付款，当前阶段决定哪些动作合法。</p>
+            <p><strong>边界与易错：</strong>边界：策略常由调用方注入；状态对象也可能推动状态迁移。不要为两个稳定的if分支立即创建一堆类，应看变化频率与扩展需求。</p>
+          </article>
+          <article class="lab-concept"><h3>装饰器与代理：包住对象的目的不同</h3>
+            <p>大白话：装饰器像给饮品逐层加料，组合附加能力；代理像门卫，在调用前后做权限、缓存、远程转发等控制。</p>
+            <p><strong>边界与易错：</strong>易错：两者都可能实现同一接口并持有目标，不能只凭结构命名。多层包装要说明执行顺序，尤其是事务、重试和日志嵌套。</p>
+          </article>
+          <article class="lab-concept"><h3>单例：只有一个实例不代表线程安全</h3>
+            <p>大白话：所有请求拿到同一个账本对象，仍可能同时改坏账本里的数。实例创建安全与实例方法并发安全是两件事。</p>
+            <p><strong>边界与易错：</strong>边界：Java双重检查锁定依赖volatile的安全发布；枚举/静态持有者适合部分场景。单例范围通常受类加载器约束，并非跨进程唯一。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>用设计模式重构时，怎样避免过度设计？</summary><p>先指出实际变化点，例如新增支付渠道总修改同一分支；抽取最小策略接口并集中注册。若只有一次性逻辑且没有扩展证据，保持直白分支更易维护。</p></details>
+          <details class="lab-question"><summary>观察者回调抛异常，会影响其他观察者吗？</summary><p>取决于派发实现：同步遍历中直接向外抛可能中断后续通知。明确异常隔离、通知顺序、同步/异步与重复消费语义；异步事件还需要重试和幂等。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="0"><h4>1. 订单在待支付、已支付、已发货时同一个操作有不同合法性，更贴近哪种模式？</h4>
+            <ol type="A">
+              <li>状态模式</li>
+              <li>建造者模式</li>
+              <li>原型模式</li>
+              <li>享元模式</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：A。</strong>行为随内部生命周期状态变化，状态迁移本身也是业务规则；策略更强调可替换的算法。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2"><h4>2. 以下哪项能直接由“对象是单例”推出？</h4>
+            <ol type="A">
+              <li>所有方法线程安全</li>
+              <li>跨JVM只有一个对象</li>
+              <li>该设计作用域内限制实例数量</li>
+              <li>不会发生内存泄漏</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>单例约束实例数量，不能自动解决共享可变状态、跨进程协调或生命周期问题。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>策略选择：新增快递渠道不修改订单流程</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "订单",
+    "策略注册表",
+    "价格策略",
+    "报价"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "提交配送请求",
+      "detail": "订单包含重量2kg和渠道standard。",
+      "state": [
+        "2kg／standard",
+        "已注册两种渠道",
+        "尚未选择",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "按渠道选择策略",
+      "detail": "注册表把standard映射到普通快递算法。",
+      "state": [
+        "参数不变",
+        "选中standard",
+        "普通快递",
+        "等待"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "执行报价算法",
+      "detail": "示例规则：首重10元，续重每kg加4元。",
+      "state": [
+        "2kg",
+        "查找完成",
+        "10+(2-1)*4",
+        "14元"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "切换渠道再次报价",
+      "detail": "切换express；示例规则首重15元、续重6元，订单主流程不用改。",
+      "state": [
+        "2kg／express",
+        "选中express",
+        "15+(2-1)*6",
+        "21元"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html" target="_blank" rel="noopener noreferrer">Java ServiceLoader 扩展机制</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

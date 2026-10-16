@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RabbitMQ - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner"><a class="nav-brand" href="../index.html">📚 面试知识复习库</a><a class="back" href="../index.html">← 返回目录</a></div></nav>
@@ -31,6 +33,7 @@
           <li class="sub"><a href="#p2-5">高可用方案</a></li>
           <li class="sub"><a href="#p2-6">消息积压处理</a></li>
           <li><a href="#p3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -665,6 +668,105 @@ channel.basicConsume("events.stream", false, consumerArgs, consumer);</code></pr
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>confirm 与 consumer ack 是两张收据</h3>
+            <p>发布确认说明 Broker 对发布承担了相应责任，消费确认说明消费者已处理投递。两者彼此独立，confirm 成功不表示用户业务完成；没有匹配路由也需 mandatory/return 或备用交换机处理。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>prefetch 是在途工作上限</h3>
+            <p>它限制尚未确认的投递数量，像工位前允许堆多少任务。太大可能让慢消费者囤积消息，太小使网络往返占比上升；不能把它误当全队列吞吐的固定值。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>重复投递必须留出口</h3>
+            <p>业务成功但 ack 丢失会重投；用业务键幂等。毒消息不要无限 requeue，应限制重试并进入死信或人工处理，死信也要监控而非当垃圾桶。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>队列持久化，消息就绝不丢吗？</summary><p>不够。还需考虑消息持久化属性、发布确认、队列类型和副本、路由失败以及消费端确认边界。</p></details>
+          <details class="study-followup"><summary>为什么不能在接收回调开头就 ack？</summary><p>ack 后消费者崩溃，Broker 不会再为该投递补发；应在业务成功后确认并用幂等承接重复窗口。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>1. 发布 confirm 成功能直接证明什么？</h4>
+            <ol type="A">
+              <li>所有消费者已完成业务</li>
+              <li>Broker 已按发布确认语义接受消息</li>
+              <li>支付数据库已提交</li>
+              <li>任何路由键都有队列</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。发布确认与消费确认独立；路由未命中的处理也需单独配置。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 业务已提交，ack 前消费者崩溃，最合理的设计是？</h4>
+            <ol type="A">
+              <li>假设不会重投</li>
+              <li>幂等处理可能的重投</li>
+              <li>预先 ack 所有消息</li>
+              <li>关闭全部确认</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。至少一次处理通常允许重投，业务去重用于避免副作用重复。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>业务完成与 ACK 丢失</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "发布者",
+    "Broker 队列",
+    "消费者",
+    "业务库"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "发布确认",
+      "detail": "Broker 接受消息 m1；发布者的责任边界完成。",
+      "state": [
+        "收到 confirm",
+        "m1 就绪",
+        "等待",
+        "未处理"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "投递待确认",
+      "detail": "m1 离开就绪状态，成为未确认投递。",
+      "state": [
+        "已完成",
+        "m1 unacked",
+        "收到 m1",
+        "未处理"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "数据库先提交",
+      "detail": "消费者完成业务，但尚未送达 ACK。",
+      "state": [
+        "已完成",
+        "仍 unacked",
+        "准备 ACK",
+        "m1 已处理"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "连接断开后重投",
+      "detail": "Broker 重排投递，消费者依据业务键去重再确认。",
+      "state": [
+        "无需重发",
+        "m1 重投",
+        "跳过重复业务",
+        "只执行一次"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://www.rabbitmq.com/docs/confirms" target="_blank" rel="noopener noreferrer">RabbitMQ 发布与消费确认</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

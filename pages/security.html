@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>安全 & 认证 - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script defer src="../js/study-lab.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -33,6 +35,7 @@
           <li class="sub"><a href="#s2-3">SQL 注入防护</a></li>
           <li class="sub"><a href="#s2-4">API 安全</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+          <li><a href="#interview-lab">面试笔试与交互演示</a></li>
         </ul>
       </div>
       <div class="main-content">
@@ -531,6 +534,104 @@ String signature = HMAC_SHA256(signStr, secretKey);
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界与过程</h2>
+          <p>先用自己的话解释，再展开追问核对答案；笔试题均为本页自编练习。</p>
+          <article class="lab-concept"><h3>认证与授权：知道你是谁，仍要查你能看什么</h3>
+            <p>大白话：登录和验签只解决身份可信问题。访问订单时还要检查订单是否属于当前用户或其授权范围，不能只看传入的orderId。</p>
+            <p><strong>边界与易错：</strong>易错：前端隐藏按钮不构成权限控制；租户过滤必须在服务端执行。JWT有效也不能自动证明资源访问被授权。</p>
+          </article>
+          <article class="lab-concept"><h3>JWT：签名防篡改，不自动保密或立即撤销</h3>
+            <p>大白话：常见签名JWT的载荷可被解码，签名让接收方识别内容是否被改。验证时还要约束算法、发行方、受众、有效期与密钥。</p>
+            <p><strong>边界与易错：</strong>边界：退出后令牌是否仍可用取决于过期时间、撤销机制和会话设计。敏感数据不要因为“有签名”就塞进去，日志也不要记录完整访问令牌。</p>
+          </article>
+          <article class="lab-concept"><h3>OAuth授权码与PKCE：把授权码绑定给本次客户端流程</h3>
+            <p>大白话：客户端先保留随机verifier，授权请求带其派生challenge；兑换授权码时提供verifier，拦截到码的攻击者也难以单独兑换。</p>
+            <p><strong>边界与易错：</strong>边界：PKCE不代替TLS、严格回调地址校验与CSRF防护。OAuth是授权框架，身份认证通常结合OIDC；按当前安全最佳实践避免把过时流程当默认方案。</p>
+          </article>
+          <h3>面试追问：展开查看答题要点</h3>
+          <details class="lab-question"><summary>XSS和CSRF怎样区分？</summary><p>XSS是在站点上下文执行攻击脚本，重点做上下文输出编码、可信内容边界及CSP等；CSRF借浏览器自动带凭据伪造请求，重点使用CSRF token、SameSite及来源检查。存在XSS时许多CSRF保护也可能被绕过。</p></details>
+          <details class="lab-question"><summary>参数化SQL为什么不适合直接代替动态表名？</summary><p>占位参数表达数据值，不能随意作为SQL语法标识符。动态列名、表名、排序方向应从服务端白名单映射，避免把用户字符串直接拼进SQL。</p></details>
+          <h3>笔试单选：先作答，再核对解析</h3>
+          <article class="lab-quiz study-question" data-answer="1"><h4>1. 服务端验证JWT签名通过后，访问任意orderId是否安全？</h4>
+            <ol type="A">
+              <li>安全，签名等于所有权限</li>
+              <li>还需做资源级授权</li>
+              <li>只需前端隐藏ID</li>
+              <li>把ID转Base64即可</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：B。</strong>签名确认令牌未被篡改，不能证明用户拥有目标订单；必须按用户、角色、租户等检查权限。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="2"><h4>2. 关于签名JWT，下列哪项正确？</h4>
+            <ol type="A">
+              <li>载荷天然加密</li>
+              <li>永远无法撤销</li>
+              <li>载荷通常可解码，签名用于完整性校验</li>
+              <li>无需校验过期时间</li>
+            </ol>
+            <details><summary>查看答案与详解</summary><p><strong>答案：C。</strong>常见JWS格式不是加密封装；应验证签名和相关声明，保密需另外机制，例如加密传输或合适的JWE设计。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>授权码+PKCE：拦截码也无法直接兑换</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "客户端",
+    "授权服务器",
+    "授权码",
+    "令牌端点"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "生成随机verifier",
+      "detail": "客户端保存verifier，发送S256派生challenge。",
+      "state": [
+        "保存秘密verifier",
+        "接收challenge",
+        "尚未签发",
+        "等待"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "用户完成授权",
+      "detail": "授权服务器把码与本次challenge及回调等绑定。",
+      "state": [
+        "等待回调",
+        "记录绑定",
+        "code=C",
+        "等待"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "假设授权码被截获",
+      "detail": "攻击者只有C，没有客户端保存的verifier。",
+      "state": [
+        "仍持有verifier",
+        "绑定不变",
+        "C被截获",
+        "错误verifier将被拒"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "合法客户端兑换",
+      "detail": "提交C和正确verifier，端点校验派生值一致后再发令牌。",
+      "state": [
+        "发送verifier",
+        "核对绑定",
+        "一次性消费",
+        "校验成功发令牌"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="lab-source">参考核对：<a href="https://www.rfc-editor.org/rfc/rfc9700.html" target="_blank" rel="noopener noreferrer">OAuth 2.0 安全最佳实践 RFC 9700</a>。题目及过程数据为教学示例，涉及实现细节请结合运行版本。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

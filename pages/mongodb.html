@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MongoDB - 面试知识复习库</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/study-lab.css">
+  <script src="../js/study-lab.js" defer></script>
 </head>
 <body>
 
@@ -37,6 +39,7 @@
           <li class="sub"><a href="#s2-3">分片集群</a></li>
           <li class="sub"><a href="#s2-4">与 MySQL 对比</a></li>
           <li><a href="#part3">第三部分：模拟面试</a></li>
+                  <li><a href="#interview-lab">面试笔试实战与交互推演</a></li>
         </ul>
       </div>
 
@@ -595,6 +598,105 @@ db.users.find().readPref("secondary")
 
 
         <!-- ============================== 面试加餐：不替换原章节 ============================== -->
+        <section id="interview-lab" class="interview-lab">
+          <h2>面试与笔试实战：机制、边界和故障推演</h2>
+          <article class="card lab-concept">
+            <h3>文档嵌入先看增长边界</h3>
+            <p>总是一起读取且规模有界的订单明细适合嵌入，单文档修改具备原子性。无限追加评论会撑大文档；引用便于独立增长，但关联读与一致性需要额外设计。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>读写关注级别各管一段</h3>
+            <p>writeConcern 管写入确认条件，readConcern 管读取隔离或可见性，readPreference 管读哪个副本。读 secondary 不能直接承诺读到刚写的数据，要明确会话与因果一致性要求。</p>
+          </article>
+          <article class="card lab-concept">
+            <h3>分片键要兼顾分散和定位</h3>
+            <p>递增时间容易把新写集中到一端；哈希可分散写却不利于连续范围定位。高基数并不自动等于均匀，业务单租户热度可能仍压垮一个分片。</p>
+          </article>
+          <h3>面试追问：先独立回答，再展开核对</h3>
+          <details class="study-followup"><summary>扣库存并记录订单一定要多文档事务吗？</summary><p>若业务模型能把约束放在同一文档，可用条件原子更新；跨文档原子性才需要事务，同时评估锁持有和重试成本。</p></details>
+          <details class="study-followup"><summary>多数写确认后读 secondary 一定读到最新值吗？</summary><p>不能仅据多数写确认推导任意副本的即时新鲜度；需组合读取语义、路由和因果会话等机制。</p></details>
+          <h3>笔试自测（自编题）</h3>
+          <article class="lab-quiz study-question" data-answer="0">
+            <h4>1. 下列哪项主要决定“读哪个副本”？</h4>
+            <ol type="A">
+              <li>readPreference</li>
+              <li>文档字段名</li>
+              <li>writeConcern</li>
+              <li>索引名称</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：A</strong>。副本路由、读隔离和写确认是不同维度，不能互相替代。</p></details>
+          </article>
+          <article class="lab-quiz study-question" data-answer="1">
+            <h4>2. 持续无限增长的评论更适合？</h4>
+            <ol type="A">
+              <li>全部永久嵌入单个主文档</li>
+              <li>独立集合引用并分页</li>
+              <li>只增加副本数</li>
+              <li>关闭索引</li>
+            </ol>
+            <details><summary>查看答案与解析</summary><p><strong>答案：B</strong>。独立集合限制单文档大小和更新争用，分页控制单次读取量。</p></details>
+          </article>
+          <div class="study-animation">
+            <h3>单文档条件更新避免超卖</h3>
+            <script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "请求 A",
+    "库存文档",
+    "请求 B",
+    "业务结果"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "A 提交条件",
+      "detail": "库存字段为 1，条件要求 stock>0。",
+      "state": [
+        "申请扣 1",
+        "stock=1",
+        "等待",
+        "暂无"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "A 原子扣减",
+      "detail": "条件匹配和修改在单文档原子操作内完成。",
+      "state": [
+        "matched=1",
+        "stock=0",
+        "等待",
+        "A 成功"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "B 尝试扣减",
+      "detail": "B 再评估条件，不匹配。",
+      "state": [
+        "已完成",
+        "stock=0",
+        "matched=0",
+        "A 成功"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "返回结果",
+      "detail": "B 业务层据匹配数返回库存不足。",
+      "state": [
+        "成功",
+        "stock=0",
+        "失败",
+        "无超卖"
+      ]
+    }
+  ]
+}
+            </script>
+          </div>
+          <p class="study-source">官方参考：<a href="https://www.mongodb.com/docs/manual/core/read-isolation-consistency-recency/" target="_blank" rel="noopener noreferrer">MongoDB 读隔离与一致性</a>。学习提示：示例压缩了后台步骤；版本、持久化与一致性配置以实际部署文档为准。</p>
+        </section>
         <section id="knowledge-boost" class="knowledge-boost">
           <h2><span class="icon">🧭</span>本章面试加餐：从概念到落地</h2>
           <p class="boost-subtitle">保留原章节全部内容，新增一张答题路线图：先讲机制，再讲异常，最后落到工程取舍。</p>

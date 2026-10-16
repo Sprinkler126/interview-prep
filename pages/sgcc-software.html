@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="../css/sgcc.css">
 <script src="../js/sgcc.js" defer>
 </script>
+<link rel="stylesheet" href="../css/study-lab.css">
+<script src="../js/study-lab.js" defer></script>
 </head>
 <body class="sgcc">
 <nav class="nav">
@@ -223,6 +225,68 @@
 <div class="exam-trap">
 <strong>易错点：</strong>维护类别按目的判断，不能只看到“修改代码”就归为改正性。</div>
 </article>
+<section class="interview-lab" id="interview-lab">
+<h2>交互动画 · 观察状态怎样变化</h2>
+<div class="study-animation">
+<h3>典型例子状态回放</h3>
+<script type="application/json" class="study-animation-data">
+{
+  "nodes": [
+    "需求",
+    "设计实现",
+    "测试",
+    "交付"
+  ],
+  "frames": [
+    {
+      "active": 0,
+      "title": "明确可验收边界",
+      "detail": "输入必须为1..100整数，先定义缺失、非整数和越界的错误行为。",
+      "state": [
+        "整数1..100",
+        "待设计",
+        "待定义",
+        "未发布"
+      ]
+    },
+    {
+      "active": 1,
+      "title": "实现一致校验",
+      "detail": "前后端按同一规格检查，服务端不信任客户端限制。",
+      "state": [
+        "边界明确",
+        "范围与类型校验",
+        "准备测试",
+        "未发布"
+      ]
+    },
+    {
+      "active": 2,
+      "title": "验证边界",
+      "detail": "选择0,1,2,99,100,101，另测缺失和非整数，每个用例都有预期。",
+      "state": [
+        "可追踪",
+        "实现完成",
+        "通过与拒绝均核对",
+        "准备发布"
+      ]
+    },
+    {
+      "active": 3,
+      "title": "发布后回归",
+      "detail": "发布包与配置受控，运行核心冒烟；后续变更应重新执行受影响用例。",
+      "state": [
+        "保留版本",
+        "记录代码版本",
+        "保留回归用例",
+        "可追踪交付"
+      ]
+    }
+  ]
+}
+</script>
+</div>
+</section>
 <h2 id="part2">第二部分：场景化讲解</h2>
 <article class="card" data-trace>
 <h3>需求到测试：输入数量 1..100</h3>
