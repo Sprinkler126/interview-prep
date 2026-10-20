@@ -40,11 +40,18 @@ async function main() {
     for (const href of links) {
       if (href.startsWith('#')) assert.ok(ids.includes(href.slice(1)),`broken anchor ${href}`);
       else if (!/^https?:/.test(href)) assert.ok(fs.existsSync(path.resolve(root,'pages',href)),`broken local link ${href}`);
-      else assert.match(new URL(href).hostname,/^(?:www\.)?abchina\.com$|^career\.abchina\.com\.cn$|^jhs\.moa\.gov\.cn$/,'unexpected source domain');
+      else assert.ok(new Set(['www.abchina.com','career.abchina.com.cn','jhs.moa.gov.cn','banna.huatu.com','www.yinhangzhaopin.com']).has(new URL(href).hostname),'unexpected source domain');
     }
     for (const src of await page.locator('script[src],link[rel=stylesheet]').evaluateAll(nodes => nodes.map(node => node.getAttribute('src') || node.getAttribute('href')))) {
       assert.ok(fs.existsSync(path.resolve(root,'pages',src)),`missing asset ${src}`);
     }
+    const distribution = await page.locator('#abc-tech-ratios').evaluate(table => ({
+      total:Number(table.dataset.total),
+      rows:[...table.querySelectorAll('tbody tr')].map(row => ({count:Number(row.dataset.count),percent:Number(row.dataset.percent)}))
+    }));
+    assert.equal(distribution.rows.reduce((sum,row) => sum+row.count,0),distribution.total);
+    assert.equal(distribution.rows.reduce((sum,row) => sum+row.percent,0),100);
+    for (const row of distribution.rows) assert.ok(Math.abs(row.count/distribution.total*100-row.percent)<0.005);
     for (const width of [1440,1024,768,390]) {
       await page.setViewportSize({width,height:1000});
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth),`page overflow ${width}`);
@@ -59,6 +66,8 @@ async function main() {
         await page.screenshot({path:path.join(screenshots,`abc-top-${width}.png`)});
         await page.locator('#strategy').evaluate(node => node.scrollIntoView({block:'start',behavior:'instant'}));
         await page.screenshot({path:path.join(screenshots,`abc-strategy-${width}.png`)});
+        await page.locator('#computer-exam').evaluate(node => node.scrollIntoView({block:'start',behavior:'instant'}));
+        await page.screenshot({path:path.join(screenshots,`abc-computer-${width}.png`)});
       }
     }
     const offline = await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
