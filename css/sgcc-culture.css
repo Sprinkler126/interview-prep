@@ -1,0 +1,47 @@
+.culture-page a { color:var(--accent); }
+.culture-page .container { max-width:1240px; }
+.culture-hero { padding:1.5rem; border:1px solid var(--border); border-radius:16px; background:linear-gradient(130deg,#17334a,#1a2940); }
+.culture-hero .subtitle { margin:.7rem 0; }
+.culture-meta { display:flex; flex-wrap:wrap; gap:.6rem; margin:1rem 0; }
+.culture-meta span { padding:.3rem .7rem; border:1px solid #54728b; border-radius:20px; font-size:.9rem; }
+.culture-page h2,.culture-map { scroll-margin-top:90px; }
+.culture-overview { display:grid; grid-template-columns:190px 1fr; gap:2rem; align-items:center; margin:1.5rem 0; }
+.culture-root { padding:1.2rem; border:2px solid var(--accent); border-radius:14px; background:#14354a; text-align:center; font-weight:700; }
+.culture-root small { display:block; font-weight:400; color:var(--text-dim); margin-top:.5rem; }
+.culture-branches { position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; padding-left:1.5rem; border-left:2px solid var(--accent); }
+.culture-branches::before { content:''; position:absolute; top:50%; left:-2rem; width:2rem; border-top:2px solid var(--accent); }
+.culture-branches a { border:1px solid var(--border); border-left:4px solid var(--branch); border-radius:8px; padding:.8rem; text-decoration:none; background:var(--surface); }
+.culture-branches small { display:block; color:var(--text-dim); }
+.culture-toolbar { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; padding:1rem; border:1px solid var(--border); border-radius:10px; background:var(--surface); margin:1.2rem 0; }
+.culture-toolbar input,.culture-toolbar button,.culture-quiz button { font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:.45rem .7rem; }
+.culture-toolbar input { flex:1; min-width:140px; }
+.culture-toolbar button,.culture-quiz button { cursor:pointer; }
+.culture-page :is(button,input,summary,a):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.culture-map { --branch:var(--accent); border:1px solid var(--border); border-top:4px solid var(--branch); border-radius:12px; margin:1.2rem 0; padding:1.2rem; background:var(--surface); }
+.culture-map > summary { cursor:pointer; font-size:1.15rem; font-weight:700; color:var(--branch); }
+.culture-map > summary span { font-size:.85rem; font-weight:400; color:var(--text-dim); margin-left:.7rem; }
+.culture-map-intro { margin:.7rem 0; color:var(--text-dim); }
+.culture-tree { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem 1.6rem; border-left:2px solid var(--branch); margin:1rem 0 0 .7rem; padding-left:1.3rem; }
+.culture-point { position:relative; min-width:0; padding:1rem; border:1px solid var(--border); border-radius:9px; background:var(--bg); overflow-wrap:anywhere; scroll-margin-top:100px; }
+.culture-point::before { content:''; position:absolute; left:-1.4rem; width:1.3rem; top:1.7rem; border-top:2px solid var(--branch); }
+.culture-point h3 { margin:0 0 .5rem; font-size:1rem; color:var(--branch); }
+.culture-point .fact { color:#f0f6ff; margin:.5rem 0; }
+.culture-point .meaning { color:var(--text-dim); font-size:.9rem; margin:.6rem 0; }
+.culture-point .pitfall { margin:.6rem 0; padding:.5rem .65rem; border-left:3px solid var(--accent4); font-size:.9rem; background:rgba(251,146,60,.06); }
+.culture-point details { margin-top:.7rem; font-size:.82rem; color:var(--text-dim); }
+.culture-point details summary { cursor:pointer; color:var(--accent); }
+.culture-point details li { margin:.15rem 0; }
+.culture-point .revealer { cursor:pointer; color:var(--accent); font-size:.9rem; }
+.culture-point .revealer[hidden],.culture-page [hidden] { display:none; }
+.culture-note { padding:1rem; border-left:4px solid var(--accent4); background:var(--surface); margin:1rem 0; }
+.culture-quiz { padding:1rem; border:1px solid var(--border); border-radius:10px; margin:1rem 0; }
+.culture-quiz fieldset { border:0; min-width:0; }
+.culture-quiz legend { font-weight:600; margin:.5rem 0; }
+.culture-quiz label { display:flex; align-items:baseline; gap:.6rem; padding:.4rem; }
+.culture-quiz .quiz-feedback { color:var(--accent3); min-height:1.7em; margin:.5rem 0; }
+.culture-quiz details { margin:.7rem 0; background:var(--surface); padding:.7rem; border-radius:6px; }
+.culture-quiz summary { cursor:pointer; color:var(--accent); }
+.culture-source { font-size:.9rem; color:var(--text-dim); }
+@media(max-width:700px) { .culture-overview { grid-template-columns:1fr; gap:1rem; } .culture-branches::before { display:none; } .culture-tree { grid-template-columns:1fr; } .culture-map { padding:.9rem; } .culture-hero { padding:1rem; } }
+@media(max-width:420px) { .culture-branches { grid-template-columns:1fr; } }
+@media print { .culture-toolbar,.culture-quiz button,.revealer { display:none!important; } .culture-map { break-inside:auto; } .culture-point { break-inside:avoid; } }
