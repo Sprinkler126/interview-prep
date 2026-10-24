@@ -1,0 +1,18 @@
+.energy-page .bank-hero { background:linear-gradient(120deg,#173e42,#192337); border-color:#39766f; }
+.energy-memory { margin:1.2rem 0; padding:1.1rem 1.3rem; border:1px solid #598978; border-radius:10px; background:#102e32; }
+.energy-memory strong { color:#99e5c7; font-size:.85rem; }
+.energy-memory p { margin-top:.5rem; font-size:clamp(1.05rem,2.3vw,1.35rem); font-weight:650; line-height:1.9; }
+.energy-page .energy-hint { font-size:.88rem; color:#b4c5d6; }
+.energy-page .bank-content section { scroll-margin-top:95px; margin-bottom:2.6rem; }
+.energy-page .bank-content h4 { margin:1rem 0 .5rem; }
+.energy-page .bank-lane b { color:#e7f4ff; }
+.energy-page .bank-lane em { color:#9ae4c9; font-style:normal; font-size:.9rem; }
+.energy-page .energy-recap { border-color:#50867a; background:#142e33; }
+.energy-recap hr { border:0; border-top:1px solid #43635e; margin:1rem 0; }
+.energy-references { font-size:.85rem; }
+@media print {
+  .energy-page .nav,.energy-page .bank-toc,.energy-page .study-controls { display:none; }
+  .energy-page,.energy-page .bank-hero,.energy-page .bank-card,.energy-page .bank-lane p,.energy-page .energy-memory { color:#111; background:white; }
+  .energy-page .bank-layout { display:block; }
+  .energy-page .bank-content { overflow:visible; }
+}

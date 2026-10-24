@@ -141,3 +141,9 @@ interview-prep/
 页面支持分支折叠/展开、正文及题号搜索、背诵隐藏/逐点揭示和6道自编辨析题。每题映射一个主知识点，题库原文的反向判断纠正后并入对应节点，时效数据保留原日期。知识数据、题号与实际起止页保存在 `data/sgcc-culture-2027.json`，包含原PDF的SHA-256；原始PDF未复制或改写。
 
 知识点以JSON为单一编辑入口，修改后运行 `python scripts/build-sgcc-culture.py` 重新生成静态页面；不需要原PDF即可构建。页面本地可用；样式 `css/sgcc-culture.css`，交互 `js/sgcc-culture.js`。验证：`node tests/sgcc-culture-smoke.cjs`（需Playwright及Edge），检查93题唯一覆盖、43节点、搜索、背诵、折叠、锚点、答题和移动布局。
+
+## 国家能源集团企业文化（2026-10-24）
+
+入口：[国家能源集团企业文化 · 考前速记](pages/chn-energy-culture.html)。按核心理念、集团业务、发展方向、管理文化、新旧辨析、岗位场景、面试和自测组织，首尾提供一句话助记口诀，包含12道自编题与回答思路回放。当前愿景、价值导向与2024版目标、旧版核心价值观分开呈现。
+
+复用全局、银行专题和学习交互样式，补充样式为 `css/chn-energy-culture.css`，不增加运行依赖。交互验证可用 `STUDY_PAGE_FILTER=chn-energy-culture` 运行 `tests/study-lab-smoke.cjs`。
