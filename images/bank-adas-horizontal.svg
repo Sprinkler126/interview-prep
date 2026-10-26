@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 360" role="img" aria-labelledby="title desc">
+<title id="title">水平段：总需求增加，只提高实际产出</title><desc id="desc">在固定的水平总供给区段内，总需求右移，均衡价格不变，实际产出增加。示意图无数值刻度。</desc>
+<rect width="560" height="360" rx="12" fill="#142033"/>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="none" stroke="#d6e0ed"/></marker></defs>
+<g font-family="Microsoft YaHei,Arial,sans-serif" font-size="17" fill="#d6e0ed">
+<text x="24" y="27">价格水平 P</text><text x="405" y="330">实际产出 Y</text>
+<g fill="none" stroke="#8294ac" stroke-width="2"><path d="M60 290V43M60 290H515" marker-end="url(#arrow)"/></g>
+<g fill="none" stroke="#60748d" stroke-dasharray="4 4" stroke-width="1.5">
+<path d="M60 185H300V290"/>
+<path d="M60 185H380V290"/></g>
+<g fill="none" stroke-width="3.5">
+<path d="M100 65L400 245" stroke="#82baff"/>
+<path d="M180 65L480 245" stroke="#f6cd72" stroke-dasharray="8 5"/>
+<path d="M90 185H475" stroke="#7ce4ae"/></g><text x="440" y="172">AS</text><g fill="none" stroke-width="3.5">
+</g>
+<text x="388" y="268" fill="#82baff">AD₀</text><text x="465" y="268" fill="#f6cd72">AD₁</text>
+<path d="M170 108H235" fill="none" stroke="#d6e0ed" stroke-width="2" marker-end="url(#arrow)"/><text x="164" y="48" font-size="15">AD右移</text>
+<circle cx="300" cy="185" r="5" fill="#82baff"/><circle cx="380" cy="185" r="5" fill="#f6cd72"/>
+<text x="275" y="208">E₀</text><text x="389" y="176">E₁</text>
+<text x="24" y="191">P</text>
+<text x="288" y="313">Y₀</text><text x="368" y="313">Y₁</text>
+<text x="70" y="344" font-size="16" fill="#a7edc9">Y增加，P不变 · 示意，不代表实测数据</text>
+</g></svg>

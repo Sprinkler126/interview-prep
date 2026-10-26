@@ -46,5 +46,11 @@
 .bank-page output { display:block; padding:.9rem; background:#0e1b2b; border-radius:7px; color:#a4efdc; }
 .bank-page :focus-visible { outline:2px solid var(--bank-gold); outline-offset:3px; }
 .bank-page .bank-sources { font-size:.9rem; color:#c1d0df; }
+.bank-page .macro-figure { margin:1rem 0; }
+.bank-page .macro-figure img { display:block; width:100%; max-width:560px; height:auto; margin:1rem auto; }
+.bank-page .macro-figure figcaption { color:#c1d0df; font-size:.92rem; line-height:1.7; }
+.bank-page .macro-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.bank-page .macro-grid .macro-figure { min-width:0; }
+@media(max-width:1100px) { .bank-page .macro-grid { grid-template-columns:1fr; } }
 @media(max-width:900px) { .bank-page .bank-layout { grid-template-columns:1fr; gap:1.3rem; } .bank-page .bank-toc { position:static; display:flex; flex-wrap:wrap; gap:.2rem 1rem; } .bank-page .bank-toc strong { width:100%; } }
 @media(max-width:600px) { .bank-page .container { padding:1rem; } .bank-page .bank-hero { padding:1.2rem; } .bank-page .bank-card { padding:1rem; } .bank-page .bank-flow { flex-direction:column; } .bank-page .bank-arrow { transform:rotate(90deg); } .bank-page .bank-lane { grid-template-columns:1fr; } .bank-page .bank-lane strong { padding:.5rem .8rem; } .bank-page .bank-nest { padding:.7rem; } .bank-page .nav-brand { font-size:.9rem; } }
