@@ -15,7 +15,7 @@ async function main() {
     await page.getByRole('link', {name:'进入银行备考页面 →'}).click();
     assert.match(page.url(), /bank-exam\.html$/);
     assert.equal(await page.locator('[id^="point-"]').count(), 20);
-    assert.equal(await page.locator('.study-question').count(), 20);
+    assert.equal(await page.locator('.study-question').count(), 50);
     assert.equal(await page.locator('.study-failure').count(), 0);
     for (const question of await page.locator('.study-question').all()) {
       const correct = Number(await question.getAttribute('data-answer'));
@@ -72,11 +72,11 @@ async function main() {
     const offline = await browser.newContext({javaScriptEnabled:false});
     const staticPage = await offline.newPage();
     await staticPage.goto(pathToFileURL(path.join(root, 'pages/bank-exam.html')).href);
-    assert.equal(await staticPage.locator('.study-question ol:visible').count(), 20);
+    assert.equal(await staticPage.locator('.study-question ol:visible').count(), 50);
     assert.equal(await staticPage.locator('#point-20').count(), 1);
     await offline.close();
     assert.deepEqual(errors, []);
-    console.log('PASS: 20 questions; bond pricing and invalid inputs; links; 4 viewports; no-JS reading.');
+    console.log('PASS: 50 questions; bond pricing and invalid inputs; links; 4 viewports; no-JS reading.');
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
