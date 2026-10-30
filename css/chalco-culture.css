@@ -1,0 +1,8 @@
+.chalco-page .bank-hero { background:linear-gradient(120deg,#193c5b,#192337); }
+.chalco-memory { margin:1.2rem 0; padding:1rem 1.2rem; border:1px solid #527b9f; border-radius:10px; background:#142c42; }
+.chalco-memory strong { color:#9ed9ff; }
+.chalco-memory p { font-size:clamp(1.05rem,2.3vw,1.3rem); line-height:1.9; }
+.chalco-page section { scroll-margin-top:95px; margin-bottom:2.4rem; }
+.chalco-page .bank-lane b { color:#e7f4ff; }
+.chalco-page .bank-lane em { color:#a0d9f5; font-style:normal; }
+.chalco-page #sources { font-size:.9rem; }

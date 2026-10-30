@@ -161,3 +161,9 @@ interview-prep/
 入口：[国家能源集团企业文化 · 考前速记](pages/chn-energy-culture.html)。按核心理念、集团业务、发展方向、管理文化、新旧辨析、岗位场景、面试和自测组织，首尾提供一句话助记口诀，包含12道自编题与回答思路回放。当前愿景、价值导向与2024版目标、旧版核心价值观分开呈现。
 
 复用全局、银行专题和学习交互样式，补充样式为 `css/chn-energy-culture.css`，不增加运行依赖。交互验证可用 `STUDY_PAGE_FILTER=chn-energy-culture` 运行 `tests/study-lab-smoke.cjs`。
+
+## 中国铝业企业文化（2026-10-30）
+
+入口：[中国铝业企业文化 · 考前速记](pages/chalco-culture.html)，已接入首页。以中国铝业2025年度ESG报告企业文化专页为主，涵盖核心价值观、使命愿景、企业精神、经营与管理理念、品牌形象和四个特强，区分集团与股份公司及新旧愿景表述，附岗位场景、面试问答、12道自编单选及思路回放。主要出处在页末折叠展示。
+
+复用银行专题样式和学习交互，无新运行依赖；专属样式为 `css/chalco-culture.css`。验证：设置 `STUDY_PAGE_FILTER=chalco-culture` 后运行 `node tests/study-lab-smoke.cjs`（需Playwright及Edge）。
